@@ -5,6 +5,8 @@ un **clone fidèle, marqué et jugé**, sur lequel les variantes pourront s'appu
 
 ```bash
 npm run clone -- <url> [--client acme] [--campaign printemps] [--seuil 0.03]
+npm run styles -- clients/acme/printemps/baseline        # relocaliser le CSS seul
+npm run assets -- clients/acme/printemps/baseline        # relocaliser les assets seuls
 npm run verify -- clients/acme/printemps/baseline        # rejuger sans recapturer
 ```
 
@@ -12,24 +14,28 @@ npm run verify -- clients/acme/printemps/baseline        # rejuger sans recaptur
 
 | Étape | État | Rôle |
 |---|---|---|
-| [`1_acquire/`](1_acquire/) | ✅ | Rendu headless (JS exécuté, overlays démontés, scroll complet), **marquage `data-lpws`**, screenshots de référence du live, vérité réseau (`resources.json`) |
-| `2_styles/` | 🔜 | CSS self-contained : feuilles rapatriées, URLs résolues, media queries intactes |
-| `3_assets/` | 🔜 | Images/vidéos/fonts téléchargées, dédupliquées, réhébergées dans `assets/` ; `palette.json` |
+| [`1_acquire/`](1_acquire/) | ✅ | Rendu headless (JS exécuté, overlays démontés, scroll complet), **marquage `data-lpws`**, gel de la page (timers/vidéos), screenshots de référence + octets des ressources (`assets/`), sérialisation des DEUX états (desktop + mobile), vérité réseau (`resources.json`) |
+| [`2_styles/`](2_styles/) | ✅ | CSS self-contained : feuilles réécrites vers `assets/` (fonts locales comprises), `<link>`/`<style>` localisés, le non-capturé absolutisé et compté |
+| [`3_assets/`](3_assets/) | ✅ | Images/vidéos locales (src, srcset, posters, styles inline), le reste absolutisé, `<base>` retirée → clone autonome |
 | [`4_structure/`](4_structure/) | 🔜 | `page.json` — segmentation + typage des sections, slots ancrés. **Le schéma est déjà posé** ([`schema.ts`](4_structure/schema.ts)) : c'est le contrat de tout l'aval |
-| [`5_verify/`](5_verify/) | ✅ | **Le juge** : diff visuel vs live, métriques de santé, preuves à l'œil |
+| [`5_verify/`](5_verify/) | ✅ | **Le juge** : rendu http local (origine synthétique), diff visuel vs live, métriques de santé, preuves à l'œil |
 
 [`run.ts`](run.ts) orchestre ; chaque étape reste utilisable seule.
 
 ## Ce que produit `clients/<client>/<campagne>/baseline/`
 
 ```
-capture.html          DOM post-JS, marqué data-lpws, sans <script>, <base> injectée
-original.png(.mobile) le site LIVE au moment de la capture — la référence du juge
+capture.html          DOM post-JS à l'état desktop, marqué data-lpws, sans <script>, autonome
+capture.mobile.html   le même DOM à l'état mobile (mêmes ancres) — le layout mobile réel,
+                      recalculé par le vrai moteur, pas un espoir de reflow sans JS
+assets/               les octets : css, fonts, images (hashés par contenu, dédupliqués)
+                      + frames vidéo capturées en poster (video-<état>-<n>.png)
+original.png(.mobile) le site LIVE gelé au moment de la capture — la référence du juge
 clone.png(.mobile)    le clone rendu — la preuve
 diff.png(.mobile)     pixels qui diffèrent
-resources.json        tout ce que le live a réellement chargé (aucune devinette en aval)
+resources.json        tout ce que le live a réellement chargé (`local` → assets/)
 verify.json           le verdict complet du juge
-meta.json             source, date, stats, verdict résumé + notes d'honnêteté
+meta.json             source, date, stats, rapports styles/assets, verdict + honnêteté
 ```
 
 ## Définition de « fini »
@@ -54,15 +60,31 @@ Un clone n'est fini que si :
   DOM). Formulaires/tracking : réinjection sélective, étape ultérieure — repérés dans
   `resources.json` pour ne rien perdre.
 - **La vérité réseau plutôt que le parsing.** `resources.json` liste ce que le live a
-  *réellement* chargé ; `2_styles`/`3_assets` consommeront cette liste au lieu de deviner en
-  parsant le HTML.
+  *réellement* chargé, octets compris ; `2_styles`/`3_assets` réécrivent des références vers
+  ces octets au lieu de re-télécharger ou de deviner en parsant le HTML.
+- **La page est GELÉE avant les références.** Timers JS tués, rAF annulés, vidéos pausées
+  (`play()` neutralisé) : référence desktop, référence mobile et DOM sérialisé sont le même
+  instant visuel. Sans ça, typewriters/carrousels bougent entre les screenshots et le juge
+  compte du désync comme de l'infidélité.
+- **Vidéos : la frame gelée devient le poster.** Les flux ne sont pas capturables (HTTP 206,
+  MSE) ; la zone de chaque vidéo visible est screenshotée et sert de poster au clone —
+  mêmes pixels des deux côtés par construction.
+- **Deux sérialisations, mêmes ancres.** Les styles inline posés par le JS au desktop
+  (largeurs px, transforms) rendent le DOM desktop faux à 390px : l'état mobile est
+  sérialisé séparément (`capture.mobile.html`), avec les mêmes ids `data-lpws`.
+- **Le juge rend en http local, pas en `file://`.** Une page `file://` a l'origine `null` :
+  Chromium y refuse les fonts par CORS, même locales. Le juge sert le dossier baseline
+  depuis une origine synthétique (`page.route` + `fulfill`).
 - **Héritage LWS assumé, minimal.** Seule la logique éprouvée a été reprise (démontage
   d'overlays, métriques du juge) — pas la machinerie templatize/composer.
 
 ## Limites connues à ce stade
 
-- Pas encore self-contained : `<base>` fait résoudre CSS/assets vers le site source → le
-  clone a besoin du réseau et changera si le source change. Corrigé par `2_styles`/`3_assets`.
+- Les flux vidéo ne sont pas embarqués (HTTP 206/MSE) : le clone montre la frame gelée en
+  poster, il ne JOUE pas la vidéo. Suffisant pour le juge et les variantes visuelles.
+- Ce qu'une page ne charge pas ne peut pas être local : fonts de graisses inutilisées,
+  images d'autres pages référencées dans le CSS, candidats srcset d'autres viewports —
+  absolutisés et comptés dans les rapports (voir `meta.json`).
 - Non clonable en statique (héritage des limites templatize) : héros WebGL/Three/Rive,
   expériences scroll-jackées maison. Le dire honnêtement, pas le simuler.
 - Sites bot-blockés (Akamai/Cloudflare) : pas encore de fallback (Wayback chez LWS) — à

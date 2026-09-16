@@ -4,9 +4,9 @@
  * Enchaîne les étapes construites, dit franchement celles qui ne le sont pas encore
  * (cf. readme.md de la famille pour la généalogie complète) :
  *
- *   1_acquire    ✅  rendu headless + marquage data-lpws + screenshots de référence
- *   2_styles     🔜  CSS self-contained (en attendant : <base> → refs distantes)
- *   3_assets     🔜  images/fonts/palette rapatriées (idem)
+ *   1_acquire    ✅  rendu headless + marquage data-lpws + screenshots + octets rapatriés
+ *   2_styles     ✅  CSS/fonts self-contained (références réécrites vers assets/)
+ *   3_assets     ✅  images/vidéos locales, <base> retirée → clone autonome
  *   4_structure  🔜  page.json (le schéma est déjà posé : 4_structure/schema.ts)
  *   5_verify     ✅  le juge : diff visuel vs live + santé + preuves
  *
@@ -17,6 +17,8 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { acquire } from "./1_acquire/render.ts"
+import { localizeStyles } from "./2_styles/localize.ts"
+import { localizeAssets } from "./3_assets/localize.ts"
 import { verifyBaseline, SEUIL_DEFAUT } from "./5_verify/verify.ts"
 import { baselineDir, slugify } from "../shared/paths.ts"
 import { step, fail } from "../shared/log.ts"
@@ -43,20 +45,39 @@ async function main() {
 
   // 1 · acquisition
   const meta = await acquire(url, dir)
-  step(SCOPE, "étapes 2_styles / 3_assets / 4_structure : pas encore construites — " +
-    "le clone référence les ressources du site source via <base> (pas self-contained)")
+
+  // 2-3 · localisation : le clone devient self-contained (ou dit ce qui lui manque)
+  const styles = await localizeStyles(dir)
+  const assets = await localizeAssets(dir)
+  step(SCOPE, "étape 4_structure : pas encore construite (le schéma est posé)")
 
   // 5 · le juge
   const verdict = await verifyBaseline(dir, seuil)
 
+  const distantes = [
+    ...styles.distantes.feuilles, ...styles.distantes.fonts, ...styles.distantes.autres,
+    ...assets.distants,
+  ]
   await writeFile(join(dir, "meta.json"), JSON.stringify({
     ...meta,
     client, campaign,
     fidele: verdict.fidele,
     diff: { desktop: verdict.desktop.diff.ratio, mobile: verdict.mobile.diff.ratio },
+    styles, assets,
     honnetete: [
       "js retiré : interactions inertes (état visuel final conservé via styles inline sérialisés)",
-      "ressources encore distantes (<base>) : nécessite le réseau, pas self-contained",
+      distantes.length === 0
+        ? "self-contained : css, fonts et images rapatriés — le clone se rend sans réseau"
+        : `self-contained partiel : ${distantes.length} ressource(s) encore distante(s) ` +
+          "(détail dans styles/assets ci-dessus)",
+      ...(verdict.desktop.sante.screenshotTronque || verdict.mobile.sante.screenshotTronque
+        ? ["scroll-jack détecté : sans JS, les pistes scroll-driven se déroulent en hauteur " +
+           "réelle (hauteur de rendu aberrante) — clone non exploitable en l'état, limite connue"]
+        : []),
+      ...(assets.srcsetNonCaptures > 0
+        ? [`${assets.srcsetNonCaptures} candidat(s) srcset d'autres viewports restés distants ` +
+           "(jamais chargés à la capture — sans effet aux viewports du juge)"]
+        : []),
       "tracking non capturé (repéré dans resources.json, réinjection à venir)",
     ],
   }, null, 2))

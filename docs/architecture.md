@@ -32,8 +32,8 @@ media buyer donne l'url de la LP du client
    ▼
 ┌ clone ────────────────────────────────────────────┐
 │ 1_acquire   rendu headless + marquage data-lpws   │  ✅
-│ 2_styles    css self-contained                    │  🔜
-│ 3_assets    images/fonts/palette rapatriées       │  🔜
+│ 2_styles    css self-contained                    │  ✅
+│ 3_assets    images/fonts rapatriés, <base> ôtée   │  ✅
 │ 4_structure page.json (sections + slots ancrés)   │  🔜 (schéma posé)
 │ 5_verify    le juge : diff vs live + santé        │  ✅
 └───────────────────────────────────────────────────┘

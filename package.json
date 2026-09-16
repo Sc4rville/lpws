@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "clone": "tsx engine/clone/run.ts",
+    "styles": "tsx engine/clone/2_styles/localize.ts",
+    "assets": "tsx engine/clone/3_assets/localize.ts",
     "verify": "tsx engine/clone/5_verify/verify.ts",
     "viewer": "tsx engine/viewer/server.ts"
   },
