@@ -1,0 +1,23 @@
+{
+  "name": "lpws",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LPWS — infrastructure de landing pages pour media buyers : clone, structure, variante, déploiement.",
+  "type": "module",
+  "scripts": {
+    "clone": "tsx engine/clone/run.ts",
+    "verify": "tsx engine/clone/5_verify/verify.ts"
+  },
+  "dependencies": {
+    "pixelmatch": "^7",
+    "playwright": "^1.55",
+    "pngjs": "^7",
+    "tsx": "^4",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/pngjs": "^6",
+    "typescript": "^5"
+  }
+}

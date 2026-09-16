@@ -1,4 +1,4 @@
-# LWS — Projet Landing Page Infrastructure pour Media Buyers
+# LpWS — Projet Landing Page Infrastructure pour Media Buyers
 
 ## Contexte
 
@@ -61,5 +61,31 @@ Google Ads envoie du trafic
 Résultats
     ↓
 Nouvelle itération
+```
 
+---
+
+## Le repo
+
+La machine qui exécute ce workflow vit dans [engine/](engine/) (code, par familles), la
+réflexion dans [.claude/skills/](.claude/skills/), les sorties dans [clients/](clients/)
+(gitignoré). Carte complète, conventions et décisions : [docs/architecture.md](docs/architecture.md).
+
+Repo autonome : LPWS partage un bout de nom avec Last Web Studios et en hérite quelques
+logiques éprouvées (démontage d'overlays, juge visuel, règle mécanique/réflexion), mais
+aucun couplage de code.
+
+## Démarrage rapide
+
+```bash
+npm install && npx playwright install chromium   # une fois
+
+# cloner la LP d'un client → clients/<client>/<campagne>/baseline/
+npm run clone -- https://exemple.com --client acme --campaign printemps
+
+# rejuger une baseline existante sans recapturer
+npm run verify -- clients/acme/printemps/baseline
+```
+
+État d'avancement du clonage : [engine/clone/readme.md](engine/clone/readme.md).
 

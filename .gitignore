@@ -10,3 +10,7 @@ build/
 .venv/
 __pycache__/
 data/cache/
+
+# sorties de l'engine — la donnée ne se versionne pas, le code oui
+clients/*
+!clients/readme.md
