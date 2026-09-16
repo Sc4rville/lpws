@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/brief.sh",
+            "timeout": 15,
+            "statusMessage": "Brief LPWS…"
+          }
+        ]
+      }
+    ]
+  }
+}
