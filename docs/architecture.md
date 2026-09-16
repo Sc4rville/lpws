@@ -12,6 +12,7 @@ lpws/
   engine/              LA MACHINE — code exécutable, par familles (voir engine/readme.md)
     shared/            socle transverse (chemins, logs)
     clone/             famille 1 : url → baseline fidèle          ← en cours
+    apply/             famille 2 : hypothèse → variante prouvée   ← en cours
   clients/             LES SORTIES — data par client/campagne, gitignoré
   .claude/skills/      LA RÉFLEXION — les moments de jugement, pilotés par Claude
 ```
@@ -39,10 +40,11 @@ media buyer donne l'url de la LP du client
 └───────────────────────────────────────────────────┘
    │  baseline/ fidèle, marquée, jugée
    ▼
-┌ variant ┐ → ┌ apply ┐ → ┌ deploy ┐                   🔜 familles à venir
-│ demande │   │ round │   │ URL    │
-│ → edits │   │ -trip │   │ live   │
+┌ variant ┐ → ┌ apply ┐ → ┌ deploy ┐
+│ diagnos.│   │ édits │   │ URL    │
+│ → édits │   │ ancrés│   │ live   │
 └─────────┘   └───────┘   └────────┘
+     🔜            ✅           🔜
 ```
 
 ## Conventions (les tenir, c'est ça qui garde le repo lisible)

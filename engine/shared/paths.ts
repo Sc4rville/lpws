@@ -29,3 +29,11 @@ export async function baselineDir(client: string, campaign: string): Promise<str
   await mkdir(join(dir, "assets"), { recursive: true })
   return dir
 }
+
+/** Dossier d'une variante, voisin de baseline/ (créé si absent). */
+export async function variantDir(baseline: string, nom: string): Promise<string> {
+  // baseline = clients/<client>/<campagne>/baseline → ../variants/<nom>
+  const dir = join(baseline, "..", "variants", slugify(nom))
+  await mkdir(dir, { recursive: true })
+  return dir
+}
