@@ -7,6 +7,7 @@ dans l'arborescence).
 ```
 engine/
   shared/     socle transverse : chemins de sortie, logs uniformes
+  viewer/     le cockpit local — comparer live/clone, suivre les captures, voir les variantes
   clone/      FAMILLE 1 — url du client → baseline fidèle, marquée, jugée   ← en cours
   apply/      FAMILLE 2 — page.json édité → html réécrit (round-trip)       ← à venir
   variant/    FAMILLE 3 — demande de test → page.json édité                 ← à venir

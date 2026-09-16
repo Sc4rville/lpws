@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "clone": "tsx engine/clone/run.ts",
-    "verify": "tsx engine/clone/5_verify/verify.ts"
+    "verify": "tsx engine/clone/5_verify/verify.ts",
+    "viewer": "tsx engine/viewer/server.ts"
   },
   "dependencies": {
     "pixelmatch": "^7",

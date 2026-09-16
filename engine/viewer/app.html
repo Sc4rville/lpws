@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LPWS — Cockpit</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #14171c; --panel2: #1a1e24; --line: #262b33;
+    --ink: #e8eaed; --dim: #8a919c; --accent: #5b9dff;
+    --ok: #34c98e; --ko: #f2724b; --warn: #e6b451;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; height: 100vh; display: flex; overflow: hidden; }
+
+  /* ——— sidebar ——— */
+  aside { width: 280px; min-width: 280px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+  aside h1 { font-size: 15px; padding: 14px 16px 4px; letter-spacing: .3px; }
+  aside h1 span { color: var(--dim); font-weight: 400; }
+  aside .sub { padding: 0 16px 10px; color: var(--dim); font-size: 12px; border-bottom: 1px solid var(--line); }
+  #list { overflow-y: auto; flex: 1; padding: 8px; }
+  .item { padding: 9px 10px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 9px; }
+  .item:hover { background: var(--panel2); }
+  .item.sel { background: var(--panel2); outline: 1px solid var(--line); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .item .name { flex: 1; min-width: 0; }
+  .item .name b { display: block; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .name small { color: var(--dim); font-size: 11px; }
+  .item .pct { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .new { font-size: 9px; background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 4px; }
+
+  /* ——— zone principale ——— */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header .src { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34ch; }
+  header a { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .badge.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .badge.ko { background: color-mix(in srgb, var(--ko) 18%, transparent); color: var(--ko); }
+  .badge.na { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+  .spacer { flex: 1; }
+
+  nav.tabs, .devices { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+  .tabs button, .devices button { background: none; border: 0; color: var(--dim); font: inherit; font-size: 12px; padding: 4px 11px; border-radius: 6px; cursor: pointer; }
+  .tabs button.on, .devices button.on { background: var(--panel2); color: var(--ink); }
+
+  #stage { flex: 1; min-height: 0; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .cols { flex: 1; min-height: 0; display: flex; gap: 10px; }
+  .col { flex: 1; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .col .cap { padding: 6px 10px; font-size: 11px; color: var(--dim); border-bottom: 1px solid var(--line); }
+  .scroll { flex: 1; overflow: auto; background: #fff; }
+  .scroll img { display: block; width: 100%; }
+  iframe { flex: 1; border: 0; background: #fff; }
+
+  /* glissière avant/après */
+  .wipe-wrap { position: relative; }
+  .wipe-wrap img { display: block; width: 100%; }
+  .wipe-wrap img.top { position: absolute; inset: 0; }
+  .wipe-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
+  .wipe-ui { display: flex; align-items: center; gap: 10px; padding: 4px 2px; color: var(--dim); font-size: 11px; }
+  .wipe-ui input { flex: 1; accent-color: var(--accent); }
+
+  .empty { margin: auto; text-align: center; color: var(--dim); max-width: 46ch; }
+  .empty b { color: var(--ink); }
+  .notes { font-size: 11px; color: var(--dim); }
+  .notes li { margin-left: 16px; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>LPWS <span>· cockpit</span></h1>
+  <div class="sub">captures & variantes — se met à jour seul</div>
+  <div id="list"></div>
+</aside>
+<main>
+  <header id="head" hidden>
+    <span id="verdict" class="badge"></span>
+    <span class="src" id="src"></span>
+    <a id="openLive" target="_blank">live ↗</a>
+    <a id="openClone" target="_blank">clone ↗</a>
+    <span class="spacer"></span>
+    <nav class="devices" id="devices">
+      <button data-d="" class="on">Desktop</button>
+      <button data-d=".mobile">Mobile</button>
+    </nav>
+    <nav class="tabs" id="tabs">
+      <button data-t="side" class="on">Côte à côte</button>
+      <button data-t="wipe">Glissière</button>
+      <button data-t="diff">Diff</button>
+      <button data-t="render">Clone rendu</button>
+      <button data-t="variants">Variantes</button>
+    </nav>
+  </header>
+  <div id="stage">
+    <div class="empty"><b>Aucune capture sélectionnée.</b><br>
+      Lance <code>npm run clone -- &lt;url&gt;</code> dans un terminal : la capture apparaîtra ici toute seule.</div>
+  </div>
+</main>
+
+<script>
+  let items = [], sel = null, tab = "side", device = "", known = new Set(), first = true
+
+  const $ = (s) => document.querySelector(s)
+  const pct = (x) => (x * 100).toFixed(1) + "%"
+  const F = (p) => `/files/${sel.path}/baseline/${p}`
+
+  /* ——— sidebar ——— */
+  function renderList() {
+    $("#list").innerHTML = items.map((it) => {
+      const color = !it.judged ? "var(--warn)" : it.fidele ? "var(--ok)" : "var(--ko)"
+      const isNew = !first && !known.has(it.path)
+      return `<div class="item ${sel?.path === it.path ? "sel" : ""}" data-p="${it.path}">
+        <span class="dot" style="background:${color}"></span>
+        <span class="name"><b>${it.campaign}</b><small>${it.client}</small></span>
+        ${isNew ? '<span class="new">nouveau</span>' : ""}
+        <span class="pct">${it.judged ? pct(it.diff.desktop) : "—"}</span>
+      </div>`
+    }).join("")
+    document.querySelectorAll(".item").forEach((el) =>
+      el.onclick = () => { sel = items.find((i) => i.path === el.dataset.p); renderStage() })
+  }
+
+  /* ——— vues ——— */
+  const col = (cap, inner) => `<div class="col"><div class="cap">${cap}</div>${inner}</div>`
+  const scrollImg = (src, id) => `<div class="scroll" id="${id}"><img src="${src}"></div>`
+
+  function renderStage() {
+    renderList()
+    const st = $("#stage")
+    if (!sel) return
+    $("#head").hidden = false
+    const v = $("#verdict")
+    v.className = "badge " + (!sel.judged ? "na" : sel.fidele ? "ok" : "ko")
+    v.textContent = !sel.judged ? "non jugée" : sel.fidele ? "fidèle" : "pas fidèle"
+    $("#src").textContent = sel.source ?? sel.path
+    $("#openLive").href = sel.source ?? "#"
+    $("#openClone").href = F("capture.html")
+
+    const orig = F(`original${device}.png`), clone = F(`clone${device}.png`), diff = F(`diff${device}.png`)
+    const ratios = sel.judged ? ` — diff desktop ${pct(sel.diff.desktop)} · mobile ${pct(sel.diff.mobile)}` : ""
+
+    if (tab === "side") {
+      st.innerHTML = `<div class="cols">
+        ${col("VRAI SITE (au moment de la capture)", scrollImg(orig, "sA"))}
+        ${col("CLONE" + ratios, scrollImg(clone, "sB"))}
+      </div>`
+      syncScroll($("#sA"), $("#sB"))
+    } else if (tab === "wipe") {
+      st.innerHTML = `
+        <div class="wipe-ui">vrai site <input type="range" id="wr" min="0" max="100" value="50"> clone</div>
+        <div class="cols">${col("GLISSIÈRE — gauche : vrai site · droite : clone",
+          `<div class="scroll"><div class="wipe-wrap" id="ww">
+             <img src="${orig}"><img class="top" src="${clone}" id="wt">
+             <div class="wipe-line" id="wl"></div></div></div>`)}</div>`
+      const upd = (p) => { $("#wt").style.clipPath = `inset(0 0 0 ${p}%)`; $("#wl").style.left = p + "%" }
+      $("#wr").oninput = (e) => upd(e.target.value); upd(50)
+    } else if (tab === "diff") {
+      st.innerHTML = `<div class="cols">${col("DIFF — en rouge, les pixels qui diffèrent" + ratios, scrollImg(diff, "sD"))}</div>`
+    } else if (tab === "render") {
+      st.innerHTML = `<div class="cols">${col(
+        "CLONE RENDU EN VRAI (pas un screenshot) — les fonts/assets chargent encore depuis le site source",
+        `<iframe src="${F("capture.html")}"></iframe>`)}</div>`
+    } else if (tab === "variants") {
+      st.innerHTML = sel.variants.length
+        ? `<div class="cols">${sel.variants.map((v) =>
+            col("VARIANTE — " + v, `<iframe src="/files/${sel.path}/variants/${v}/index.html"></iframe>`)).join("")}</div>`
+        : `<div class="empty"><b>Aucune variante pour cette campagne.</b><br>
+           La famille <code>variant</code> n'est pas encore construite — quand elle générera dans
+           <code>clients/${sel.path}/variants/</code>, elles s'afficheront ici, à côté de la baseline.</div>`
+    }
+  }
+
+  function syncScroll(a, b) {
+    if (!a || !b) return
+    let lock = false
+    const link = (x, y) => x.addEventListener("scroll", () => {
+      if (lock) return; lock = true
+      y.scrollTop = x.scrollTop / (x.scrollHeight - x.clientHeight || 1) * (y.scrollHeight - y.clientHeight)
+      requestAnimationFrame(() => (lock = false))
+    })
+    link(a, b); link(b, a)
+  }
+
+  /* ——— tabs & device ——— */
+  $("#tabs").onclick = (e) => { if (!e.target.dataset.t) return
+    tab = e.target.dataset.t
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b === e.target))
+    renderStage() }
+  $("#devices").onclick = (e) => { if (e.target.dataset.d === undefined) return
+    device = e.target.dataset.d
+    document.querySelectorAll("#devices button").forEach((b) => b.classList.toggle("on", b === e.target))
+    renderStage() }
+
+  /* ——— poll : les nouvelles captures apparaissent seules ——— */
+  async function refresh() {
+    try {
+      const next = await (await fetch("/api/baselines")).json()
+      if (JSON.stringify(next) !== JSON.stringify(items)) {
+        items = next
+        if (sel) sel = items.find((i) => i.path === sel.path) ?? null
+        renderList()
+        if (sel) renderStage()
+      }
+      if (first || items.some((i) => !known.has(i.path))) {
+        setTimeout(() => { items.forEach((i) => known.add(i.path)); renderList() }, 6000)
+      }
+      first = false
+    } catch { /* serveur redémarré : on retentera */ }
+  }
+  refresh(); setInterval(refresh, 4000)
+</script>
+</body>
+</html>
