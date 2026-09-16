@@ -64,6 +64,22 @@
   .empty b { color: var(--ink); }
   .notes { font-size: 11px; color: var(--dim); }
   .notes li { margin-left: 16px; }
+
+  /* ——— variantes ——— */
+  .vbar { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vbar button { background: var(--panel); border: 1px solid var(--line); color: var(--dim);
+    font: inherit; font-size: 12px; padding: 4px 11px; border-radius: 7px; cursor: pointer; }
+  .vbar button.on { background: var(--panel2); color: var(--ink); border-color: var(--accent); }
+  .hypo { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; display: grid; gap: 6px; font-size: 12px; }
+  .hypo .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hypo .h { color: var(--ink); font-size: 13px; }
+  .hypo .k { color: var(--dim); }
+  .hypo .k b { color: var(--ink); font-weight: 600; }
+  .prio { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; }
+  .prio.HIGH { background: color-mix(in srgb, var(--ko) 20%, transparent); color: var(--ko); }
+  .prio.MEDIUM { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+  .prio.LOW { background: color-mix(in srgb, var(--dim) 20%, transparent); color: var(--dim); }
 </style>
 </head>
 <body>
@@ -99,9 +115,12 @@
 
 <script>
   let items = [], sel = null, tab = "side", device = "", known = new Set(), first = true
+  let selVariant = null
+  const vcache = {}   // "<campagne>/<variante>" → variant.json (évite de refetch à chaque rendu)
 
   const $ = (s) => document.querySelector(s)
   const pct = (x) => (x * 100).toFixed(1) + "%"
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]))
   const F = (p) => `/files/${sel.path}/baseline/${p}`
 
   /* ——— sidebar ——— */
@@ -161,13 +180,59 @@
         "CLONE RENDU EN VRAI (pas un screenshot) — les fonts/assets chargent encore depuis le site source",
         `<iframe src="${F("capture.html")}"></iframe>`)}</div>`
     } else if (tab === "variants") {
-      st.innerHTML = sel.variants.length
-        ? `<div class="cols">${sel.variants.map((v) =>
-            col("VARIANTE — " + v, `<iframe src="/files/${sel.path}/variants/${v}/index.html"></iframe>`)).join("")}</div>`
-        : `<div class="empty"><b>Aucune variante pour cette campagne.</b><br>
-           La famille <code>variant</code> n'est pas encore construite — quand elle générera dans
-           <code>clients/${sel.path}/variants/</code>, elles s'afficheront ici, à côté de la baseline.</div>`
+      renderVariants(st)
     }
+  }
+
+  /* ——— onglet variantes : l'hypothèse, puis baseline / variante / delta synchronisés ——— */
+  function renderVariants(st) {
+    if (!sel.variants.length) {
+      st.innerHTML = `<div class="empty"><b>Aucune variante pour cette campagne.</b><br>
+        La mécanique existe (<code>npm run apply -- &lt;baseline&gt; &lt;spec.json&gt;</code>) mais le
+        moteur de diagnostic qui écrit les specs n'est pas encore construit.</div>`
+      return
+    }
+    if (!sel.variants.includes(selVariant)) selVariant = sel.variants[0]
+    const key = sel.path + "/" + selVariant
+    const bar = `<div class="vbar">${sel.variants.map((v) =>
+      `<button data-v="${v}" class="${v === selVariant ? "on" : ""}">${v}</button>`).join("")}</div>`
+
+    const V = (p) => `/files/${sel.path}/variants/${selVariant}/${p}`
+    const charge = key in vcache          // distinguer « pas encore lu » de « illisible »
+    const d = vcache[key]
+    const dd = d?.deltas?.[device === ".mobile" ? "mobile" : "desktop"]
+    const card = !d ? `<div class="hypo k">${charge
+      ? "variant.json illisible — la variante s'affiche quand même, sans son hypothèse."
+      : "lecture de variant.json…"}</div>` : `
+      <div class="hypo">
+        <div class="top">
+          <span class="prio ${d.diagnostic.priorite}">${d.diagnostic.priorite}</span>
+          <span class="h">${esc(d.hypothese)}</span>
+        </div>
+        <div class="k"><b>Signal —</b> ${esc(d.diagnostic.signal)}</div>
+        <div class="k"><b>Métrique visée —</b> ${esc(d.metrique)} &nbsp;·&nbsp;
+          <b>Risque —</b> ${esc(d.risque)}</div>
+        <div class="k"><b>Règle —</b> ${esc(d.diagnostic.regle)} &nbsp;·&nbsp;
+          <b>Confiance —</b> ${esc(d.diagnostic.confiance)} &nbsp;·&nbsp;
+          <b>Preuve —</b> ${esc(d.diagnostic.preuve)}</div>
+        ${dd ? `<div class="k"><b>Delta ${device === ".mobile" ? "mobile" : "desktop"} —</b>
+          ${pct(dd.ratio)} de pixels changés, Δhauteur ${dd.heightDelta}px
+          ${dd.heightDelta > 4 ? "— attention : la page s'est décalée, le ratio mesure la cascade" : "— strictement localisé"}</div>` : ""}
+      </div>`
+
+    st.innerHTML = bar + card + `<div class="cols">
+      ${col("BASELINE (le clone du client)", scrollImg(F(`clone${device}.png`), "vA"))}
+      ${col("VARIANTE — " + selVariant, scrollImg(V(`variant${device}.png`), "vB"))}
+      ${col("DELTA — en rouge, ce qui a changé", scrollImg(V(`delta${device}.png`), "vC"))}
+    </div>`
+    syncScroll($("#vA"), $("#vB")); syncScroll($("#vB"), $("#vC"))
+    st.querySelector(".vbar").onclick = (e) => {
+      if (!e.target.dataset.v) return
+      selVariant = e.target.dataset.v; renderStage()
+    }
+    if (!charge) fetch(V("variant.json")).then((r) => r.json())
+      .then((j) => { vcache[key] = j; if (tab === "variants") renderStage() })
+      .catch(() => { vcache[key] = null })
   }
 
   function syncScroll(a, b) {
