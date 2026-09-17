@@ -114,3 +114,7 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 - **00:26** — mais t'es sur que genre meme GPT 6 aurait pas su copier une page HTML ? il est multimodal et hyper smart, surtout avec un bon screen etc. non ? parce que n'oubl
 - **01:00** — ya pas la partie implementation aussi ou jsp quoi?
 - **01:04** — reprenons depuis le debut et essayson de tout comprendre / tout fixer pour que le projet soit parfait donc renforcons chaque maillon parfaitement step by step j
+- **01:19** — tu peux documenter ce que tu viens de faire et globalement tout ce que tu feras qui vient de moi dans un kusaila.md comme ca je sais ce que j;ai ajoute, mais al
+  - fichiers : kusaila.md
+- **01:21** — entry le SaaS renseigne toi! tu sais meme pas de quoi je parle
+- **01:29** — clignotement? reponse courte, OVH aussi pour domain connect? on pourrait le rajouter s'il y est pas? toi tu ferais quoi concernant tout ca du coup? et le but po

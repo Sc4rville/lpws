@@ -122,11 +122,15 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
   - ⬜ Sous-domaine, certificat, DNS
   - ⬜ `noindex` pour éviter le contenu dupliqué
   - ⬜ Bandeau de consentement
-- **Option B — un tag posé via leur gestionnaire de balises**
-  - ⬜ Appliquer les verbes côté navigateur
-  - ⬜ Éviter le clignotement sans détruire la vitesse de chargement
+- **Option B — un tag posé via leur gestionnaire de balises** ← **la voie d'entrée** ([`engine/deploy/tag`](../engine/deploy/tag/readme.md))
+  - ✅ Appliquer les verbes côté navigateur (`set`, `remove`, `move`, `swap`, `duplicate` ; `compose` reste hébergé)
+  - ✅ Cibles retrouvées **par empreinte** sur le DOM vivant — impossible avant 1.1.3
+  - ✅ Tout ou rien : une cible ambiguë et le visiteur voit la page d'origine
+  - ✅ Répartition **collante par `gclid`** : une seule Final URL, donc plus de biais de diffusion
+  - ✅ Clignotement **mesuré** sur la vraie page live (60 ms sur HubSpot), pas supposé
+  - ✅ Juge sur le site LIVE, témoin vérifié intact
   - ⬜ Survivre au re-rendu React/Next *(le framework peut effacer nos modifications)*
-  - ⬜ Mesurer l'impact réel sur les performances
+  - ⬜ Mesurer l'impact réel sur le LCP, pas seulement la durée du masque
 
 ---
 

@@ -10,15 +10,12 @@
  * Une ambiguïté n'est JAMAIS tranchée au hasard : elle est rapportée comme telle, et l'aval
  * refuse d'éditer dessus.
  *
- * Aucun navigateur, aucun réseau : pur calcul sur deux fichiers `anchors.json`. C'est
- * volontaire — c'est la pièce qu'on doit pouvoir tester à la main.
+ * Aucun navigateur, aucun réseau, aucun import node : pur calcul sur deux jeux d'empreintes.
+ * C'est volontaire deux fois — c'est la pièce qu'on doit pouvoir tester à la main, et c'est
+ * la même qui part dans le navigateur du visiteur avec le tag (cf. deploy/tag/).
+ * Le CLI vit à côté, dans relink-cli.ts.
  */
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
-import { step, fail } from "../../shared/log.ts"
 import type { Empreinte } from "./fingerprint.ts"
-
-const SCOPE = "clone/1_acquire/relink"
 
 /** En dessous, aucun candidat n'est crédible (le maximum atteignable est ~122). */
 const SEUIL = 45
@@ -203,18 +200,4 @@ export function relier(avant: Empreinte[], apres: Empreinte[]): Rapport {
       perdus: perdus.length,
     },
   }
-}
-
-/* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("1_acquire/relink.ts")) {
-  const [a, b] = process.argv.slice(2).filter((x) => !x.startsWith("--"))
-  if (!a || !b) fail(SCOPE, "usage : npm run relink -- <baseline-avant> <baseline-apres>")
-  const lire = async (d: string): Promise<Empreinte[]> => {
-    try { return JSON.parse(await readFile(join(d, "anchors.json"), "utf8")) }
-    catch { return fail(SCOPE, `pas d'anchors.json dans ${d} — capture trop ancienne, la recapturer`) }
-  }
-  const r = relier(await lire(a), await lire(b))
-  const s = r.stats
-  step(SCOPE, `${s.retrouves}/${s.avant} retrouvées · ${s.deplaces} déplacées · ${s.ambigus} ambiguës · ${s.perdus} perdues`)
-  console.log(JSON.stringify(r, null, 2))
 }

@@ -11,9 +11,11 @@
     "verify": "tsx engine/clone/5_verify/verify.ts",
     "apply": "tsx engine/apply/run.ts",
     "viewer": "tsx engine/viewer/server.ts",
-    "relink": "tsx engine/clone/1_acquire/relink.ts",
+    "relink": "tsx engine/clone/1_acquire/relink-cli.ts",
     "relink:check": "tsx engine/clone/1_acquire/relink-check.ts",
-    "deploy": "tsx engine/deploy/run.ts"
+    "deploy": "tsx engine/deploy/run.ts",
+    "tag": "tsx engine/deploy/tag/build.ts",
+    "tag:check": "tsx engine/deploy/tag/check.ts"
   },
   "dependencies": {
     "pixelmatch": "^7",
