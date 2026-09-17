@@ -59,6 +59,11 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   chaque `i` ouvre le détail technique. C'est la préfiguration de la KB : quand elle sera un
   fichier de données validé par schéma, la page le lira au lieu de le contenir.
 
+## La feuille de route
+[docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
+(contrôler · créer · distribuer · nourrir), avec l'état de chaque micro-tâche. C'est la
+référence ; la liste courte ci-dessous n'en garde que le haut.
+
 ## À faire (dans l'ordre)
 1. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
    et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.
