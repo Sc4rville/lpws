@@ -215,17 +215,16 @@
         <div class="k"><b>Règle —</b> ${esc(d.diagnostic.regle)} &nbsp;·&nbsp;
           <b>Confiance —</b> ${esc(d.diagnostic.confiance)} &nbsp;·&nbsp;
           <b>Preuve —</b> ${esc(d.diagnostic.preuve)}</div>
-        ${dd ? `<div class="k"><b>Delta ${device === ".mobile" ? "mobile" : "desktop"} —</b>
-          ${pct(dd.ratio)} de pixels changés, Δhauteur ${dd.heightDelta}px
-          ${dd.heightDelta > 4 ? "— attention : la page s'est décalée, le ratio mesure la cascade" : "— strictement localisé"}</div>` : ""}
+        ${dd ? `<div class="k"><b>Éditions —</b> ${d.edits.length} ·
+          ${dd.heightDelta > 4 ? `la page a changé de hauteur de ${dd.heightDelta}px`
+            : "hauteur inchangée"}</div>` : ""}
       </div>`
 
     st.innerHTML = bar + card + `<div class="cols">
       ${col("BASELINE (le clone du client)", scrollImg(F(`clone${device}.png`), "vA"))}
       ${col("VARIANTE — " + selVariant, scrollImg(V(`variant${device}.png`), "vB"))}
-      ${col("DELTA — en rouge, ce qui a changé", scrollImg(V(`delta${device}.png`), "vC"))}
     </div>`
-    syncScroll($("#vA"), $("#vB")); syncScroll($("#vB"), $("#vC"))
+    syncScroll($("#vA"), $("#vB"))
     st.querySelector(".vbar").onclick = (e) => {
       if (!e.target.dataset.v) return
       selVariant = e.target.dataset.v; renderStage()
