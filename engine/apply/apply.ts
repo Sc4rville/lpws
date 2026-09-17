@@ -26,12 +26,57 @@ const SCOPE = "apply"
 
 export type ApplyReport = { fichier: string; appliquees: number }
 
-/** Applique les éditions dans la page ouverte. Retourne les ancres introuvables. */
+/**
+ * Applique les éditions dans la page ouverte, dans l'ordre de la spec (une duplication
+ * peut donc être suivie d'éditions visant la copie). Retourne les ancres introuvables.
+ */
 function applyInPage(edits: Edit[]): string[] {
   const manquantes: string[] = []
+  const get = (a?: string) => a ? document.querySelector(`[data-lpws="${a}"]`) : null
+
   for (const e of edits) {
-    const el = document.querySelector(`[data-lpws="${e.anchor}"]`)
+    const el = get(e.anchor)
     if (!el) { manquantes.push(e.anchor); continue }
+    const op = e.op ?? "set"
+
+    if (op === "remove") { el.remove(); continue }
+
+    if (op === "move" || op === "duplicate") {
+      const cible = get(e.before ?? e.after)
+      if (!cible) { manquantes.push((e.before ?? e.after)!); continue }
+      let noeud: Element = el
+      if (op === "duplicate") {
+        noeud = el.cloneNode(true) as Element
+        // re-cléage : la copie et TOUS ses descendants reçoivent le suffixe, sinon deux
+        // éléments porteraient la même ancre et les éditions suivantes seraient ambiguës
+        const suffixe = "-" + e.as
+        const marquer = (n: Element) => {
+          const a = n.getAttribute("data-lpws")
+          if (a) n.setAttribute("data-lpws", a + suffixe)
+        }
+        marquer(noeud)
+        noeud.querySelectorAll("[data-lpws]").forEach(marquer)
+        noeud.setAttribute("data-lpws-added", "")
+      }
+      if (e.before) cible.before(noeud); else cible.after(noeud)
+      ;(noeud as HTMLElement).setAttribute("data-lpws-edited", "")
+      continue
+    }
+
+    if (op === "swap") {
+      const autre = get(e.with)
+      if (!autre) { manquantes.push(e.with!); continue }
+      // marqueur neutre : on ne peut pas échanger deux nœuds sans point de repère
+      const repere = document.createComment("lpws-swap")
+      el.before(repere)
+      autre.before(el)
+      repere.replaceWith(autre)
+      el.setAttribute("data-lpws-edited", "")
+      autre.setAttribute("data-lpws-edited", "")
+      continue
+    }
+
+    // op "set"
     if (e.text !== undefined) {
       // un <input> n'a pas de texte : sa "valeur affichée" est son placeholder/value
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = e.text

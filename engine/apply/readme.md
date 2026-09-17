@@ -30,8 +30,29 @@ règle maison : toute sortie de skill passe un schéma avant d'être écrite.
 | Fichier | Rôle |
 |---|---|
 | [`spec.ts`](spec.ts) | **Le contrat** : hypothèse, métrique, risque, diagnostic traçable, éditions ancrées |
-| [`apply.ts`](apply.ts) | **La mécanique** : ancres `data-lpws` → nouvelles valeurs, sur les DEUX états (desktop + mobile) |
+| [`apply.ts`](apply.ts) | **La mécanique** : les cinq verbes, sur les DEUX états (desktop + mobile) |
 | [`run.ts`](run.ts) | Orchestration : appliquer, rendre, produire le delta visuel |
+
+## Les cinq verbes
+
+| Verbe | Ce qu'il fait | Exemple de règle servie |
+|---|---|---|
+| `set` | remplace texte / href / src / placeholder | aligner le hero sur la promesse de l'annonce |
+| `remove` | retire l'élément | retirer la navigation d'une LP payante |
+| `move` | replace avant/après une autre ancre | remonter la preuve au-dessus du pli |
+| `duplicate` | **clone** un bloc existant et le repose | ajouter un second moment de conversion |
+| `swap` | échange deux blocs de place | inverser l'ordre de l'argumentaire |
+
+**`duplicate` est notre « ajouter une section ».** On ne génère jamais de markup : on
+réutilise un bloc du client et on le remplit. Le design system est donc conservé au pixel
+par construction, et la règle « jamais de HTML libre » tient sans exception. Les ancres de
+la copie reçoivent un suffixe (`e384` → `e384-b`), donc les éditions suivantes de la même
+spec peuvent viser la copie — les éditions s'appliquent dans l'ordre de la spec.
+
+Deux niveaux d'ancres, posés à la capture ([`mark.ts`](../clone/1_acquire/mark.ts)) :
+`e<n>` pour le contenu (par balise) et `s<n>` pour les bandes de haut niveau (**par
+géométrie** — sur un site React moderne les sections sont des `div` anonymes, un marquage
+par balise ne leur donnerait aucune poignée).
 
 ## Le delta : lire le bon signe
 
@@ -62,8 +83,13 @@ Le delta par section ancré `data-lpws` (juge v2) réglera les deux côtés à l
 
 ## Limites connues
 
-- Le delta global cascade (voir plus haut) — juge v2 par section à construire.
-- Les éditions se limitent à texte / href / src / placeholder : pas de déplacement de bloc,
-  pas d'ajout de section. Ça suffit pour les hypothèses de copy et d'offre ; une hypothèse
-  structurelle (« remonter la preuve au-dessus du pli ») demandera un verbe de plus.
+- Le delta global cascade (voir plus haut) — juge v2 par section à construire. Sur une
+  restructuration, le ratio dépasse 50 % et ne veut plus rien dire : seule la preuve à
+  l'œil compte.
+- On ne peut pas créer un bloc qui n'existe nulle part sur la page. `duplicate` réutilise
+  l'existant ; si la page n'a aucun bloc de témoignages, on ne peut pas en inventer un dans
+  son design system. Une bibliothèque de blocs par client viendra peut-être — ou pas :
+  c'est exactement là qu'on redeviendrait un builder.
+- Pas de changement de style (couleurs, espacements, typo) : on manipule la structure et le
+  contenu, jamais le CSS du client.
 - Rien n'est déployé : `variant.html` est un fichier local. La famille `deploy` viendra.

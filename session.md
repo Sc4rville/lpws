@@ -25,6 +25,17 @@ la main.
   (biais du survivant) ; en revanche un **dataset d'évaluation annoté** est nécessaire —
   sans lui, la confiance affichée est du théâtre.
 
+## Test de liberté mécanique (2026-09-17)
+`apply` a maintenant CINQ verbes : set · remove · move · duplicate · swap. Testé par une
+restructuration complète de Jira (`lp-payante`, 12 éditions) : nav et footer retirés, preuve
+remontée sous le héros, deux sections hors-sujet supprimées, bloc CTA dupliqué à mi-page et
+retexté, deux sections échangées, CTA harmonisés. Design system conservé au pixel — on ne
+génère jamais de markup, `duplicate` réutilise un bloc du client.
+
+Ça a nécessité de corriger `mark.ts` à la racine : les 9 sections de Jira sont des `div`
+anonymes, le marquage par balise ne leur donnait AUCUNE poignée. Deux niveaux d'ancres
+désormais — `e<n>` contenu (par balise) et `s<n>` sections (**par géométrie**).
+
 ## À faire (dans l'ordre)
 1. **Juge v2 par section** ancré `data-lpws` — nécessaire des DEUX côtés maintenant :
    fidélité du clone ET delta de variante (la cascade fausse les deux).
@@ -41,8 +52,12 @@ la main.
 - Corpus 100 % SaaS/enterprise : ajouter PDP Shopify, advertorial, quiz funnel.
 - Salesforce (anti-bot Akamai) : fallback quand un vrai client en aura besoin.
 - Monday/scroll-jack : détecté et rapporté, clone inexploitable en l'état.
-- `apply` ne sait qu'éditer (texte/href/src/placeholder) : une hypothèse structurelle
-  (« remonter la preuve au-dessus du pli ») demandera un verbe de plus.
+- **Gel trop brutal** : `freezePage` peut figer une animation en plein vol (héros Jira
+  capturé mi-transition, un bloc noir en travers). Le clone est fidèle au live gelé, donc le
+  juge dit vert — mais on ne livrerait pas ça à un client. Attendre la fin des animations,
+  ou détecter l'état intermédiaire.
+- `apply` ne peut pas créer un bloc absent de la page (`duplicate` réutilise l'existant).
+  Une bibliothèque de blocs serait la réponse — ou le moment où l'on redevient un builder.
 - Jev (TypeSafe, sorti le 15/09) : décisions typées calibrées, pas de vision, précision
   mid-tier. Pas adopté — mais concevoir l'extraction de signaux en questions typées
   indépendantes pour garder l'option ouverte.

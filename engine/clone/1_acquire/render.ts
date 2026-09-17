@@ -60,7 +60,7 @@ export type Resource = {
 export type AcquireResult = {
   source: string
   capturedAt: string
-  marked: number
+  marked: { elements: number; sections: number }
   htmlBytes: { desktop: number; mobile: number }
   resources: Record<string, number> // compte par type (stylesheet, image, font, script…)
   assetsLocaux: { fichiers: number; octets: number }
@@ -345,7 +345,7 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
     // marquage AVANT toute sérialisation : les deux états (desktop/mobile) du même DOM
     // portent les MÊMES ancres data-lpws
     const marked = await page.evaluate(markDom)
-    step(SCOPE, `${marked} éléments marqués data-lpws`)
+    step(SCOPE, `${marked.elements} éléments + ${marked.sections} sections marqués data-lpws`)
 
     // pour chaque état : freeze (référence, clone et DOM = le même instant visuel,
     // cf. freezePage), screenshot de référence, puis sérialisation de CET état

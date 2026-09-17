@@ -13,8 +13,12 @@
  */
 import { z } from "zod"
 
-/** Ancre vers le DOM capturé : la valeur d'un attribut data-lpws ("e42"). */
-export const Anchor = z.string().regex(/^e\d+$/)
+/**
+ * Ancre vers le DOM capturé : la valeur d'un attribut data-lpws.
+ *   "e42" → élément de contenu · "s3" → bande de haut niveau (cf. 1_acquire/mark.ts)
+ * Le suffixe "-b", "-c"… désigne une copie produite par une duplication (famille apply).
+ */
+export const Anchor = z.string().regex(/^[es]\d+(-[a-z0-9]+)?$/)
 
 /** Un slot = un emplacement éditable par une variante. */
 export const Slot = z.object({

@@ -16,19 +16,50 @@
 import { z } from "zod"
 import { Anchor } from "../clone/4_structure/schema.ts"
 
-/** Ce qu'une édition peut changer sur l'élément ancré. Volontairement étroit. */
+/**
+ * Les cinq verbes. Volontairement peu nombreux : chacun préserve le design system du
+ * client par construction, parce qu'aucun ne fabrique de markup.
+ *
+ *   set        remplacer texte / href / src / placeholder
+ *   remove     retirer l'élément (nav d'une LP payante, badge bloat, section hors-sujet)
+ *   move       déplacer avant/après une autre ancre (remonter la preuve au-dessus du pli)
+ *   duplicate  CLONER un bloc existant et le replacer — c'est notre « ajouter une section » :
+ *              on ne génère jamais de HTML, on réutilise celui du client et on le remplit.
+ *              Les descendants de la copie sont re-clés avec un suffixe (`e42` → `e42-b`),
+ *              donc les éditions suivantes de la même spec peuvent les viser.
+ *   swap       échanger deux blocs de place (inverser deux sections)
+ */
 export const Edit = z.object({
   anchor: Anchor,
   /** pourquoi CETTE édition sert l'hypothèse (une ligne, lisible par un humain) */
   pourquoi: z.string().min(3),
+  op: z.enum(["set", "remove", "move", "duplicate", "swap"]).default("set"),
+
+  // op "set"
   text: z.string().optional(),
   href: z.string().optional(),
   src: z.string().optional(),
   placeholder: z.string().optional(),
-}).refine(
-  (e) => e.text !== undefined || e.href !== undefined || e.src !== undefined || e.placeholder !== undefined,
-  { message: "une édition doit changer au moins un attribut" },
-)
+
+  // op "move" / "duplicate" : où poser le bloc
+  before: Anchor.optional(),
+  after: Anchor.optional(),
+
+  // op "duplicate" : suffixe des ancres de la copie ("b" → e42-b) ; "swap" : l'autre bloc
+  as: z.string().regex(/^[a-z0-9]+$/).optional(),
+  with: Anchor.optional(),
+}).superRefine((e, ctx) => {
+  const err = (message: string) => ctx.addIssue({ code: "custom", message })
+  if (e.op === "set" && e.text === undefined && e.href === undefined
+      && e.src === undefined && e.placeholder === undefined)
+    err("op 'set' : il faut changer au moins un attribut (text/href/src/placeholder)")
+  if ((e.op === "move" || e.op === "duplicate") && !e.before && !e.after)
+    err(`op '${e.op}' : il faut dire où — 'before' ou 'after'`)
+  if (e.op === "duplicate" && !e.as)
+    err("op 'duplicate' : 'as' est requis (suffixe des ancres de la copie, ex. \"b\")")
+  if (e.op === "swap" && !e.with)
+    err("op 'swap' : 'with' est requis (l'ancre de l'autre bloc)")
+})
 
 /** Le diagnostic qui a JUSTIFIÉ la variante — sa traçabilité jusqu'à la preuve. */
 export const Diagnostic = z.object({
