@@ -43,6 +43,22 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   Limites : 25 sections par template, 50 blocs par section, 1 000 templates par thème.
   Nommage : `product.<suffixe>.json` s'ouvre avec `?view=<suffixe>`.
 
+## Fait le 2026-09-17 (soir)
+- **Verbe `compose`** : créer une section absente de la page à partir du design system
+  récolté (`design.ts` → rôles = chaînes de classes du client). Deux sections créées sur
+  Jira. Honnêtement : typo, échelle des titres et grille exactes, mais les **wrappers** ne
+  se récoltent pas (fond de bande sombre resté blanc, gouttière, bouton étiré). `duplicate`
+  reste la voie recommandée dès qu'un gabarit existe ; la voie du pixel parfait serait de
+  cloner la coquille d'une section exemplaire — documentée, non faite.
+- Corrigé : les positions du journal étaient mesurées avant chargement des images, donc
+  fausses de milliers de pixels (le « clique pour t'y rendre » du cockpit tombait à côté).
+- **[docs/brain.html](brain.html)** : carte locale du marketing brain, en langage humain —
+  le chemin en 5 temps, les 3 niches, les questions d'entrée, 30 règles (ce qu'on voit → ce
+  qu'on conclut → ce qu'on décide, avec priorité et niveau de preuve), les refus, les
+  garde-fous, et un annuaire de 28 sources avec leurs biais. Filtre par niche + recherche ;
+  chaque `i` ouvre le détail technique. C'est la préfiguration de la KB : quand elle sera un
+  fichier de données validé par schéma, la page le lira au lieu de le contenir.
+
 ## À faire (dans l'ordre)
 1. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
    et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.

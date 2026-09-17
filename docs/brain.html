@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LPWS — le marketing brain, en clair</title>
+<style>
+  :root{
+    --ink:#14161a; --dim:#5d6470; --faint:#8b929e; --line:#e4e7ec; --bg:#f7f8fa; --card:#fff;
+    --mm:#4f46e5; --vp:#0d7fd6; --pr:#12926b; --fr:#e07a1f; --of:#d6346f;
+    --st:#7c3aed; --pe:#0d9488; --te:#64748b; --me:#9333ea; --ko:#dc2626; --gf:#d97706;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    color:var(--ink);background:var(--bg);padding:0 0 80px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  header{background:linear-gradient(135deg,#1b1f2a,#2b2350 60%,#3b1f4d);color:#fff;padding:38px 0 30px}
+  header h1{font-size:30px;letter-spacing:-.5px}
+  header p{color:#c9c6e4;margin-top:8px;max-width:70ch;font-size:16px}
+  header .note{margin-top:14px;font-size:13px;color:#a8a3d0}
+
+  .sticky{position:sticky;top:0;z-index:20;background:rgba(247,248,250,.94);
+    backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:10px 0}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .bar b{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .niche{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;
+    font:inherit;font-size:14px;cursor:pointer;color:var(--dim)}
+  .niche.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  input[type=search]{flex:1;min-width:180px;border:1px solid var(--line);border-radius:999px;
+    padding:7px 14px;font:inherit;font-size:14px;background:#fff}
+
+  h2{font-size:22px;margin:38px 0 6px;letter-spacing:-.3px}
+  h2 .n{color:var(--faint);font-weight:400;font-size:15px;margin-left:8px}
+  .lead{color:var(--dim);margin-bottom:16px;max-width:76ch}
+
+  .chemin{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .etape{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;
+    border-top:4px solid var(--c)}
+  .etape .num{font-size:12px;font-weight:700;color:var(--c)}
+  .etape h3{font-size:16px;margin:4px 0 6px}
+  .etape p{font-size:14px;color:var(--dim)}
+
+  .niches{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+  .nc{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .nc .top{padding:12px 14px;color:#fff;background:var(--c)}
+  .nc .top b{font-size:17px}
+  .nc .top span{display:block;font-size:13px;opacity:.9}
+  .nc dl{padding:12px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:14px}
+  .nc dt{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding-top:2px}
+  .nc dd{color:var(--ink)}
+
+  .q{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
+  .q .t{font-weight:600}
+  .q .w{font-size:14px;color:var(--dim);margin-top:2px}
+  .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#eef1f5;color:var(--dim);white-space:nowrap}
+
+  .fam{margin-top:22px}
+  .fam > h3{font-size:15px;text-transform:uppercase;letter-spacing:.8px;color:var(--c);
+    display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .fam > h3::before{content:"";width:12px;height:12px;border-radius:4px;background:var(--c)}
+  .rule{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);
+    border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .rule .flow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:start}
+  .rule .cell .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);
+    display:block;margin-bottom:3px}
+  .rule .cell p{font-size:14.5px}
+  .rule .cell.dec p{font-weight:600}
+  .rule .meta{display:flex;gap:6px;align-items:center;flex-direction:column}
+  .prio{font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:.5px}
+  .prio.HAUTE{background:#fee2e2;color:#b91c1c}
+  .prio.MOYENNE{background:#fef3c7;color:#92400e}
+  .prio.BASSE{background:#eef1f5;color:#64748b}
+  .conf{font-size:11px;color:var(--dim);white-space:nowrap}
+  .i{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:#fff;
+    color:var(--dim);font:700 13px/1 serif;cursor:pointer;flex:none}
+  .i:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .srcs{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11.5px;padding:3px 9px;border-radius:999px;background:#f1f3f7;color:var(--dim);
+    cursor:pointer;border:1px solid transparent}
+  .chip:hover{border-color:var(--dim);color:var(--ink)}
+
+  .panelko{background:#fff5f5;border:1px solid #fecaca;border-left:5px solid var(--ko);
+    border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .panelko b{color:#b91c1c}
+  .panelgf{background:#fffbeb;border:1px solid #fde68a;border-left:5px solid var(--gf);
+    border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .panelgf b{color:#92400e}
+  .panelko p,.panelgf p{font-size:14px;color:var(--dim);margin-top:3px}
+
+  .src{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    margin-bottom:8px;scroll-margin-top:90px}
+  .src.flash{animation:fl 1.6s ease}
+  @keyframes fl{0%,40%{background:#fff7d6;border-color:#fcd34d}100%{background:#fff}}
+  .src .h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  .src .h b{font-size:15px}
+  .force{font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:.4px}
+  .f-tres{background:#dcfce7;color:#15803d}.f-haute{background:#e0f2fe;color:#0369a1}
+  .f-moyenne{background:#fef3c7;color:#92400e}.f-faible{background:#f1f3f7;color:#64748b}
+  .src .kind{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px}
+  .src p{font-size:14px;margin-top:5px}
+  .src .biais{font-size:13px;color:#9a3412;margin-top:5px}
+
+  #drawer{position:fixed;inset:0 0 0 auto;width:min(560px,100%);background:#fff;z-index:60;
+    box-shadow:-10px 0 40px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .22s ease;
+    display:flex;flex-direction:column}
+  #drawer.open{transform:none}
+  #drawer .dh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:start}
+  #drawer .dh h3{font-size:18px;flex:1}
+  #drawer .db{padding:18px 20px;overflow-y:auto;font-size:15px}
+  #drawer .db h4{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);
+    margin:18px 0 6px}
+  #drawer .db h4:first-child{margin-top:0}
+  #drawer .db p{margin-bottom:8px}
+  #drawer .db code{background:#f1f3f7;padding:1px 5px;border-radius:5px;font-size:13px}
+  .x{border:0;background:#f1f3f7;border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer}
+  #scrim{position:fixed;inset:0;background:rgba(10,12,16,.35);z-index:50;opacity:0;pointer-events:none;
+    transition:opacity .2s}
+  #scrim.on{opacity:1;pointer-events:auto}
+  .empty{color:var(--dim);padding:18px;text-align:center}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <h1>Le marketing brain, en clair</h1>
+  <p>Ce n'est pas une IA qui « améliore » une page. C'est un système qui <b>pose des questions</b>,
+     <b>regarde des choses précises</b> sur la page, en tire des <b>constats</b>, et propose des
+     <b>décisions</b> — chacune avec son niveau de preuve et sa source.</p>
+  <p class="note">Carte locale, à ouvrir dans un navigateur. Les petits <b>i</b> ouvrent le détail technique.
+     État : règles issues de la recherche v1 (orientée B2B). La famille e-commerce est incomplète
+     jusqu'à la recherche v2.</p>
+</div></header>
+
+<div class="sticky"><div class="wrap bar">
+  <b>Niche</b>
+  <button class="niche on" data-n="all">Toutes</button>
+  <button class="niche" data-n="ecom">E-commerce / DTC</button>
+  <button class="niche" data-n="saas">SaaS self-serve</button>
+  <button class="niche" data-n="b2b">B2B enterprise</button>
+  <input type="search" id="q" placeholder="Filtrer : preuve, prix, formulaire, trafic…">
+</div></div>
+
+<div class="wrap">
+  <h2>Le chemin, en cinq temps</h2>
+  <p class="lead">Chaque étape ne peut pas sauter la précédente. C'est ce qui empêche le système
+     de « proposer des idées » au hasard.</p>
+  <div class="chemin" id="chemin"></div>
+
+  <h2>Les trois niches<span class="n">— la même page se juge différemment selon qui arrive</span></h2>
+  <div class="niches" id="niches"></div>
+
+  <h2>Ce qu'on demande avant tout<span class="n">— sans ça, tout diagnostic est générique</span></h2>
+  <p class="lead">Ces réponses viennent du media buyer, pas d'une devinette. Le système peut
+     pré-remplir en lisant la page, jamais affirmer.</p>
+  <div id="questions"></div>
+
+  <h2>L'arbre de décision<span class="n" id="cpt"></span></h2>
+  <p class="lead">On lit chaque ligne de gauche à droite : <b>ce qu'on voit</b> → <b>ce qu'on en
+     conclut</b> → <b>ce qu'on décide</b>. La priorité dit quoi traiter d'abord ; la confiance dit
+     à quel point c'est démontré. Une confiance moyenne ou faible se présente toujours comme une
+     hypothèse à tester, jamais comme une vérité.</p>
+  <div id="arbre"></div>
+
+  <h2>Ce que le brain refuse de faire</h2>
+  <p class="lead">Même si on le lui demande. C'est un actif de confiance, pas une limitation.</p>
+  <div id="refus"></div>
+
+  <h2>Les garde-fous</h2>
+  <p class="lead">Ce qu'il surveille pour qu'un gain n'en soit pas un faux.</p>
+  <div id="gardes"></div>
+
+  <h2>D'où ça vient<span class="n">— l'annuaire des sources</span></h2>
+  <p class="lead">Chaque source est jugée : ce qu'elle prouve vraiment, et ce qui la biaise.
+     Un éditeur d'outil qui publie ses propres chiffres n'a pas le même poids qu'une étude
+     expérimentale.</p>
+  <div id="sources"></div>
+</div>
+
+<div id="scrim"></div>
+<aside id="drawer" role="dialog" aria-label="Détail technique">
+  <div class="dh"><h3 id="dt"></h3><button class="x" id="dx" aria-label="Fermer">✕</button></div>
+  <div class="db" id="dbody"></div>
+</aside>
+
+<script>
+/* ——— LES DONNÉES ———
+   Écrites à la main depuis le rapport de recherche. C'est la préfiguration de la KB :
+   quand elle deviendra un fichier de données validé par schéma, cette page la lira. */
+
+const CHEMIN = [
+  {c:"var(--mm)", t:"Ce qu'on demande", d:"L'offre, à qui elle parle, comment la boîte gagne de l'argent, et ce que la publicité promet."},
+  {c:"var(--vp)", t:"Ce qu'on regarde", d:"Des faits vérifiables sur la page : y a-t-il un prix, des avis, un chiffre dans le titre, combien de champs."},
+  {c:"var(--pr)", t:"Ce qu'on en conclut", d:"Un constat, pas une opinion : « la promesse qui a payé le clic n'est pas sur la page »."},
+  {c:"var(--of)", t:"Ce qu'on décide", d:"Une seule hypothèse, le changement minimal qui la teste, et ce que ça peut casser."},
+  {c:"var(--me)", t:"Comment on saura", d:"La métrique qui doit bouger — et l'aveu franc quand le trafic ne permettra pas de conclure."},
+];
+
+const NICHES = [
+  {id:"ecom", c:"var(--of)", nom:"E-commerce / DTC", sous:"La plus grosse part de nos clients",
+   d:{"On mesure":"Le revenu par visiteur, pas le taux de conversion",
+      "L'action":"Acheter maintenant",
+      "La preuve qui marche":"Les avis et les notes, les photos de vrais clients",
+      "Le trafic":"Meta, TikTok, Google Shopping — du monde froid, interrompu",
+      "Le piège":"Une remise qui fait vendre plus et gagner moins ; les retours"}},
+  {id:"saas", c:"var(--vp)", nom:"SaaS self-serve", sous:"Essai gratuit, petit ticket, cycle court",
+   d:{"On mesure":"L'activation, puis le passage de l'essai au payant",
+      "L'action":"Commencer gratuitement",
+      "La preuve qui marche":"Voir le produit : captures, démo, prix affiché",
+      "Le trafic":"Recherche et social, souvent déjà informé",
+      "Le piège":"Des inscriptions faciles qui n'utilisent jamais le produit"}},
+  {id:"b2b", c:"var(--te)", nom:"B2B enterprise", sous:"Cas minoritaire, règles à part",
+   d:{"On mesure":"Les opportunités réellement qualifiées",
+      "L'action":"Parler à un commercial",
+      "La preuve qui marche":"Études de cas, logos, conformité et sécurité",
+      "Le trafic":"Peu de volume, très ciblé",
+      "Le piège":"Trop peu de trafic pour tester quoi que ce soit"}},
+];
+
+const QUESTIONS = [
+  {t:"Qu'est-ce que vous vendez, exactement ?", w:"Un essai gratuit, un produit à 90 €, un contrat annuel : rien ne se juge pareil.", g:"Offre"},
+  {t:"À qui ça s'adresse ?", w:"Une preuve ne fonctionne que si le visiteur peut s'y reconnaître.", g:"Audience"},
+  {t:"Comment se conclut la vente ?", w:"En libre-service ou avec un commercial. C'est ce qui décide du bon bouton.", g:"Vente"},
+  {t:"Quel est le panier ou le contrat moyen ?", w:"Plus le montant est élevé, plus il faut lever le risque perçu.", g:"Valeur"},
+  {t:"Quelle marge reste-t-il ?", w:"Pour refuser une remise qui ferait vendre plus et gagner moins.", g:"Marge"},
+  {t:"D'où vient le trafic ?", w:"Une recherche Google et une pub TikTok n'amènent pas le même visiteur.", g:"Trafic"},
+  {t:"Que promet la publicité ?", w:"Le texte ET le visuel. C'est la comparaison la plus utile qu'on sache faire.", g:"Promesse"},
+  {t:"Combien de visiteurs par mois ?", w:"En dessous d'un certain volume, aucun petit test ne peut conclure.", g:"Volume"},
+  {t:"Qu'est-ce qu'on n'a pas le droit de dire ?", w:"Les allégations doivent être étayées par le client, pas inventées par nous.", g:"Limites"},
+];
+
+const FAMILLES = {
+  mm:{nom:"La promesse tenue", c:"var(--mm)"},
+  vp:{nom:"Ce que la page promet", c:"var(--vp)"},
+  pr:{nom:"La preuve", c:"var(--pr)"},
+  fr:{nom:"La friction", c:"var(--fr)"},
+  of:{nom:"L'offre et le prix", c:"var(--of)"},
+  st:{nom:"L'ordre et l'attention", c:"var(--st)"},
+  pe:{nom:"La personnalisation", c:"var(--pe)"},
+  te:{nom:"La technique", c:"var(--te)"},
+  me:{nom:"La méthode de test", c:"var(--me)"},
+};
+
+const REGLES = [
+ {f:"mm",n:["ecom","saas","b2b"],p:"HAUTE",c:"Élevée",
+  s:"La promesse de la publicité n'apparaît pas dans le titre de la page.",
+  o:"Le visiteur a cliqué pour quelque chose qu'il ne retrouve pas. Le clic est payé pour rien.",
+  d:"Remettre la promesse exacte de l'annonce dans le titre.",
+  src:["google-ads","cxl"],
+  tech:"<h4>Comment le signal se calcule</h4><p>On extrait de l'annonce ses <b>entités de promesse</b> : le bénéfice chiffré, le mécanisme, l'offre. On extrait les mêmes du titre et du sous-titre. On calcule un recouvrement à la fois <b>sémantique</b> (proximité de sens) et <b>lexical</b> (mots partagés), plus la présence ou non du chiffre.</p><h4>Pourquoi c'est le meilleur point de départ</h4><p>Ce diagnostic ne demande <b>aucune donnée de performance</b> : il compare deux textes qu'on a déjà. Il est donc utilisable dès le premier jour, sans intégration, sans historique.</p><h4>Ce qui peut mal tourner</h4><p>Une promesse peut être reformulée sans être trahie (« -40 % » vs « à moitié prix »). Le recouvrement lexical seul produirait un faux positif : d'où la couche sémantique.</p>"},
+ {f:"mm",n:["ecom","saas"],p:"HAUTE",c:"Moyenne",
+  s:"Le visuel de la publicité n'a aucun rapport avec le haut de la page.",
+  o:"En publicité sociale, c'est l'image qui a provoqué le clic. Rompre la continuité visuelle, c'est perdre le visiteur avant qu'il lise.",
+  d:"Reprendre le visuel de la créa, ou son motif, dans le haut de page.",
+  src:["cxl"],
+  tech:"<h4>La brique qui nous manque</h4><p>Comparer une créa à un haut de page demande de <b>comprendre une image</b>. C'est la seule partie du diagnostic qui exige un modèle capable de voir — les modèles de décision typée rapides (type Jev) ne savent pas le faire.</p><h4>Pourquoi ça compte plus qu'en recherche</h4><p>Sur Google, l'ancre du message est le mot-clé, qui est du texte. Sur Meta ou TikTok, l'ancre est l'image ou la vidéo. Notre mix client étant majoritairement social, c'est le diagnostic le plus important et le moins outillé.</p>"},
+ {f:"mm",n:["ecom","saas","b2b"],p:"HAUTE",c:"Élevée",
+  s:"L'annonce affiche un chiffre, la page n'en a aucun.",
+  o:"Le bénéfice chiffré est le signal de crédibilité le plus fort. Il disparaît juste au moment où il devrait rassurer.",
+  d:"Reprendre le chiffre dans le titre — seulement s'il est étayé par le client.",
+  src:["google-ads","ftc"],
+  tech:"<h4>La limite dure</h4><p>On ne fabrique jamais un chiffre. On <b>reporte</b> celui que l'annonceur affiche déjà, et on le signale si rien ne l'étaye. Une allégation non étayée n'est pas seulement mauvaise pour la confiance : depuis octobre 2024 elle est sanctionnable.</p>"},
+ {f:"mm",n:["saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Plusieurs intentions très différentes atterrissent sur la même page.",
+  o:"Une page qui parle à tout le monde ne parle précisément à personne.",
+  d:"Créer une page par grande intention plutôt qu'une page fourre-tout.",
+  src:["instapage"],
+  tech:"<h4>L'arbitrage</h4><p>Une page par intention augmente la pertinence mais multiplie la maintenance. Le seuil raisonnable : séparer quand les intentions demandent des <b>promesses différentes</b>, pas quand elles changent juste de vocabulaire.</p>"},
+
+ {f:"vp",n:["ecom","saas","b2b"],p:"HAUTE",c:"Moyenne",
+  s:"Le titre nomme une catégorie (« logiciel marketing ») au lieu d'un résultat.",
+  o:"Le visiteur comprend ce que c'est, pas ce qu'il y gagne.",
+  d:"Réécrire en résultat obtenu, le plus spécifique possible.",
+  src:["meclabs","nng"],
+  tech:"<h4>Attention au réflexe inverse</h4><p>Rendre plus spécifique n'est pas toujours gagnant : un cas documenté montre une perte de 29 % quand la spécificité a coûté la clarté. La règle utile est « spécifique <b>et</b> compris », pas « spécifique à tout prix ».</p>"},
+ {f:"vp",n:["saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"On ne comprend pas à quoi le produit se compare.",
+  o:"Sans point de comparaison, le visiteur ne peut pas évaluer la valeur.",
+  d:"Nommer la catégorie et les alternatives, même imparfaites.",
+  src:["dunford"],
+  tech:"<h4>Le cadre</h4><p>C'est l'idée de <i>frame of reference</i> : la valeur n'est jamais absolue, elle est relative à ce que le visiteur aurait fait sinon — y compris « ne rien faire » ou « le faire à la main ».</p>"},
+ {f:"vp",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Le texte est écrit à un niveau de lecture professionnel.",
+  o:"L'effort de lecture réduit la compréhension, donc l'action.",
+  d:"Simplifier : une idée par phrase, des mots courants.",
+  src:["unbounce"],
+  tech:"<h4>L'ordre de grandeur</h4><p>Sur un très gros échantillon de pages, les textes les plus simples convertissent plus du double des textes les plus techniques. C'est une <b>corrélation</b> sur les clients d'un éditeur, pas un test contrôlé : à traiter comme une forte indication, pas comme une loi.</p>"},
+
+ {f:"pr",n:["ecom"],p:"HAUTE",c:"Élevée",
+  s:"Aucune note ni avis sur un produit qu'on réfléchit avant d'acheter.",
+  o:"Le doute sur la qualité n'est levé par rien.",
+  d:"Afficher les avis réels, avec leur nombre.",
+  src:["luca","salganik"],
+  tech:"<h4>Pourquoi c'est solide</h4><p>L'effet a été isolé de façon causale en exploitant l'arrondi des notes affichées : à qualité réelle égale, une étoile de plus change le revenu. L'effet est concentré sur les marques <b>peu connues</b> — ce qui est précisément le cas de la plupart des marques DTC.</p><h4>Ce que ça ne dit pas</h4><p>Que plus d'avis est toujours mieux. Quelques avis négatifs peuvent renforcer la crédibilité de l'ensemble.</p>"},
+ {f:"pr",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"La preuve cite de grands comptes alors que la campagne vise des petites équipes.",
+  o:"Une preuve n'agit que si le visiteur se reconnaît dans le groupe cité.",
+  d:"Recadrer la preuve sur le segment que la campagne vise vraiment.",
+  src:["salganik","luca"],
+  tech:"<h4>Nuance importante</h4><p>La preuve sociale est puissante mais <b>dépend du contexte</b>. Elle modifie causalement les choix, tout en rendant le résultat moins prévisible : ce n'est pas un levier qu'on tourne, c'est un levier qu'on teste.</p>"},
+ {f:"pr",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Des témoignages sans nom, sans fonction et sans résultat.",
+  o:"Une preuve invérifiable ne prouve rien, et peut faire douter du reste.",
+  d:"Nommer, situer, chiffrer — ou retirer.",
+  src:["cxl","baymard"],
+  tech:"<h4>Cas où il faut les retirer</h4><p>Sur une page de comparaison, où le visiteur est en mode analytique, des témoignages élogieux peuvent faire baisser la confiance. Preuve faible : à traiter comme une hypothèse.</p>"},
+ {f:"pr",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Un compteur affiche zéro : zéro partage, zéro avis.",
+  o:"C'est de la preuve sociale à l'envers : ça dit « personne n'y va ».",
+  d:"Retirer le compteur tant qu'il est vide.",
+  src:["cialdini"],
+  tech:"<h4>La démonstration</h4><p>Une expérience de terrain a montré qu'annoncer une norme <b>indésirable</b> (« beaucoup de visiteurs emportent du bois ») a presque triplé le vol. Une norme mal formulée ne persuade pas : elle autorise.</p>"},
+ {f:"pr",n:["b2b"],p:"HAUTE",c:"Élevée",
+  s:"Contrat à montant élevé, mais aucune étude de cas, aucun logo, aucune preuve de conformité.",
+  o:"L'essentiel de la décision se prend sans nous parler. La page doit permettre de s'auto-convaincre.",
+  d:"Ajouter études de cas, références et éléments de conformité.",
+  src:["gartner","6sense"],
+  tech:"<h4>Les chiffres derrière</h4><p>Une part très minoritaire du parcours d'achat se passe avec les fournisseurs, et une large majorité d'acheteurs a déjà un favori avant le premier contact commercial. Conséquence : la page ne sert pas à déclencher un appel, elle sert à <b>gagner la comparaison</b> qui a lieu sans nous.</p>"},
+
+ {f:"fr",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Un formulaire long en tout début de parcours.",
+  o:"Ce sont <b>quels</b> champs qui coûtent, pas combien il y en a.",
+  d:"Garder les champs utiles, retirer les invasifs, tester les libellés.",
+  src:["aagaard"],
+  tech:"<h4>Le contre-exemple qui a tué la règle</h4><p>Un praticien a retiré des champs et <b>perdu</b> 14 % de conversions ; en réintroduisant les champs utiles et en retravaillant les libellés, il a gagné 19,2 %. Sa formule : « j'avais retiré les champs avec lesquels les gens veulent interagir, et gardé les mauvais ».</p><h4>Ce qu'on en fait</h4><p>On ne recommande jamais « moins de champs ». On recommande d'identifier les champs qui n'apportent rien à personne.</p>"},
+ {f:"fr",n:["saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Le téléphone est obligatoire dès le premier contact.",
+  o:"C'est le champ qui fait le plus reculer, pour une information rarement utile tout de suite.",
+  d:"Le rendre optionnel, ou le demander plus tard.",
+  src:["cxl"],
+  tech:"<h4>Exception assumée</h4><p>Si l'objectif est la <b>qualité</b> et non le volume, garder le téléphone est un choix défendable : il filtre. C'est une décision business, pas une erreur d'UX.</p>"},
+ {f:"fr",n:["ecom"],p:"HAUTE",c:"Élevée",
+  s:"Il faut créer un compte pour acheter.",
+  o:"C'est l'une des premières causes d'abandon de panier.",
+  d:"Permettre l'achat en invité.",
+  src:["baymard"],
+  tech:"<h4>Source et prudence</h4><p>Les grandes enquêtes sur l'abandon de panier reposent sur du <b>déclaratif</b> : les gens disent pourquoi ils sont partis. C'est solide pour hiérarchiser les frictions, moins pour prédire un gain chiffré.</p>"},
+ {f:"fr",n:["ecom"],p:"MOYENNE",c:"Moyenne",
+  s:"Aucun signal de sécurité près des champs de paiement.",
+  o:"La méfiance au moment de payer fait abandonner une part non négligeable des paniers.",
+  d:"Un ou deux repères reconnus, placés au point de friction.",
+  src:["baymard"],
+  tech:"<h4>Trop de badges nuit</h4><p>L'accumulation de logos de sécurité produit l'effet inverse : elle attire l'attention sur le risque. Un ou deux suffisent, et les très grandes marques n'en ont pas besoin.</p>"},
+ {f:"fr",n:["b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"L'objectif est la qualité des contacts, mais le formulaire ne demande presque rien.",
+  o:"Moins de friction fait monter le volume et peut faire baisser le retour sur investissement.",
+  d:"Assumer des champs de qualification.",
+  src:["kohavi"],
+  tech:"<h4>Le principe général</h4><p>C'est le cœur du choix de l'indicateur à optimiser : une page peut gonfler ses conversions <b>en détruisant</b> la valeur créée. Ici, augmenter la friction est parfois la bonne décision.</p>"},
+
+ {f:"of",n:["saas"],p:"MOYENNE",c:"Moyenne",
+  s:"Produit en libre-service, mais aucun prix visible.",
+  o:"L'incertitude sur le prix retarde la décision et attire les mauvais profils.",
+  d:"Afficher le prix, ou au moins la structure de prix.",
+  src:["plg"],
+  tech:"<h4>Frontière</h4><p>Valable en libre-service. En vente enterprise, l'absence de prix est une pratique normale : la recommandation ne s'y applique pas.</p>"},
+ {f:"of",n:["saas","b2b"],p:"HAUTE",c:"Moyenne",
+  s:"« Commencer gratuitement » sur une offre qui exige en réalité un commercial.",
+  o:"Le bouton ne correspond pas à la façon dont la vente se fait : ça produit des contacts inexploitables.",
+  d:"Aligner le bouton sur le mode de vente réel.",
+  src:["cxl"],
+  tech:"<h4>Détection</h4><p>Signal repérable sans donnée de performance : on compare le verbe du bouton principal au mode de vente déclaré dans le contexte. C'est l'un des rares diagnostics purement logiques.</p>"},
+ {f:"of",n:["ecom","saas"],p:"MOYENNE",c:"Moyenne",
+  s:"Risque perçu élevé et aucune garantie affichée.",
+  o:"Pouvoir revenir en arrière débloque la décision.",
+  d:"Afficher la garantie ou la politique de retour — si elle existe réellement.",
+  src:["cxl","ftc"],
+  tech:"<h4>Contrainte</h4><p>On n'invente jamais une garantie. Elle doit exister et être tenable : une promesse de retour non honorée est à la fois un problème légal et un générateur de litiges.</p>"},
+
+ {f:"st",n:["ecom","saas","b2b"],p:"HAUTE",c:"Élevée",
+  s:"La promesse principale arrive sous la ligne de flottaison.",
+  o:"L'essentiel de l'attention se joue avant le premier défilement.",
+  d:"Remonter la promesse, et donner une raison de faire défiler.",
+  src:["nng"],
+  tech:"<h4>Les deux vérités</h4><p>Une majorité du temps d'attention se passe au-dessus de la ligne de flottaison, <b>et</b> les gens défilent volontiers si on leur en donne une raison. Les deux affirmations coexistent : le haut de page porte la promesse, le reste porte la démonstration.</p>"},
+ {f:"st",n:["saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Page de campagne servie avec le menu complet du site.",
+  o:"Chaque lien de navigation est une porte de sortie payée par la publicité.",
+  d:"Retirer la navigation sur une page de campagne.",
+  src:["cxl"],
+  tech:"<h4>Ne s'applique pas en e-commerce</h4><p>Sur une page produit, l'en-tête porte le <b>panier</b> et la recherche. Le retirer casse l'achat. Cette règle vient du monde B2B et ne se transpose pas telle quelle : c'est exactement le genre de généralisation qu'on refuse d'encoder.</p>"},
+ {f:"st",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Aucune section ne traite les objections.",
+  o:"Un doute non traité ne devient pas un refus visible : il devient un report de décision.",
+  d:"Ajouter un bloc d'objections avant le dernier appel à l'action.",
+  src:["lift"],
+  tech:"<h4>Le cadre utilisé</h4><p>Un modèle praticien répandu décompose la page en six leviers, dont l'<i>anxiété</i> (les doutes) et la <i>distraction</i>. Ce n'est pas une théorie validée expérimentalement : c'est une grille de lecture utile, à créditer comme telle.</p>"},
+ {f:"st",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Moyenne",
+  s:"Douze fonctionnalités listées sans hiérarchie.",
+  o:"Quand tout est au même niveau, rien ne ressort.",
+  d:"Garder trois à cinq bénéfices, hiérarchisés.",
+  src:["nng"],
+  tech:"<h4>Fondement</h4><p>Charge cognitive et lecture en balayage : au-delà de quelques éléments, la page n'est plus lue mais survolée. Principe robuste en ergonomie, sans chiffre de gain transposable.</p>"},
+
+ {f:"pe",n:["ecom","saas","b2b"],p:"MOYENNE",c:"Élevée",
+  s:"Personnalisation basée sur l'identité : « Bonjour {Entreprise}, nous avons fait ça pour vous ».",
+  o:"Quand le visiteur pense à sa vie privée, ce type de personnalisation se retourne contre la marque.",
+  d:"Personnaliser par contexte (source, intention), pas par identité.",
+  src:["kimhan"],
+  tech:"<h4>La preuve causale</h4><p>Une expérience contrôlée montre que lorsque la préoccupation vie privée est activée, la personnalisation basée sur des données personnelles <b>ne fait pas mieux</b> qu'un message générique, et fait <b>moins bien</b> qu'une personnalisation contextuelle modérée.</p><h4>Et la précision</h4><p>L'identification d'entreprise par adresse IP s'est par ailleurs dégradée avec les évolutions de confidentialité : la donnée elle-même est devenue moins fiable.</p>"},
+
+ {f:"te",n:["ecom","saas","b2b"],p:"BASSE",c:"Moyenne",
+  s:"Le plus gros élément visible met plus de 2,5 secondes à s'afficher.",
+  o:"C'est de l'hygiène, pas un levier marketing.",
+  d:"Alléger les images et le code, sans en faire une priorité stratégique.",
+  src:["deloitte","cwv"],
+  tech:"<h4>Pourquoi je déclasse cette règle</h4><p>L'étude la plus citée sur la vitesse est <b>observationnelle</b> : elle compare des sites rapides et des sites lents, elle ne teste pas la même page à deux vitesses. Or les sites rapides sont souvent mieux financés et mieux faits. La corrélation est réelle, la causalité est surestimée — et aucune marque de logiciel n'était dans l'échantillon.</p>"},
+ {f:"te",n:["ecom","saas","b2b"],p:"HAUTE",c:"Élevée",
+  s:"Le consentement ou la mesure est cassé.",
+  o:"Sans donnée fiable, on ne peut rien optimiser : on décide dans le noir.",
+  d:"Réparer la mesure avant de toucher au marketing.",
+  src:["consent"],
+  tech:"<h4>Ordre des opérations</h4><p>C'est la seule règle technique en priorité haute, parce qu'elle conditionne toutes les autres. Une part croissante des conversions est aujourd'hui <b>modélisée</b> plutôt qu'observée : si le consentement est mal posé, les chiffres servent à se rassurer, pas à décider.</p>"},
+
+ {f:"me",n:["ecom","saas","b2b"],p:"HAUTE",c:"Très élevée",
+  s:"Moins de cent mille visiteurs par mois et par variante.",
+  o:"Un petit changement ne sera jamais détectable : le test dira « rien » quoi qu'il arrive.",
+  d:"Interdire les micro-tests. Proposer un changement franc, assumé comme une décision.",
+  src:["kohavi","georgiev"],
+  tech:"<h4>Les ordres de grandeur</h4><p>Sur une base de conversion de 3 %, détecter un gain de 5 % demande environ 208 000 visiteurs par variante ; un gain de 10 %, environ 53 000 ; un gain de 20 %, environ 14 000. Or le gain médian réellement observé tourne autour de 5 %.</p><h4>Conséquence produit</h4><p>La taille du changement qu'on recommande doit dépendre du <b>trafic du client</b>, pas de notre goût. Peu de trafic : gros changements. Beaucoup de trafic : tests chirurgicaux.</p>"},
+ {f:"me",n:["ecom","saas","b2b"],p:"HAUTE",c:"Élevée",
+  s:"La conversion monte mais la qualité baisse.",
+  o:"L'indicateur facile à mesurer trompe sur la valeur réellement créée.",
+  d:"Alerter, et suivre l'indicateur situé plus loin dans la chaîne.",
+  src:["kohavi","netflix"],
+  tech:"<h4>Le problème des indicateurs de substitution</h4><p>On optimise ce qui est rapide à mesurer (un clic, une inscription) en espérant que ça prédit ce qui compte (du revenu, un client qui reste). Chez un acteur disposant de centaines de tests, un indicateur court bien choisi prédisait la bonne direction dans 95 % des cas, mais la bonne <b>décision</b> dans seulement 79 % : un substitut imparfait produit beaucoup de faux gagnants.</p>"},
+ {f:"me",n:["ecom","saas","b2b"],p:"BASSE",c:"Moyenne",
+  s:"On demande de tester une couleur de bouton.",
+  o:"C'est de la micro-optimisation avant d'avoir réglé l'offre et le message.",
+  d:"Déprioriser sous les changements de fond.",
+  src:["pxl"],
+  tech:"<h4>Attention à l'excès inverse</h4><p>Les grilles de priorisation objectives ont un défaut connu : elles <b>sous-notent</b> les changements audacieux, ceux qui touchent au positionnement, parce qu'ils sont difficiles à justifier ligne par ligne. Il faut donc une catégorie « changement stratégique » qui échappe à la note.</p>"},
+];
+
+const REFUS = [
+ {t:"Fabriquer de l'urgence qui n'existe pas", w:"Compte à rebours qui se remet à zéro, « plus que 3 en stock » sans stock réel. Inefficace à terme et sanctionnable.", src:["ftc","dsa"]},
+ {t:"Écrire de faux avis ou de faux témoignages", w:"Y compris ceux générés par une IA — la réglementation les visait explicitement.", src:["ftc"]},
+ {t:"Utiliser des ressorts psychologiques non reproduits", w:"L'épuisement de la volonté et une bonne part des effets d'amorçage ne se sont pas répliqués. On ne les encode pas.", src:["hagger","bohner"]},
+ {t:"Faire semblant de personnaliser", w:"« Conçu spécialement pour vous, {Entreprise} » quand rien n'a été conçu pour personne.", src:["kimhan"]},
+ {t:"Afficher une statistique sans source", w:"Soit le client peut l'étayer, soit elle sort de la page.", src:["ftc"]},
+ {t:"Cacher un coût ou compliquer la résiliation", w:"Frais qui apparaissent à la fin, désabonnement labyrinthique : interdits et destructeurs de confiance.", src:["dsa"]},
+];
+
+const GARDES = [
+ {t:"La marge", w:"Un hero centré sur la remise peut faire monter la conversion et baisser le revenu net. On surveille le revenu par visiteur, jamais le taux seul."},
+ {t:"La qualité des contacts", w:"Enlever de la friction produit plus de contacts, pas forcément plus de clients. On regarde ce qui se passe après le formulaire."},
+ {t:"Les retours", w:"Une promesse trop enthousiaste se paie en retours, surtout sur le vêtement. Le coût est différé, donc invisible dans un test court."},
+ {t:"L'activation", w:"Des inscriptions qui n'utilisent jamais le produit ne valent rien. C'est l'activation qui compte, pas le signup."},
+ {t:"Le juridique", w:"Toute allégation doit être étayée par le client. Le brain rapporte, il n'invente pas."},
+ {t:"La marque", w:"On ne touche ni aux couleurs, ni à la typographie, ni au ton. Les variantes vivent dans le design system du client."},
+];
+
+const SOURCES = {
+ "google-ads":{nom:"Documentation Google Ads",kind:"Documentation officielle",force:"Très élevée",
+   quoi:"Comment Google évalue la cohérence entre une annonce et sa page d'arrivée. À noter : l'indice de qualité est un outil de diagnostic, pas un paramètre d'enchère — c'est très souvent mal rapporté.",
+   biais:"Aucun sur les faits produit ; ne dit rien sur l'ampleur des gains de conversion."},
+ "nng":{nom:"Nielsen Norman Group",kind:"Cabinet de recherche en ergonomie",force:"Élevée",
+   quoi:"La majorité du temps d'attention se passe au-dessus de la ligne de flottaison, et les gens défilent quand on leur donne une raison.",
+   biais:"Cabinet de conseil : vend des formations et des audits d'ergonomie."},
+ "luca":{nom:"Michael Luca, Harvard Business School",kind:"Recherche académique (causale)",force:"Élevée",
+   quoi:"Une étoile de plus sur une note publique fait augmenter le revenu de 5 à 9 %, avec un effet concentré sur les établissements indépendants.",
+   biais:"Étudie la restauration : la transposition au e-commerce est raisonnable mais non démontrée."},
+ "salganik":{nom:"Salganik, Dodds & Watts (2006), Science",kind:"Expérience contrôlée, 14 341 participants",force:"Très élevée",
+   quoi:"Afficher la popularité modifie causalement les choix — et rend le succès moins prévisible.",
+   biais:"Domaine musical ; le mécanisme est général, les amplitudes ne se transposent pas."},
+ "cialdini":{nom:"Cialdini et al. (2006), Petrified Forest",kind:"Expérience de terrain",force:"Élevée",
+   quoi:"Annoncer une norme indésirable a presque triplé le comportement qu'on voulait éviter.",
+   biais:"Un seul terrain ; le résultat est néanmoins robuste et très cité."},
+ "hagger":{nom:"Hagger et al. (2016), 23 laboratoires",kind:"Réplication multi-sites",force:"Très élevée (réfutation)",
+   quoi:"L'épuisement de la volonté ne se réplique pas.",
+   biais:"Aucun : c'est précisément une étude faite pour tester la solidité d'un résultat."},
+ "bohner":{nom:"Bohner & Schlüter (2014), PLOS ONE",kind:"Réplication",force:"Élevée (nuance)",
+   quoi:"L'étude célèbre des serviettes d'hôtel ne se reproduit pas dans d'autres contextes.",
+   biais:"Deux hôtels allemands ; suffit à interdire d'en faire une loi."},
+ "kimhan":{nom:"Kim & Han (2025), Behavioral Sciences",kind:"Expérience contrôlée, 360 participants",force:"Élevée",
+   quoi:"Quand la vie privée est saillante, la personnalisation par données personnelles perd son avantage et passe derrière une personnalisation contextuelle.",
+   biais:"Échantillon modeste, contexte expérimental."},
+ "kohavi":{nom:"Kohavi, Deng, Tang",kind:"Praticiens-chercheurs (Microsoft, Airbnb)",force:"Très élevée",
+   quoi:"Comment choisir l'indicateur à optimiser, pourquoi la plupart des tests sont sous-dimensionnés, et comment réduire la variance pour gagner en puissance.",
+   biais:"Issu de très grandes plateformes : certaines techniques supposent un volume que nos clients n'ont pas."},
+ "georgiev":{nom:"Méta-analyse Georgiev sur 115 tests",kind:"Analyse indépendante sur base publique",force:"Élevée",
+   quoi:"Le gain médian réel d'un test tourne autour de 5 %, et environ 70 % des tests examinés étaient sous-dimensionnés.",
+   biais:"Base constituée de tests publiés, donc plutôt les plus spectaculaires : le vrai médian est peut-être plus bas encore."},
+ "netflix":{nom:"Zhang et al. (2023), Netflix",kind:"Étude d'entreprise, ~200 tests",force:"Élevée",
+   quoi:"Un indicateur court bien choisi prédit la bonne direction dans 95 % des cas, mais la bonne décision de lancement dans 79 % seulement.",
+   biais:"Un seul acteur, un seul produit ; l'ordre de grandeur reste instructif."},
+ "baymard":{nom:"Baymard Institute",kind:"Cabinet de recherche e-commerce",force:"Moyenne à élevée",
+   quoi:"Causes d'abandon de panier, ergonomie du paiement, usage des repères de confiance.",
+   biais:"Vend des audits ; une partie des données est déclarative (ce que les gens disent avoir fait)."},
+ "unbounce":{nom:"Unbounce Conversion Benchmark Report",kind:"Rapport d'éditeur (464 M de visites)",force:"Moyenne",
+   quoi:"Médianes de conversion par secteur et par source de trafic, et effet du niveau de lecture.",
+   biais:"Très gros volume, mais l'échantillon est constitué des clients d'un éditeur d'outil, et la définition de « conversion » varie d'un client à l'autre."},
+ "aagaard":{nom:"Michael Aagaard (Unbounce)",kind:"Cas documenté",force:"Moyenne",
+   quoi:"Retirer des champs a fait perdre 14 % ; le formulaire reconstruit autour des champs utiles a gagné 19,2 %.",
+   biais:"Un seul cas, mais il suffit à réfuter la règle universelle « moins de champs = mieux »."},
+ "gartner":{nom:"Gartner",kind:"Cabinet d'analyse",force:"Moyenne à élevée",
+   quoi:"L'essentiel du parcours d'achat B2B se déroule sans contact avec les fournisseurs.",
+   biais:"Méthodologie peu publique ; chiffres largement repris sans vérification."},
+ "6sense":{nom:"6sense",kind:"Éditeur logiciel",force:"Moyenne",
+   quoi:"Une large majorité d'acheteurs a déjà un fournisseur préféré avant le premier contact commercial.",
+   biais:"Intérêt commercial direct à démontrer que le marketing amont est décisif."},
+ "ftc":{nom:"FTC — règle sur les avis et témoignages",kind:"Texte réglementaire (en vigueur depuis oct. 2024)",force:"Très élevée",
+   quoi:"Interdit les faux avis, les témoignages non divulgués et les avis générés par IA, avec des pénalités par infraction.",
+   biais:"Aucun. C'est du droit, pas une opinion — et ça s'applique quel que soit notre avis."},
+ "dsa":{nom:"Union européenne — DSA, UCPD",kind:"Textes réglementaires",force:"Très élevée",
+   quoi:"Interdiction des interfaces trompeuses, des frais cachés et des parcours de résiliation volontairement compliqués.",
+   biais:"Aucun ; le périmètre exact évolue, un texte complémentaire est en préparation."},
+ "deloitte":{nom:"Deloitte / Google, « Milliseconds Make Millions »",kind:"Étude observationnelle, 37 marques",force:"Moyenne",
+   quoi:"Un dixième de seconde gagné est associé à environ 8 % de conversions en plus dans le commerce de détail.",
+   biais:"Corrélation, pas test contrôlé : les sites rapides sont aussi les mieux financés. Aucune marque de logiciel dans l'échantillon."},
+ "cwv":{nom:"Core Web Vitals (Google)",kind:"Référentiel officiel",force:"Élevée",
+   quoi:"Des seuils chiffrés de performance perçue, mesurés sur le vécu réel des visiteurs.",
+   biais:"Définit des seuils, pas un effet business. À utiliser comme hygiène."},
+ "meclabs":{nom:"MECLABS",kind:"Praticien",force:"Moyenne",
+   quoi:"Travaux sur la clarté et la spécificité de la proposition de valeur, y compris des cas où trop simplifier a fait perdre.",
+   biais:"Cas isolés, méthodologie inégale."},
+ "dunford":{nom:"April Dunford",kind:"Cadre conceptuel praticien",force:"Moyenne",
+   quoi:"La valeur s'évalue toujours par rapport à une alternative : il faut nommer le cadre de référence.",
+   biais:"Non testé expérimentalement ; utile comme grille, pas comme preuve."},
+ "lift":{nom:"Modèle LIFT",kind:"Cadre praticien",force:"Moyenne",
+   quoi:"Décompose une page en six leviers, dont les doutes et les distractions.",
+   biais:"Grille de lecture commerciale, jamais validée en tant que modèle."},
+ "pxl":{nom:"PXL (priorisation)",kind:"Cadre praticien",force:"Moyenne",
+   quoi:"Priorise les tests par une série de questions binaires, plus reproductible que les notes au feeling.",
+   biais:"Sous-note structurellement les changements audacieux — défaut connu et documenté."},
+ "cxl":{nom:"CXL / Speero",kind:"Cabinet de formation et d'optimisation",force:"Moyenne",
+   quoi:"Consensus de pratique sur la friction, la preuve et la structure des pages.",
+   biais:"Vend de la formation ; « consensus de praticiens » n'est pas une preuve expérimentale."},
+ "instapage":{nom:"Instapage (AdMap)",kind:"Éditeur logiciel",force:"Faible à moyenne",
+   quoi:"Principe d'une page dédiée par groupe d'annonces.",
+   biais:"Vend l'outil qui rend ce principe facile à appliquer."},
+ "plg":{nom:"Sources PLG (OpenView, Kyle Poyar)",kind:"Investisseurs et praticiens",force:"Moyenne",
+   quoi:"Repères sur l'activation, l'essai gratuit et le freemium en libre-service.",
+   biais:"Écosystème d'investisseurs ; sélection des cas qui réussissent."},
+ "consent":{nom:"Consent Mode v2 et modélisation des conversions",kind:"Documentation officielle",force:"Élevée",
+   quoi:"Exigences de consentement et part croissante de conversions estimées plutôt qu'observées.",
+   biais:"Aucun sur les faits techniques ; la modélisation elle-même reste une boîte noire."},
+};
+
+/* ——— AFFICHAGE ——— */
+const $ = (s) => document.querySelector(s);
+let niche = "all", texte = "";
+
+$("#chemin").innerHTML = CHEMIN.map((e, i) => `<div class="etape" style="--c:${e.c}">
+  <span class="num">ÉTAPE ${i+1}</span><h3>${e.t}</h3><p>${e.d}</p></div>`).join("");
+
+$("#niches").innerHTML = NICHES.map((n) => `<div class="nc" style="--c:${n.c}">
+  <div class="top"><b>${n.nom}</b><span>${n.sous}</span></div>
+  <dl>${Object.entries(n.d).map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></div>`).join("");
+
+$("#questions").innerHTML = QUESTIONS.map((q) => `<div class="q">
+  <div><div class="t">${q.t}</div><div class="w">${q.w}</div></div>
+  <span class="tag">${q.g}</span></div>`).join("");
+
+$("#refus").innerHTML = REFUS.map((r) => `<div class="panelko"><b>${r.t}</b><p>${r.w}</p>
+  <div class="srcs">${r.src.map((s) => chip(s)).join("")}</div></div>`).join("");
+
+$("#gardes").innerHTML = GARDES.map((g) => `<div class="panelgf"><b>${g.t}</b><p>${g.w}</p></div>`).join("");
+
+$("#sources").innerHTML = Object.entries(SOURCES).map(([id, s]) => {
+  const cl = s.force.startsWith("Très") ? "f-tres" : s.force.startsWith("Élevée") ? "f-haute"
+    : s.force.startsWith("Faible") ? "f-faible" : "f-moyenne";
+  return `<div class="src" id="src-${id}">
+    <div class="h"><b>${s.nom}</b><span class="force ${cl}">${s.force}</span>
+      <span class="kind">${s.kind}</span></div>
+    <p>${s.quoi}</p><div class="biais"><b>Ce qui la biaise —</b> ${s.biais}</div></div>`;
+}).join("");
+
+function chip(id) {
+  const s = SOURCES[id];
+  return `<span class="chip" data-src="${id}">${s ? s.nom : id}</span>`;
+}
+
+function rendreArbre() {
+  const ok = REGLES.filter((r) => (niche === "all" || r.n.includes(niche))
+    && (!texte || (r.s + r.o + r.d).toLowerCase().includes(texte)));
+  $("#cpt").textContent = `— ${ok.length} règle${ok.length > 1 ? "s" : ""} affichée${ok.length > 1 ? "s" : ""}`;
+  if (!ok.length) { $("#arbre").innerHTML = `<div class="empty">Aucune règle ne correspond.</div>`; return; }
+  const parFam = {};
+  for (const r of ok) (parFam[r.f] ??= []).push(r);
+  $("#arbre").innerHTML = Object.entries(parFam).map(([f, rs]) => {
+    const fam = FAMILLES[f];
+    return `<div class="fam" style="--c:${fam.c}"><h3>${fam.nom}</h3>${rs.map((r) => `
+      <div class="rule" style="--c:${fam.c}">
+        <div class="flow">
+          <div class="cell"><span class="k">Ce qu'on voit</span><p>${r.s}</p></div>
+          <div class="cell"><span class="k">Ce qu'on en conclut</span><p>${r.o}</p></div>
+          <div class="cell dec"><span class="k">Ce qu'on décide</span><p>${r.d}</p></div>
+          <div class="meta">
+            <span class="prio ${r.p}">${r.p}</span>
+            <span class="conf">preuve : ${r.c}</span>
+            <button class="i" data-i="${REGLES.indexOf(r)}" title="Détail technique">i</button>
+          </div>
+        </div>
+        <div class="srcs">${r.src.map((s) => chip(s)).join("")}</div>
+      </div>`).join("")}</div>`;
+  }).join("");
+}
+rendreArbre();
+
+document.querySelectorAll(".niche").forEach((b) => b.onclick = () => {
+  niche = b.dataset.n;
+  document.querySelectorAll(".niche").forEach((x) => x.classList.toggle("on", x === b));
+  rendreArbre();
+});
+$("#q").oninput = (e) => { texte = e.target.value.trim().toLowerCase(); rendreArbre(); };
+
+/* tiroir technique + navigation vers les sources */
+function ouvrir(t, html, src) {
+  $("#dt").textContent = t;
+  $("#dbody").innerHTML = html + (src?.length ? `<h4>Sur quoi ça repose</h4>` +
+    src.map((id) => { const s = SOURCES[id]; return s
+      ? `<p><b>${s.nom}</b> — ${s.kind}, force ${s.force.toLowerCase()}.<br>${s.quoi}
+         <br><span style="color:#9a3412">Biais : ${s.biais}</span></p>` : "" }).join("") : "");
+  $("#drawer").classList.add("open"); $("#scrim").classList.add("on");
+}
+function fermer() { $("#drawer").classList.remove("open"); $("#scrim").classList.remove("on"); }
+$("#dx").onclick = fermer; $("#scrim").onclick = fermer;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") fermer(); });
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".i");
+  if (b) { const r = REGLES[+b.dataset.i]; ouvrir(r.d, r.tech, r.src); return; }
+  const c = e.target.closest(".chip");
+  if (c) {
+    const el = document.getElementById("src-" + c.dataset.src);
+    if (el) { fermer(); el.scrollIntoView({behavior:"smooth", block:"center"});
+      el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); }
+  }
+});
+</script>
+</body>
+</html>
