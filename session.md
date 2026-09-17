@@ -59,12 +59,33 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   chaque `i` ouvre le détail technique. C'est la préfiguration de la KB : quand elle sera un
   fichier de données validé par schéma, la page le lira au lieu de le contenir.
 
+## Fait le 2026-09-18 (kabylesystem)
+- **L'identité des ancres (1.1.3) est comblée.** `e231` voulait dire « 231ᵉ élément », pas
+  « titre du héros » : mesuré sur Jira, une bannière ajoutée en tête de page et **293 ancres
+  sur 471 désignaient un autre contenu**, sans qu'`apply` s'en aperçoive.
+  - `1_acquire/fingerprint.ts` : empreinte par élément (rôle, texte, classes hors hachages de
+    build, chemin des parents, section, rang) → `anchors.json`, écrit à la capture.
+  - `1_acquire/relink.ts` : re-liage de deux captures. Ossature des correspondances franches
+    (seuil 70, sans concurrent), plus longue sous-suite croissante pour jeter les croisements,
+    puis **l'ordre du document contraint le voisinage** — c'est ce qui débloque les pages à
+    composants répétés (51,6 % → 87,3 % de re-liage).
+  - `apply/spec.ts` : champ `attendu` (rôle + texte témoin) ; `apply` **refuse en échec franc**
+    si l'ancre ne désigne plus la même chose, et renvoie vers `npm run relink`.
+  - `npm run relink:check -- <baseline>` : la preuve rejouable, sur une mutation connue.
+- **Mesuré sur Jira** : 411/471 retrouvées (87,3 %), dont 402 déplacées, **0 lien faux** contre
+  la vérité terrain, 60 ambiguës, 0 perdue. Les ambiguës sont refusées à l'édition, pas devinées.
+- Non-régression : Jira fidèle (0,08 % / 0,44 %), HubSpot fidèle (0,05 % desktop).
+
 ## La feuille de route
 [docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
 (contrôler · créer · distribuer · nourrir), avec l'état de chaque micro-tâche. C'est la
 référence ; la liste courte ci-dessous n'en garde que le haut.
 
 ## À faire (dans l'ordre)
+0. **Remplir `attendu` automatiquement** à l'écriture d'une spec, et **traduire une spec ancienne**
+   vers une capture neuve via le rapport de re-liage — sans ça le garde-fou existe mais reste vide.
+   Puis versionner les captures au lieu de les écraser, et tester le re-liage sur deux captures
+   réelles à deux dates (la mutation synthétique prouve le mécanisme, pas la dérive d'un vrai site).
 1. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
    et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.
 2. Sur la boutique : pousser la variante Dawn, la rendre, vérifier que Shopify accepte/rejette ce
@@ -87,3 +108,7 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 - Corpus sans aucune page e-commerce : ajouter une PDP Shopify réelle.
 - Gel trop brutal (animation figée en plein vol) · Salesforce anti-bot · Monday scroll-jack.
 - Jev (TypeSafe) : non adopté ; garder l'extraction de signaux en questions typées indépendantes.
+- **00:01** — ancres c quoi ? + je viens darriver sur le projet vienso n fait un point, message court par message court
+- **00:09** — une grande bande? en gros il label les diffrents componets de la page? ca sappelle c omme ca? pas comrpis l'histoire de aucun LLM ne touche au HTML
+- **00:14** — mais donc c bien ou pas de fonctionner comme ca?
+- **00:26** — mais t'es sur que genre meme GPT 6 aurait pas su copier une page HTML ? il est multimodal et hyper smart, surtout avec un bon screen etc. non ? parce que n'oubl

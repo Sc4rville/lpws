@@ -10,7 +10,9 @@
     "assets": "tsx engine/clone/3_assets/localize.ts",
     "verify": "tsx engine/clone/5_verify/verify.ts",
     "apply": "tsx engine/apply/run.ts",
-    "viewer": "tsx engine/viewer/server.ts"
+    "viewer": "tsx engine/viewer/server.ts",
+    "relink": "tsx engine/clone/1_acquire/relink.ts",
+    "relink:check": "tsx engine/clone/1_acquire/relink-check.ts"
   },
   "dependencies": {
     "pixelmatch": "^7",

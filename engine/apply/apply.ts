@@ -21,7 +21,7 @@ import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import type { Edit } from "./spec.ts"
 import { harvestDesign, type DesignSystem, type Role } from "./design.ts"
-import { step } from "../shared/log.ts"
+import { step, fail } from "../shared/log.ts"
 
 const SCOPE = "apply"
 
@@ -53,10 +53,40 @@ export type ApplyReport = {
  * finale dans la page. C'est lui qu'on affiche : relire la spec ne dit pas ce qui s'est
  * passé, seulement ce qui était demandé.
  */
-function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }): { manquantes: string[]; journal: Entree[] } {
+function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
+  { manquantes: string[]; desaccords: string[]; journal: Entree[] } {
   const { edits, ds } = arg
   const manquantes: string[] = []
+  /** l'ancre existe mais ne désigne plus ce que la spec visait — cf. Attendu dans spec.ts */
+  const desaccords: string[] = []
   const journal: Entree[] = []
+
+  const roleDe = (el: Element): string => {
+    const t = el.tagName.toLowerCase()
+    if (/^h[1-6]$/.test(t)) return "heading"
+    if (t === "a" || t === "button") return "link"
+    if (t === "img" || t === "picture" || t === "video" || t === "svg") return "media"
+    if (t === "input" || t === "textarea" || t === "select" || t === "label") return "field"
+    if (t === "p" || t === "li" || t === "blockquote" || t === "figcaption") return "text"
+    return "bande"
+  }
+  const norme = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase().slice(0, 140)
+  /**
+   * Le témoin ne réclame pas l'identique : le client a le droit de corriger une coquille.
+   * Il réclame que ce soit encore LE MÊME élément — même rôle, texte reconnaissable.
+   */
+  const concorde = (el: Element, att: { role: string; text: string }): boolean => {
+    if (roleDe(el) !== att.role) return false
+    const a = norme(att.text), b = norme(el.textContent || "")
+    if (!a && !b) return true
+    if (!a || !b) return false
+    if (a === b || a.includes(b) || b.includes(a)) return true
+    const mots = (t: string) => new Set(t.split(/[^\p{L}\p{N}]+/u).filter((m) => m.length > 2))
+    const A = mots(a), B = mots(b)
+    let inter = 0
+    for (const m of A) if (B.has(m)) inter++
+    return inter / Math.max(A.size + B.size - inter, 1) >= 0.4
+  }
   const get = (a?: string) => a ? document.querySelector(`[data-lpws="${a}"]`) : null
   const lire = (el: Element): string => {
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
@@ -137,6 +167,11 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }): { manquantes: st
 
     const el = get(e.anchor)
     if (!el) { manquantes.push(e.anchor!); return }
+    if (e.attendu && !concorde(el, e.attendu)) {
+      desaccords.push(`${e.anchor} : attendu ${e.attendu.role} « ${e.attendu.text.slice(0, 40)} »,`
+        + ` trouvé ${roleDe(el)} « ${(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40)} »`)
+      return
+    }
     const ligne: Entree = { n: i + 1, op, anchor: e.anchor!, quoi: "", pourquoi: e.pourquoi }
 
     if (op === "remove") {
@@ -231,7 +266,7 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }): { manquantes: st
     const a = bande?.getAttribute("data-lpws")
     if (a) l.section = a
   }
-  return { manquantes, journal }
+  return { manquantes, desaccords, journal }
 }
 
 /**
@@ -260,7 +295,12 @@ export async function applyEdits(
       // le design system se récolte sur CE document : la grille du mobile n'est pas celle
       // du desktop, les classes diffèrent
       const ds = await page.evaluate(harvestDesign)
-      const { manquantes, journal } = await page.evaluate(applyInPage, { edits, ds })
+      const { manquantes, desaccords, journal } = await page.evaluate(applyInPage, { edits, ds })
+      if (desaccords.length > 0)
+        fail(SCOPE,
+          `l'ancre ne désigne plus la même chose dans ${source} :\n  ` + desaccords.join("\n  ") +
+          `\n  → la page du client a changé depuis la capture. Recapturer, puis re-lier les ancres ` +
+          `(npm run relink -- <ancienne> <nouvelle>) avant de rejouer cette variante.`)
       if (manquantes.length > 0)
         throw new Error(
           `ancres introuvables dans ${source} : ${manquantes.join(", ")} — ` +

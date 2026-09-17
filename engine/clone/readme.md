@@ -14,13 +14,38 @@ npm run verify -- clients/acme/printemps/baseline        # rejuger sans recaptur
 
 | Étape | État | Rôle |
 |---|---|---|
-| [`1_acquire/`](1_acquire/) | ✅ | Rendu headless (JS exécuté, overlays démontés, scroll complet), **marquage `data-lpws`**, gel de la page (timers/vidéos), screenshots de référence + octets des ressources (`assets/`), sérialisation des DEUX états (desktop + mobile), vérité réseau (`resources.json`) |
+| [`1_acquire/`](1_acquire/) | ✅ | Rendu headless (JS exécuté, overlays démontés, scroll complet), **marquage `data-lpws`** + **empreinte de chaque ancre** ([`fingerprint.ts`](1_acquire/fingerprint.ts) → `anchors.json`), gel de la page (timers/vidéos), screenshots de référence + octets des ressources (`assets/`), sérialisation des DEUX états (desktop + mobile), vérité réseau (`resources.json`) |
 | [`2_styles/`](2_styles/) | ✅ | CSS self-contained : feuilles réécrites vers `assets/` (fonts locales comprises), `<link>`/`<style>` localisés, le non-capturé absolutisé et compté |
 | [`3_assets/`](3_assets/) | ✅ | Images/vidéos locales (src, srcset, posters, styles inline), le reste absolutisé, `<base>` retirée → clone autonome |
 | [`4_structure/`](4_structure/) | 🔜 | `page.json` — segmentation + typage des sections, slots ancrés. **Le schéma est déjà posé** ([`schema.ts`](4_structure/schema.ts)) : c'est le contrat de tout l'aval |
 | [`5_verify/`](5_verify/) | ✅ | **Le juge** : rendu http local (origine synthétique), diff visuel vs live, métriques de santé, preuves à l'œil |
 
 [`run.ts`](run.ts) orchestre ; chaque étape reste utilisable seule.
+
+## L'identité des ancres — ce que le numéro ne dit pas
+
+`e231` veut dire « le 231ᵉ élément dans l'ordre du document », pas « le titre du héros ».
+Un paragraphe ajouté en haut de page et le numéro désigne autre chose : sur Jira, **293
+ancres sur 471 pointaient un AUTRE contenu** après une seule insertion, sans qu'`apply` s'en
+aperçoive. Faux, confiant, silencieux.
+
+La réponse tient en trois pièces :
+
+| Pièce | Rôle |
+|---|---|
+| [`1_acquire/fingerprint.ts`](1_acquire/fingerprint.ts) | relève ce que chaque élément **est** (rôle, texte, classes hors hachages de build, chemin des parents, section, rang) → `anchors.json` |
+| [`1_acquire/relink.ts`](1_acquire/relink.ts) | **re-lie** deux captures : ossature des correspondances franches, puis l'ordre du document contraint le reste. Rapport honnête : retrouvées / déplacées / ambiguës / perdues |
+| [`apply/spec.ts`](../apply/spec.ts) → `attendu` | le témoin d'identité dans la spec ; `apply` **refuse** l'édition si l'ancre ne désigne plus la même chose |
+
+```bash
+npm run relink -- <baseline-avant> <baseline-apres>   # rapport de re-liage
+npm run relink:check -- <baseline>                    # la preuve, sur une mutation connue
+```
+
+**Mesuré** (Jira, 471 ancres, une bannière injectée en tête de page) : 411 ancres retrouvées
+(87,3 %), dont 402 déplacées, **0 lien faux** contre la vérité terrain, 60 ambiguës et 0 perdue.
+Les ambiguës ne sont pas devinées : elles sont refusées à l'édition. Une ancre muette (image,
+carte sans texte) au milieu de jumelles reste indécidable, et c'est le bon comportement.
 
 ## Ce que produit `clients/<client>/<campagne>/baseline/`
 

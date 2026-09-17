@@ -14,8 +14,8 @@
 et répétable. Par le clone, ou par une intégration à sa plateforme. **Cette étape doit être
 irréprochable, sinon tout ce qui suit hérite de ses approximations.**
 
-**Où on en est :** le bloc le plus avancé — deux pages du corpus fidèles à 0,1 % — mais miné
-par un trou d'identité (1.3) qui invalide silencieusement tout l'aval.
+**Où on en est :** le bloc le plus avancé — deux pages du corpus fidèles à 0,1 % — et le trou
+d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et prouvé.
 
 ## 1.1 · Capturer la page
 
@@ -43,22 +43,24 @@ par un trou d'identité (1.3) qui invalide silencieusement tout l'aval.
 - 🟡 Ce que la page ne charge pas reste distant, et c'est compté honnêtement
 - ⬜ Vidéos non embarquées : seul le poster est là
 
-### 1.1.3 · ⚠️ L'IDENTITÉ DES ANCRES — le trou béant
-> Aujourd'hui `e231` ne veut pas dire « le titre du héros », mais « le 231ᵉ élément dans
-> l'ordre du document au moment de la capture ». **Prouvé :** un seul paragraphe ajouté en
-> haut de page et `e231` désigne un lien « Register now », `e236` un champ de saisie. Et
-> `apply` ne s'en aperçoit pas : l'ancre existe toujours, elle désigne autre chose. Faux,
-> confiant, silencieux — le pire mode d'échec possible.
+### 1.1.3 · L'IDENTITÉ DES ANCRES — le trou comblé
+> Constat de départ : `e231` ne voulait pas dire « le titre du héros » mais « le 231ᵉ élément
+> dans l'ordre du document ». **Mesuré sur Jira (471 ancres), une bannière ajoutée en haut de
+> page : 293 ancres désignaient un AUTRE contenu**, sans qu'`apply` s'en aperçoive.
+> **État : empreinte + re-liage + refus construits et prouvés.** 411 ancres retrouvées (87,3 %),
+> dont 402 déplacées, **0 lien faux** contre la vérité terrain, 60 ambiguës, 0 perdue.
 - ✅ Ancres de contenu `e<n>` (par balise)
 - ✅ Ancres de section `s<n>` (par géométrie — les sections modernes sont des div anonymes)
-- 🔴 Les ancres sont des numéros de place, pas des noms
-- ⬜ Définir une **empreinte** par élément : rôle, texte, signature de classes, chemin des parents, rang dans sa section
-- ⬜ Écrire l'empreinte dans la capture, à côté du numéro
-- ⬜ Étape de **re-liage** : rattacher les ancres d'une capture aux éléments de la suivante
-- ⬜ Rapport honnête du re-liage : retrouvés / perdus / ambigus
-- ⬜ `apply` refuse une édition dont l'empreinte ne correspond plus
+- ✅ **Empreinte** par élément : rôle, texte, signature de classes (hachages de build retirés), chemin des parents, section, rang ([`fingerprint.ts`](../engine/clone/1_acquire/fingerprint.ts))
+- ✅ Empreinte écrite à la capture, à côté du numéro → `anchors.json`
+- ✅ Étape de **re-liage** ([`relink.ts`](../engine/clone/1_acquire/relink.ts)) : ossature des correspondances franches, puis l'ordre du document contraint le voisinage — c'est ce qui débloque les composants répétés
+- ✅ Rapport honnête : retrouvées / déplacées / ambiguës / perdues, jamais de tranchage au hasard
+- ✅ `apply` refuse une édition dont l'empreinte ne correspond plus (`attendu` dans [`spec.ts`](../engine/apply/spec.ts))
+- ✅ Preuve rejouable sur mutation connue : `npm run relink:check -- <baseline>`
 - ⬜ Versionner les captures d'un client au lieu de les écraser
-- ⬜ Corpus de test du re-liage : les mêmes pages capturées à deux dates
+- ⬜ Corpus de test du re-liage : les mêmes pages capturées à deux dates réelles *(la mutation synthétique prouve le mécanisme, pas la dérive d'un vrai site)*
+- ⬜ Remplir `attendu` automatiquement à l'écriture d'une spec *(sinon personne ne le remplira)*
+- ⬜ Rejouer une spec ancienne sur une capture neuve en traduisant ses ancres par le rapport de re-liage
 
 ### 1.1.4 · Le juge
 - ✅ Diff visuel contre le live, desktop et mobile
@@ -139,7 +141,7 @@ la valeur, et la seule partie que personne d'autre ne fait.
 ## 2.1 · La représentation de la page (`page.json`)
 - ✅ Contrat posé : sections typées, emplacements ancrés
 - 🔴 Rien ne le produit encore
-- 🔴 **Dépend de 1.1.3** : le bâtir sur des numéros de place coulerait le trou dans les fondations
+- ✅ **Dépendance à 1.1.3 levée** : les ancres ont une empreinte, `page.json` peut être bâti dessus
 - ⬜ Élargir la taxonomie au mix réel : page produit, collection, advertorial, listicle, quiz, bundle, abonnement, pricing, outil gratuit
 - ⬜ Extraire la structure (skill) et la valider par schéma
 - ⬜ Extraire aussi le **texte actuel** de chaque emplacement *(sans lui, rien à comparer à l'annonce)*
@@ -291,7 +293,7 @@ maintenant et qui coûteront très cher à rattraper.
 
 # Les cinq choses à faire maintenant
 
-1. **L'identité des ancres** (1.1.3) — avant `page.json`, sinon on coule le trou dans les fondations.
+1. ~~**L'identité des ancres** (1.1.3)~~ — **fait** : empreinte, re-liage, refus d'`apply`, preuve rejouable. Reste le versionnage des captures et le remplissage automatique d'`attendu`.
 2. **La boutique de dev Shopify** (1.3) — débloque le gros de l'e-commerce, et c'est du côté de Yann.
 3. **La recherche v2** (2.3) — tourne en parallèle, livre la moitié manquante de la KB.
 4. **Le juge par section** (1.1.4) — sans lui on ne sait pas *quoi* a cassé, ni côté clone ni côté variante.

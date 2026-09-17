@@ -38,6 +38,7 @@ import { writeFile, rm, mkdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { markDom } from "./mark.ts"
+import { fingerprintDom } from "./fingerprint.ts"
 import { step, timed } from "../../shared/log.ts"
 
 const SCOPE = "clone/1_acquire"
@@ -365,6 +366,13 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
     // portent les MÊMES ancres data-lpws
     const marked = await page.evaluate(markDom)
     step(SCOPE, `${marked.elements} éléments + ${marked.sections} sections marqués data-lpws`)
+
+    // l'ancre seule est un rang, donc périssable : on relève AUSSI ce que chaque élément est
+    // (rôle, texte, classes, chemin, section, rang) pour pouvoir la re-lier à la prochaine
+    // capture et refuser une édition dont la cible a changé de nature (cf. fingerprint.ts)
+    const empreintes = await page.evaluate(fingerprintDom)
+    await writeFile(join(dir, "anchors.json"), JSON.stringify(empreintes, null, 2))
+    step(SCOPE, `${empreintes.length} empreintes relevées → anchors.json`)
 
     // pour chaque état : freeze (référence, clone et DOM = le même instant visuel,
     // cf. freezePage), screenshot de référence, puis sérialisation de CET état

@@ -42,9 +42,23 @@ export const Contenu = z.object({
   cta: z.object({ label: z.string().min(2), href: z.string().optional() }).optional(),
 })
 
+/**
+ * Ce que l'ancre désignait quand la spec a été écrite. Une ancre est un RANG : le client
+ * ajoute une bannière et `e231` ne pointe plus le titre du héros mais un lien « Register
+ * now ». Sans ce témoin, `apply` écrirait au mauvais endroit sans lever une erreur.
+ * Relevé depuis `anchors.json` (cf. clone/1_acquire/fingerprint.ts).
+ */
+export const Attendu = z.object({
+  role: z.enum(["heading", "text", "link", "media", "field", "bande", "autre"]),
+  /** le texte au moment de l'écriture, normalisé — tronqué, c'est un témoin, pas une copie */
+  text: z.string(),
+})
+
 export const Edit = z.object({
   /** la cible : requise partout SAUF pour `compose`, qui ne part d'aucun élément existant */
   anchor: Anchor.optional(),
+  /** témoin d'identité de la cible — apply REFUSE si l'ancre désigne autre chose */
+  attendu: Attendu.optional(),
   /** pourquoi CETTE édition sert l'hypothèse (une ligne, lisible par un humain) */
   pourquoi: z.string().min(3),
   op: z.enum(["set", "remove", "move", "duplicate", "swap", "compose"]).default("set"),
@@ -108,6 +122,7 @@ export const VariantSpec = z.object({
   edits: z.array(Edit).min(1),
 })
 
+export type Attendu = z.infer<typeof Attendu>
 export type Contenu = z.infer<typeof Contenu>
 export type Edit = z.infer<typeof Edit>
 export type VariantSpec = z.infer<typeof VariantSpec>
