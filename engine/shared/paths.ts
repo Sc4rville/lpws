@@ -12,6 +12,19 @@ import { join } from "node:path"
 
 export const CLIENTS_ROOT = "clients"
 
+/**
+ * Marque d'un client depuis l'URL de sa page : "https://www.atlassian.com/software/jira"
+ * → "atlassian". C'est ce nom qui range la donnée, parce qu'un dossier doit se lire sans
+ * décodeur — jamais un slug d'URL ni un nom de lot ("corpus", "test").
+ */
+export function marque(url: string): string {
+  const hote = new URL(url).hostname.replace(/^www\./, "")
+  // on retire le TLD (et le TLD composé type .co.uk) : "atlassian.com" → "atlassian"
+  const parts = hote.split(".")
+  const garde = parts.length > 2 && parts.at(-2)!.length <= 3 ? parts.slice(0, -2) : parts.slice(0, -1)
+  return slugify(garde.at(-1) ?? hote)
+}
+
 /** slug sûr pour dossiers : "Acme SaaS!" → "acme-saas" ; "www.acme.io" → "acme-io" */
 export function slugify(s: string): string {
   return s

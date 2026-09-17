@@ -22,5 +22,5 @@ for u in \
 ; do npm run clone -- "$u" --client corpus; done
 ```
 
-Les résultats vivent sous `clients/corpus/` (gitignoré) — seuls les verdicts comptent,
+Les résultats vivent sous `clients/<marque>/` (gitignoré) — `atlassian/`, `asana/`, `hubspot/`, `monday/` — seuls les verdicts comptent,
 notés dans la conversation/les sessions, pas versionnés.

@@ -80,6 +80,26 @@
   .prio.HIGH { background: color-mix(in srgb, var(--ko) 20%, transparent); color: var(--ko); }
   .prio.MEDIUM { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
   .prio.LOW { background: color-mix(in srgb, var(--dim) 20%, transparent); color: var(--dim); }
+
+  /* ——— journal des changements ——— */
+  .jrn { border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    max-height: 32vh; overflow-y: auto; }
+  .jrn .hd { padding: 7px 12px; font-size: 11px; color: var(--dim);
+    border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+  .jr { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 8px 12px;
+    border-bottom: 1px solid var(--line); cursor: pointer; font-size: 12px; }
+  .jr:last-child { border-bottom: 0; }
+  .jr:hover { background: var(--panel2); }
+  .verbe { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    padding: 2px 0; text-align: center; border-radius: 5px; height: fit-content; }
+  .verbe.set { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .verbe.remove { background: color-mix(in srgb, var(--ko) 20%, transparent); color: var(--ko); }
+  .verbe.duplicate { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+  .verbe.move, .verbe.swap { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+  .jr .av { color: var(--dim); text-decoration: line-through; }
+  .jr .ap { color: var(--ink); }
+  .jr .po { color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .jr .lieu { color: var(--dim); font-size: 10px; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -124,13 +144,26 @@
   const F = (p) => `/files/${sel.path}/baseline/${p}`
 
   /* ——— sidebar ——— */
+  /** "https://www.atlassian.com/software/jira" → "Atlassian" — on identifie une capture par
+   *  la MARQUE du client, pas par le slug d'URL ni par le dossier de rangement. */
+  function marque(it) {
+    if (!it.source) return it.client
+    try {
+      const h = new URL(it.source).hostname.replace(/^www\./, "")
+      const n = h.split(".")[0]
+      return n.charAt(0).toUpperCase() + n.slice(1)
+    } catch { return it.client }
+  }
+
   function renderList() {
     $("#list").innerHTML = items.map((it) => {
       const color = !it.judged ? "var(--warn)" : it.fidele ? "var(--ok)" : "var(--ko)"
       const isNew = !first && !known.has(it.path)
+      const nv = it.variants.length
       return `<div class="item ${sel?.path === it.path ? "sel" : ""}" data-p="${it.path}">
         <span class="dot" style="background:${color}"></span>
-        <span class="name"><b>${it.campaign}</b><small>${it.client}</small></span>
+        <span class="name"><b>${marque(it)}</b><small>${it.campaign}${
+          nv ? ` · ${nv} variante${nv > 1 ? "s" : ""}` : ""}</small></span>
         ${isNew ? '<span class="new">nouveau</span>' : ""}
         <span class="pct">${it.judged ? pct(it.diff.desktop) : "—"}</span>
       </div>`
@@ -215,16 +248,41 @@
         <div class="k"><b>Règle —</b> ${esc(d.diagnostic.regle)} &nbsp;·&nbsp;
           <b>Confiance —</b> ${esc(d.diagnostic.confiance)} &nbsp;·&nbsp;
           <b>Preuve —</b> ${esc(d.diagnostic.preuve)}</div>
-        ${dd ? `<div class="k"><b>Éditions —</b> ${d.edits.length} ·
-          ${dd.heightDelta > 4 ? `la page a changé de hauteur de ${dd.heightDelta}px`
-            : "hauteur inchangée"}</div>` : ""}
       </div>`
 
-    st.innerHTML = bar + card + `<div class="cols">
+    // le journal : ce que la mécanique a RÉELLEMENT changé, dans l'ordre, avec sa position
+    const j = d?.journal ?? []
+    const flecheOuBloc = (r) => r.op === "set"
+      ? `<span class="av">${esc(r.avant || "(vide)")}</span> → <span class="ap">${esc(r.apres)}</span>`
+      : r.op === "remove" ? `<span class="av">${esc(r.avant)}</span>`
+      : r.op === "swap" ? `<span class="ap">${esc(r.avant)}</span> ↔ <span class="ap">${esc(r.apres)}</span>`
+      : `<span class="ap">${esc(r.quoi)}</span> <span class="lieu">→ ${esc(r.ou ?? "")}</span>`
+    const jrn = !j.length ? "" : `<div class="jrn">
+      <div class="hd">CE QUI A CHANGÉ — ${j.length} modification${j.length > 1 ? "s" : ""} ·
+        clique une ligne pour t'y rendre dans la page</div>
+      ${j.map((r) => `<div class="jr" data-y="${r.y ?? 0}">
+        <span class="verbe ${r.op}">${r.op}</span>
+        <span>
+          <div>${flecheOuBloc(r)}</div>
+          <div class="po">${esc(r.pourquoi)}</div>
+          <div class="lieu">${r.section ? "section " + r.section + " · " : ""}${
+            r.y != null ? "à " + r.y + " px du haut" : ""} · ancre ${r.anchor}</div>
+        </span>
+      </div>`).join("")}</div>`
+
+    st.innerHTML = bar + card + jrn + `<div class="cols">
       ${col("BASELINE (le clone du client)", scrollImg(F(`clone${device}.png`), "vA"))}
       ${col("VARIANTE — " + selVariant, scrollImg(V(`variant${device}.png`), "vB"))}
     </div>`
     syncScroll($("#vA"), $("#vB"))
+
+    // aller à l'endroit exact d'un changement : les captures sont pleine page, donc la
+    // position en pixels de page se convertit par le facteur d'affichage de l'image
+    st.querySelectorAll(".jr").forEach((row) => row.onclick = () => {
+      const box = $("#vB"), img = box?.querySelector("img")
+      if (!img?.naturalWidth) return
+      box.scrollTop = Number(row.dataset.y) * (img.clientWidth / img.naturalWidth) - 120
+    })
     st.querySelector(".vbar").onclick = (e) => {
       if (!e.target.dataset.v) return
       selVariant = e.target.dataset.v; renderStage()

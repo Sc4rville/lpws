@@ -20,7 +20,7 @@ import { acquire } from "./1_acquire/render.ts"
 import { localizeStyles } from "./2_styles/localize.ts"
 import { localizeAssets } from "./3_assets/localize.ts"
 import { verifyBaseline, SEUIL_DEFAUT } from "./5_verify/verify.ts"
-import { baselineDir, slugify } from "../shared/paths.ts"
+import { baselineDir, marque, slugify } from "../shared/paths.ts"
 import { step, fail } from "../shared/log.ts"
 
 const SCOPE = "clone"
@@ -34,7 +34,8 @@ async function main() {
   const url = process.argv.slice(2).find((a) => a.startsWith("http"))
   if (!url) fail(SCOPE, "usage : npm run clone -- <url> [--client x] [--campaign y] [--seuil 0.03]")
 
-  const client = arg("--client") ?? slugify(new URL(url).hostname)
+  // par défaut, le dossier porte la MARQUE du client ("atlassian"), pas l'hôte ni un lot
+  const client = arg("--client") ?? marque(url)
   // défaut : le chemin de l'URL ("/products/marketing" → "products-marketing") — deux LP
   // du même client ne s'écrasent pas ; page racine → "campagne-1"
   const campaign = arg("--campaign") ?? (slugify(new URL(url).pathname) || "campagne-1")

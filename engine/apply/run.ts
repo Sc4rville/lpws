@@ -81,7 +81,9 @@ export async function applyVariant(baseline: string, specPath: string) {
   step(SCOPE, `${spec.nom} → ${vdir}`)
   step(SCOPE, `hypothèse : ${spec.hypothese}`)
 
-  await applyEdits(baseline, vdir, spec.edits)
+  // le journal desktop fait foi pour l'affichage (le mobile applique les mêmes éditions)
+  const rapports = await applyEdits(baseline, vdir, spec.edits)
+  const journal = rapports[0].journal
 
   const deltas: Record<string, { ratio: number; heightDelta: number }> = {}
   await timed(SCOPE, "rendu + delta vs baseline", async () => {
@@ -100,8 +102,9 @@ export async function applyVariant(baseline: string, specPath: string) {
     }
   })
 
-  await writeFile(join(vdir, "variant.json"), JSON.stringify({ ...spec, deltas, baseline }, null, 2))
-  return { vdir, spec, deltas }
+  await writeFile(join(vdir, "variant.json"),
+    JSON.stringify({ ...spec, journal, deltas, baseline }, null, 2))
+  return { vdir, spec, journal, deltas }
 }
 
 /* CLI */
