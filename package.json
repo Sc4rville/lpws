@@ -12,7 +12,8 @@
     "apply": "tsx engine/apply/run.ts",
     "viewer": "tsx engine/viewer/server.ts",
     "relink": "tsx engine/clone/1_acquire/relink.ts",
-    "relink:check": "tsx engine/clone/1_acquire/relink-check.ts"
+    "relink:check": "tsx engine/clone/1_acquire/relink-check.ts",
+    "deploy": "tsx engine/deploy/run.ts"
   },
   "dependencies": {
     "pixelmatch": "^7",

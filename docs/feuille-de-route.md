@@ -203,9 +203,11 @@ la valeur, et la seule partie que personne d'autre ne fait.
 **Ce que ça veut dire :** que tout soit fluide de son côté. Mettre une page en ligne,
 brancher la mesure, voir ses comptes, valider une variante.
 
-**Où on en est :** quasi inexistant. Le cockpit est un outil de développement, pas un produit.
+**Où on en est :** la mesure est câblée et jugée (3.2), l'hébergement ne l'est pas. Le cockpit
+reste un outil de développement, pas un produit.
 
 ## 3.1 · Mettre en ligne
+- ✅ Dossier publiable produit et **jugé avant publication** ([`engine/deploy`](../engine/deploy/readme.md))
 - ⬜ Héberger une variante : sous-domaine, certificat, diffusion
 - ⬜ Une URL stable par variante *(c'est elle que le buyer colle dans son annonce)*
 - ⬜ Sur Shopify : publier le template et ouvrir par `?view=`
@@ -213,10 +215,12 @@ brancher la mesure, voir ses comptes, valider une variante.
 - ⬜ `noindex` et canonique pour ne pas polluer le référencement du client
 
 ## 3.2 · Brancher la mesure
-- ⬜ Remettre les pixels du client sur la variante
-- ⬜ **Vérifier que la mesure fonctionne avant de déclarer une variante prête**
-- ⬜ Consentement conforme en Europe
-- ⬜ Paramètres de campagne cohérents entre l'annonce et la page
+- ✅ Remettre les pixels du client sur la variante (gtag / Meta, depuis la config)
+- ✅ **Juge de livraison** : la page est ouverte comme Google Ads le ferait (`?gclid=…`) et refusée si un CTA perd l'identifiant de clic
+- ✅ Consentement conforme en Europe : Consent Mode v2 en refus par défaut, avant les pixels
+- ✅ Paramètres de campagne relayés vers le tunnel du client (gclid, gbraid, wbraid, msclkid, fbclid, utm_*)
+- ✅ `noindex` + `canonical` : pas de concurrence de référencement avec la page du client
+- ⬜ Preuve de bout en bout : un clic de test qui remonte dans le compte du client
 
 ## 3.3 · Brancher les plateformes publicitaires
 - ⬜ Google Ads : lire les annonces, mots-clés, termes de recherche, conversions

@@ -40,11 +40,11 @@ media buyer donne l'url de la LP du client
 └───────────────────────────────────────────────────┘
    │  baseline/ fidèle, marquée, jugée
    ▼
-┌ variant ┐ → ┌ apply ┐ → ┌ deploy ┐
-│ diagnos.│   │ édits │   │ URL    │
-│ → édits │   │ ancrés│   │ live   │
-└─────────┘   └───────┘   └────────┘
-     🔜            ✅           🔜
+┌ variant ┐ → ┌ apply ┐ → ┌ deploy ─────────────┐
+│ diagnos.│   │ édits │   │ gclid relayé, pixels │
+│ → édits │   │ ancrés│   │ noindex, juge mesure │
+└─────────┘   └───────┘   └──────────────────────┘
+     🔜            ✅         🟡 (hébergement 🔜)
 ```
 
 ## Conventions (les tenir, c'est ça qui garde le repo lisible)

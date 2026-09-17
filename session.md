@@ -112,3 +112,5 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 - **00:09** — une grande bande? en gros il label les diffrents componets de la page? ca sappelle c omme ca? pas comrpis l'histoire de aucun LLM ne touche au HTML
 - **00:14** — mais donc c bien ou pas de fonctionner comme ca?
 - **00:26** — mais t'es sur que genre meme GPT 6 aurait pas su copier une page HTML ? il est multimodal et hyper smart, surtout avec un bon screen etc. non ? parce que n'oubl
+- **01:00** — ya pas la partie implementation aussi ou jsp quoi?
+- **01:04** — reprenons depuis le debut et essayson de tout comprendre / tout fixer pour que le projet soit parfait donc renforcons chaque maillon parfaitement step by step j

@@ -11,7 +11,7 @@ engine/
   clone/      FAMILLE 1 — url du client → baseline fidèle, marquée, jugée   ← en cours
   apply/      FAMILLE 2 — hypothèse + éditions ancrées → variante prouvée   ← en cours
   variant/    FAMILLE 3 — diagnostic → hypothèse + éditions (le brain)      ← à venir
-  deploy/     FAMILLE 4 — variante validée → URL live                       ← à venir
+  deploy/     FAMILLE 4 — variante validée → page publiable et jugée        ← en cours
 ```
 
 Le workflow produit complet est dans le [readme racine](../readme.md) ; la carte
