@@ -52,15 +52,29 @@ export function markDom(): { elements: number; sections: number } {
   const LARGEUR_MIN = 0.8    // une section occupe la largeur de son conteneur
 
   /**
-   * Descend depuis <main> tant qu'un seul enfant porte toute la hauteur : les pages
-   * modernes empilent 3-5 div d'enrobage avant d'arriver au vrai conteneur de sections.
+   * Descend jusqu'au vrai conteneur de sections. Les pages modernes empilent des div
+   * d'enrobage ; il faut les traverser sans s'arrêter au premier niveau où il y a plusieurs
+   * enfants — sur une page sans <main>, le body a pour enfants le bandeau, l'en-tête, LE
+   * CONTENU, le pied de page et des overlays (constaté sur HubSpot : la descente s'arrêtait
+   * au body et ne voyait que 4 « sections »).
+   *
+   * Règle : on descend tant qu'un enfant DOMINE — soit il est seul à être haut, soit il
+   * porte l'essentiel de la hauteur du conteneur et écrase largement le suivant.
    */
   function conteneurDeSections(): Element {
     let c: Element = document.querySelector("main") ?? document.body
-    for (let i = 0; i < 8; i++) {
-      const hauts = [...c.children].filter((k) => k.getBoundingClientRect().height > MIN_H)
-      if (hauts.length !== 1) break
-      c = hauts[0]
+    for (let i = 0; i < 10; i++) {
+      const hauts = [...c.children]
+        .map((k) => ({ el: k, h: k.getBoundingClientRect().height }))
+        .filter((k) => k.h > MIN_H)
+        .sort((a, b) => b.h - a.h)
+      if (hauts.length === 0) break
+      if (hauts.length === 1) { c = hauts[0].el; continue }
+      // plusieurs enfants hauts : ne descendre que si le premier écrase les autres
+      const total = c.getBoundingClientRect().height || 1
+      const domine = hauts[0].h > total * 0.6 && hauts[0].h > hauts[1].h * 2
+      if (!domine) break
+      c = hauts[0].el
     }
     return c
   }

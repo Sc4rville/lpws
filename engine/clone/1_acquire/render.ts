@@ -321,10 +321,29 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
         bodies.set(res.url(), res.body().catch(() => null))
     })
 
-    await timed(SCOPE, `chargement ${url}`, async () => {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
+    const statut = await timed(SCOPE, `chargement ${url}`, async () => {
+      const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
       await page.waitForTimeout(1500) // laisse le preloader/intro démarrer
+      return resp?.status() ?? 0
     })
+
+    // Le juge compare le clone au live : il ne peut PAS savoir que le live n'est pas la page
+    // demandée. Sans ce garde-fou, une 404 clonée fidèlement sort « fidèle à 0,00 % » — c'est
+    // arrivé sur asana.com/uses/sales, deux fois, sans que rien ne le signale.
+    if (statut >= 400)
+      throw new Error(`le serveur a répondu ${statut} pour ${url} — ce n'est pas la page du ` +
+        "client, rien à cloner (URL périmée, blocage anti-bot, ou géo-restriction)")
+
+    // 200 mais page d'erreur quand même : certains sites servent leur 404 en 200
+    const erreurDeguisee = await page.evaluate(() => {
+      const t = (document.title || "").toLowerCase()
+      const cls = (document.body.className || "").toLowerCase()
+      const motifs = /404|not found|page introuvable|page n'existe pas|doesn't exist|error/
+      return motifs.test(t) || /404|error-page|template404/.test(cls) ? (document.title || cls) : null
+    })
+    if (erreurDeguisee)
+      throw new Error(`la page répond ${statut} mais ressemble à une page d'erreur ` +
+        `("${erreurDeguisee}") — vérifier l'URL avant de cloner`)
 
     await page.evaluate(dismantleOverlays) // AVANT le scroll (sites scroll-jackés)
     await timed(SCOPE, "scroll complet (lazy-load + reveals)", async () => {
