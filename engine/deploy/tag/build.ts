@@ -1,22 +1,26 @@
 /**
- * build.ts — une VariantSpec → un tag autonome à coller dans le Google Tag Manager du client.
+ * build.ts — produit les DEUX pièces de la voie tag, et la séparation est tout l'intérêt.
  *
- * C'est la voie de livraison SANS DNS ni hébergement : la variante s'applique sur la vraie
- * page, à la vraie URL. Le media buyer a déjà l'accès GTM (c'est par là qu'il pose son suivi
- * de conversion), donc l'entrée ne demande aucun nouvel accès à son client.
+ *   loader.js          collé UNE FOIS dans le GTM du client, puis jamais retouché
+ *   v/<client>.json    la config servie — c'est elle qu'on change pour piloter
  *
- * Le tag embarque, pour chaque édition, l'EMPREINTE de sa cible relevée à la capture — pas
- * son numéro d'ancre, qui ne veut rien dire sur une page qu'on n'a pas capturée. Le
- * rapprochement se fait dans le navigateur, avec exactement le même calcul que hors ligne.
+ * Avant cette séparation, chaque variante était un tag à recréer dans Google Tag Manager,
+ * avec republication du conteneur. Personne ne teste dix variantes à ce prix-là, et tester
+ * dix variantes est exactement ce qu'on vend. Maintenant : lancer, changer la part de trafic
+ * ou tout arrêter ne touche plus jamais à GTM.
  *
- * Usage : npm run tag -- <dossier-baseline> <spec.json> [--part 50] [--delai 1500]
+ * Le tag embarque, pour chaque édition, l'EMPREINTE de sa cible relevée à la capture — pas son
+ * numéro d'ancre, qui ne veut rien dire sur une page qu'on n'a pas capturée.
+ *
+ * Usage : npm run tag -- <dossier-baseline> <spec.json> [...] [--part 50] [--base <url>]
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { build } from "esbuild"
 import { VariantSpec } from "../../apply/spec.ts"
 import type { Empreinte } from "../../clone/1_acquire/fingerprint.ts"
-import type { ConfigTag, EditTag } from "./runtime.ts"
+import type { ConfigServie, EditTag, VarianteServie } from "./loader.ts"
+import { slugify } from "../../shared/paths.ts"
 import { step, fail } from "../../shared/log.ts"
 
 const SCOPE = "deploy/tag"
@@ -29,9 +33,19 @@ const SCOPE = "deploy/tag"
  */
 const VERBES_TAG = new Set(["set", "remove", "move", "swap", "duplicate"])
 
-export async function buildTag(
-  baseline: string, specPath: string, part = 50, delaiMax = 1500,
-): Promise<{ fichier: string; edits: number; octets: number }> {
+/** Le script collé dans GTM. Il ne contient AUCUNE variante : juste où aller les chercher. */
+export async function buildLoader(client: string, base: string): Promise<string> {
+  const bundle = await build({
+    entryPoints: [new URL("./loader.ts", import.meta.url).pathname],
+    bundle: true, format: "iife", target: "es2019", minify: true, write: false,
+    define: { __LPWS_BASE__: JSON.stringify(base), __LPWS_CLIENT__: JSON.stringify(client) },
+    legalComments: "none",
+  })
+  return bundle.outputFiles[0].text
+}
+
+/** Traduit une VariantSpec en variante servie : les ancres deviennent des empreintes. */
+async function traduire(baseline: string, specPath: string, part: number): Promise<VarianteServie> {
   const parsed = VariantSpec.safeParse(JSON.parse(await readFile(specPath, "utf8")))
   if (!parsed.success)
     fail(SCOPE, `spec invalide (${specPath}) :\n` +
@@ -42,6 +56,9 @@ export async function buildTag(
   try { empreintes = JSON.parse(await readFile(join(baseline, "anchors.json"), "utf8")) }
   catch { return fail(SCOPE, `pas d'anchors.json dans ${baseline} — recapturer la page`) }
   const parAncre = new Map(empreintes.map((e) => [e.a, e]))
+
+  const meta = JSON.parse(await readFile(join(baseline, "meta.json"), "utf8"))
+  if (!meta.source) fail(SCOPE, `pas de source dans ${baseline}/meta.json`)
 
   const edits: EditTag[] = []
   for (const e of spec.edits) {
@@ -63,40 +80,51 @@ export async function buildTag(
       pourquoi: e.pourquoi,
     })
   }
+  return { nom: spec.nom, part, page: meta.source, edits }
+}
 
-  const cfg: ConfigTag = { nom: spec.nom, part, delaiMax, edits }
+export async function buildTag(
+  baseline: string, specPaths: string[], opts: { part?: number; base?: string; delaiMax?: number } = {},
+) {
+  const part = opts.part ?? 50
+  const base = opts.base ?? "https://lpws.local"
+  const meta = JSON.parse(await readFile(join(baseline, "meta.json"), "utf8"))
+  const client = slugify(meta.client ?? new URL(meta.source).hostname)
 
-  const bundle = await build({
-    entryPoints: [new URL("./runtime.ts", import.meta.url).pathname],
-    bundle: true, format: "iife", target: "es2019", minify: true, write: false,
-    define: { __LPWS__: JSON.stringify(cfg) },
-    legalComments: "none",
-  })
-  const code = bundle.outputFiles[0].text
+  const variantes: VarianteServie[] = []
+  for (const p of specPaths) variantes.push(await traduire(baseline, p, part))
 
-  const entete = `/* LPWS — variante "${spec.nom}"\n`
-    + `   hypothèse : ${spec.hypothese}\n`
-    + `   métrique  : ${spec.metrique}\n`
-    + `   risque    : ${spec.risque}\n`
-    + `   ${part}% du trafic · révélation forcée à ${delaiMax}ms · abandon si une cible est ambiguë */\n`
+  const cfg: ConfigServie = { actif: true, delaiMax: opts.delaiMax ?? 1500, variantes }
 
   const dir = join(baseline, "..", "tags")
-  await mkdir(dir, { recursive: true })
-  const fichier = join(dir, `${spec.nom}.js`)
-  await writeFile(fichier, entete + code)
+  await mkdir(join(dir, "v"), { recursive: true })
+  const fLoader = join(dir, "loader.js")
+  const fConfig = join(dir, "v", `${client}.json`)
 
-  step(SCOPE, `${spec.nom} → ${fichier} · ${edits.length} édition(s) · ${(code.length / 1024).toFixed(1)} Ko`)
-  return { fichier, edits: edits.length, octets: code.length }
+  const loader = await buildLoader(client, base)
+  const entete = `/* LPWS — à coller UNE FOIS dans le Google Tag Manager de ${client}.\n`
+    + `   Ensuite, lancer/changer/arrêter une variante ne touche plus jamais à GTM.\n`
+    + `   Bouton stop : passer "actif" à false dans ${base}/v/${client}.json\n`
+    + `   Prévisualiser : ?lpws=<nom-de-variante> · voir l'original : ?lpws=off */\n`
+  await writeFile(fLoader, entete + loader)
+  await writeFile(fConfig, JSON.stringify(cfg, null, 2))
+
+  step(SCOPE, `loader → ${fLoader} (${(loader.length / 1024).toFixed(1)} Ko, collé une seule fois)`)
+  step(SCOPE, `config → ${fConfig} · ${variantes.length} variante(s) : ${variantes.map((v) => `${v.nom} ${v.part}%`).join(" · ")}`)
+  return { fLoader, fConfig, cfg, client, loader }
 }
 
 /* CLI */
 if (process.argv[1]?.replace(/\\/g, "/").endsWith("tag/build.ts")) {
   const args = process.argv.slice(2)
-  const [baseline, spec] = args.filter((a) => !a.startsWith("--"))
-  const val = (n: string, d: number) => {
-    const i = args.indexOf("--" + n)
-    return i >= 0 && args[i + 1] ? Number(args[i + 1]) : d
-  }
-  if (!baseline || !spec) fail(SCOPE, "usage : npm run tag -- <dossier-baseline> <spec.json> [--part 50] [--delai 1500]")
-  await buildTag(baseline, spec, val("part", 50), val("delai", 1500))
+  const libres = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))
+  const [baseline, ...specs] = libres
+  const opt = (n: string) => { const i = args.indexOf("--" + n); return i >= 0 ? args[i + 1] : undefined }
+  if (!baseline || specs.length === 0)
+    fail(SCOPE, "usage : npm run tag -- <dossier-baseline> <spec.json> [...] [--part 50] [--base <url>]")
+  await buildTag(baseline, specs, {
+    part: opt("part") ? Number(opt("part")) : undefined,
+    base: opt("base"),
+    delaiMax: opt("delai") ? Number(opt("delai")) : undefined,
+  })
 }
