@@ -23,14 +23,25 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - `1_acquire` refuse une page >= 400 ou une page d'erreur déguisée (asana.com/uses/sales était
   une 404 clonée « fidèle à 0,00 % »). Descente vers les sections corrigée (HubSpot 4 → 17).
 - **Spike Shopify hors ligne** (scratchpad, `engine/` non touché) sur le thème Dawn :
-  - nos verbes se traduisent 1:1 en opérations de template (réglages, `order`, `block_order`),
-    au niveau section ET bloc, + un verbe `add` : n'importe quelle section du thème → le dossier
-    `sections/` est la bibliothèque de blocs du client (fin de la limite de `duplicate`) ;
-  - une variante PDP valide produite (réassurance sous le bouton, FAQ native, cross-sell retitré) ;
-  - validation contre les `{% schema %}` : spec invalide refusée 6/6, rien écrit ;
+  - une variante PDP valide produite (réassurance sous le bouton d'achat, FAQ native,
+    cross-sell retitré), diff relu ; tous les verbes testés au niveau section ET bloc ;
+  - validation contre les `{% schema %}` du thème : spec invalide refusée 6/6, rien écrit ;
   - Theme Check (outil officiel) : 0 erreur sur nos templates, MAIS contrôle volontairement cassé →
     il ne détecte que 1 erreur sur 4 (type de section inconnu ; pas les blocs ni réglages
     inexistants). Notre validation est plus stricte que la sienne : elle est nécessaire.
+
+  **Correspondance verbe → template JSON** (le code du spike est dans le scratchpad, donc
+  éphémère : ce tableau suffit à le refaire) :
+  | verbe | opération |
+  |---|---|
+  | `set` | `sections.<id>.settings.<clé>`, ou `.blocks.<bloc>.settings.<clé>` |
+  | `remove` | retirer de `order` / `block_order` + supprimer l'entrée · refus si type `main-*` |
+  | `move` · `swap` | réordonner `order` / `block_order` |
+  | `duplicate` | copier l'entrée sous une nouvelle clé alphanumérique |
+  | `add` | **nouveau** : entrée `{type, settings, blocks, block_order}` — le type doit avoir un `presets` dans son schéma, sinon l'éditeur de thème ne l'autorise pas. Rend toute la bibliothèque `sections/` du client disponible : c'est la fin de la limite de `duplicate` |
+
+  Limites : 25 sections par template, 50 blocs par section, 1 000 templates par thème.
+  Nommage : `product.<suffixe>.json` s'ouvre avec `?view=<suffixe>`.
 
 ## À faire (dans l'ordre)
 1. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
