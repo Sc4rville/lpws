@@ -20,6 +20,7 @@ import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import type { Edit } from "./spec.ts"
+import { harvestDesign, type DesignSystem, type Role } from "./design.ts"
 import { step } from "../shared/log.ts"
 
 const SCOPE = "apply"
@@ -38,7 +39,11 @@ export type Entree = {
   section?: string      // la bande de haut niveau qui contient l'élément
 }
 
-export type ApplyReport = { fichier: string; appliquees: number; journal: Entree[] }
+export type ApplyReport = {
+  fichier: string; appliquees: number; journal: Entree[]
+  /** rôles du design system introuvables sur cette page — ce qu'on n'a pas su reproduire */
+  manquesDesign: string[]
+}
 
 /**
  * Applique les éditions dans la page ouverte, dans l'ordre de la spec (une duplication
@@ -48,7 +53,8 @@ export type ApplyReport = { fichier: string; appliquees: number; journal: Entree
  * finale dans la page. C'est lui qu'on affiche : relire la spec ne dit pas ce qui s'est
  * passé, seulement ce qui était demandé.
  */
-function applyInPage(edits: Edit[]): { manquantes: string[]; journal: Entree[] } {
+function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }): { manquantes: string[]; journal: Entree[] } {
+  const { edits, ds } = arg
   const manquantes: string[] = []
   const journal: Entree[] = []
   const get = (a?: string) => a ? document.querySelector(`[data-lpws="${a}"]`) : null
@@ -60,10 +66,78 @@ function applyInPage(edits: Edit[]): { manquantes: string[]; journal: Entree[] }
   const court = (s: string, n = 110) => s.length > n ? s.slice(0, n) + "…" : s
 
   edits.forEach((e, i) => {
-    const el = get(e.anchor)
-    if (!el) { manquantes.push(e.anchor); return }
     const op = e.op ?? "set"
-    const ligne: Entree = { n: i + 1, op, anchor: e.anchor, quoi: "", pourquoi: e.pourquoi }
+
+    /* ——— COMPOSE : fabriquer une section absente de la page, avec les classes du client ——— */
+    if (op === "compose") {
+      const c = e.contenu!
+      const sombre = e.ton === "sombre"
+      const cible = get(e.before ?? e.after)
+      if (!cible) { manquantes.push((e.before ?? e.after)!); return }
+      const mk = (r: Role | undefined, repli: string, txt?: string): HTMLElement => {
+        const n = document.createElement(r?.tag ?? repli)
+        if (r?.cls) n.setAttribute("class", r.cls)
+        if (txt !== undefined) n.textContent = txt
+        return n
+      }
+      // une bande sombre impose ses propres rôles de texte : réutiliser le titre d'une
+      // section claire donnerait du noir sur noir
+      const rBande = sombre ? (ds.bandDark ?? ds.band) : ds.band
+      const rTitre = sombre ? (ds.darkTitle ?? ds.title) : ds.title
+      const rTexte = sombre ? (ds.darkText ?? ds.subtitle) : ds.subtitle
+      const rCta = sombre ? (ds.darkCta ?? ds.ctaPrimary) : ds.ctaPrimary
+      const cle = "c-" + e.as
+      const bande = mk(rBande, "section")
+      bande.setAttribute("data-lpws", cle)
+      bande.setAttribute("data-lpws-added", "")
+      // on rebâtit la chaîne d'emboîtement du client (bande > wrapper > … > conteneur) :
+      // c'est elle qui porte la gouttière, pas un conteneur unique
+      let dedans: HTMLElement = bande
+      for (const r of ds.chain ?? (ds.container ? [ds.container] : [])) {
+        const w = mk(r, "div")
+        dedans.append(w)
+        dedans = w
+      }
+      const h = mk(rTitre, "h2", c.titre)
+      h.setAttribute("data-lpws", cle + "-titre")
+      dedans.append(h)
+      if (c.accroche) {
+        const p = mk(rTexte, "p", c.accroche)
+        p.setAttribute("data-lpws", cle + "-accroche")
+        dedans.append(p)
+      }
+      if (e.gabarit === "colonnes") {
+        const grille = mk(ds.grid, "div")
+        ;(c.colonnes ?? []).forEach((col, k) => {
+          const carte = mk(ds.card, "div")
+          const ct = mk(ds.cardTitle, "h3", col.titre)
+          ct.setAttribute("data-lpws", `${cle}-t${k + 1}`)
+          const cx = mk(ds.cardText, "p", col.texte)
+          cx.setAttribute("data-lpws", `${cle}-p${k + 1}`)
+          carte.append(ct, cx)
+          grille.append(carte)
+        })
+        dedans.append(grille)
+      }
+      if (c.cta) {
+        const a = mk(rCta, "a", c.cta.label)
+        a.setAttribute("href", c.cta.href ?? "#")
+        a.setAttribute("data-lpws", cle + "-cta")
+        dedans.append(a)
+      }
+      if (e.before) cible.before(bande); else cible.after(bande)
+      journal.push({
+        n: i + 1, op, anchor: cle, pourquoi: e.pourquoi,
+        quoi: `section ${e.gabarit} créée (${(c.colonnes ?? []).length} colonnes, ton ${e.ton})`,
+        ou: (e.before ? "avant " : "après ") + (e.before ?? e.after),
+        apres: c.titre,
+      })
+      return
+    }
+
+    const el = get(e.anchor)
+    if (!el) { manquantes.push(e.anchor!); return }
+    const ligne: Entree = { n: i + 1, op, anchor: e.anchor!, quoi: "", pourquoi: e.pourquoi }
 
     if (op === "remove") {
       const t = el.tagName.toLowerCase()
@@ -183,7 +257,10 @@ export async function applyEdits(
         r.request().url().startsWith("file://") ? r.continue() : r.abort())
       await page.goto("file://" + resolve(src), { waitUntil: "domcontentloaded", timeout: 60_000 })
 
-      const { manquantes, journal } = await page.evaluate(applyInPage, edits)
+      // le design system se récolte sur CE document : la grille du mobile n'est pas celle
+      // du desktop, les classes diffèrent
+      const ds = await page.evaluate(harvestDesign)
+      const { manquantes, journal } = await page.evaluate(applyInPage, { edits, ds })
       if (manquantes.length > 0)
         throw new Error(
           `ancres introuvables dans ${source} : ${manquantes.join(", ")} — ` +
@@ -191,8 +268,9 @@ export async function applyEdits(
 
       await writeFile(join(outDir, cible), await page.content())
       await page.close()
-      rapports.push({ fichier: cible, appliquees: journal.length, journal })
-      step(SCOPE, `${cible} : ${edits.length} édition(s) → ${journal.length} changement(s)`)
+      rapports.push({ fichier: cible, appliquees: journal.length, journal, manquesDesign: ds.manques })
+      step(SCOPE, `${cible} : ${edits.length} édition(s) → ${journal.length} changement(s)` +
+        (ds.manques.length ? ` · design non récolté : ${ds.manques.join(", ")}` : ""))
     }
   } finally {
     await browser.close()

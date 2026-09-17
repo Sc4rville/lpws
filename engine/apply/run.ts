@@ -39,7 +39,10 @@ const MIME: Record<string, string> = {
  * duplique pas 5 Mo d'images pour un headline) : la route sert d'abord le dossier de la
  * variante, puis la baseline en repli.
  */
-async function shoot(vdir: string, bdir: string, fichier: string, viewport: { width: number; height: number }, out: string) {
+async function shoot(
+  vdir: string, bdir: string, fichier: string,
+  viewport: { width: number; height: number }, out: string, ancres: string[] = [],
+): Promise<Record<string, number>> {
   const browser = await chromium.launch({ args: ["--no-sandbox", "--hide-scrollbars"] })
   try {
     const page = await browser.newPage({ viewport })
@@ -61,6 +64,17 @@ async function shoot(vdir: string, bdir: string, fichier: string, viewport: { wi
     await page.evaluate(autoScroll)
     await page.waitForTimeout(1500)
     await page.screenshot({ path: out, fullPage: true })
+    // les positions se relèvent ICI, sur la page complètement rendue : mesurées pendant
+    // l'édition (images pas encore chargées) elles étaient fausses de plusieurs milliers
+    // de pixels, et le « clique pour t'y rendre » du cockpit tombait à côté
+    return await page.evaluate((as: string[]) => {
+      const out: Record<string, number> = {}
+      for (const a of as) {
+        const el = document.querySelector(`[data-lpws="${a}"]`)
+        if (el) out[a] = Math.round(el.getBoundingClientRect().y + window.scrollY)
+      }
+      return out
+    }, ancres)
   } finally {
     await browser.close()
   }
@@ -93,7 +107,11 @@ export async function applyVariant(baseline: string, specPath: string) {
     ] as const) {
       if (!existsSync(join(vdir, fichier))) continue
       const shot = join(vdir, label === "desktop" ? "variant.png" : "variant.mobile.png")
-      await shoot(vdir, baseline, fichier, viewport, shot)
+      const positions = await shoot(vdir, baseline, fichier, viewport, shot,
+        journal.map((j) => j.anchor))
+      // le desktop fait foi pour l'affichage du journal
+      if (label === "desktop")
+        for (const j of journal) if (positions[j.anchor] != null) j.y = positions[j.anchor]
       if (!existsSync(join(baseline, ref))) continue
       const d = await visualDiff(join(baseline, ref), shot,
         join(vdir, label === "desktop" ? "delta.png" : "delta.mobile.png"))

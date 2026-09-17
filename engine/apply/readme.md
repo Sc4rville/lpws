@@ -42,12 +42,34 @@ règle maison : toute sortie de skill passe un schéma avant d'être écrite.
 | `move` | replace avant/après une autre ancre | remonter la preuve au-dessus du pli |
 | `duplicate` | **clone** un bloc existant et le repose | ajouter un second moment de conversion |
 | `swap` | échange deux blocs de place | inverser l'ordre de l'argumentaire |
+| `compose` | **crée** une section absente de la page, avec les classes du client | ajouter un bloc d'objections quand la page n'en a aucun |
 
 **`duplicate` est notre « ajouter une section ».** On ne génère jamais de markup : on
 réutilise un bloc du client et on le remplit. Le design system est donc conservé au pixel
 par construction, et la règle « jamais de HTML libre » tient sans exception. Les ancres de
 la copie reçoivent un suffixe (`e384` → `e384-b`), donc les éditions suivantes de la même
 spec peuvent viser la copie — les éditions s'appliquent dans l'ordre de la spec.
+
+## `duplicate` ou `compose` : lequel choisir
+
+**`duplicate` d'abord, toujours.** Il recopie un bloc du client : le rendu est identique au
+pixel, par construction. C'est le bon verbe dès qu'un gabarit comparable existe quelque part
+sur la page — et c'est presque toujours le cas.
+
+**`compose` seulement quand rien n'existe.** Il fabrique la section à partir des rôles
+récoltés par [`design.ts`](design.ts) : titre de section, accroche, grille, carte, bouton,
+bande sombre. Chaque rôle est la chaîne de classes d'un exemplaire trouvé sur la page, donc
+**aucune règle CSS n'est écrite**.
+
+Ce que `compose` réussit, mesuré sur Jira : la typographie, l'échelle des titres, la grille
+(les colonnes s'alignent au pixel sur celles du client) et les couleurs de texte.
+
+Ce qu'il ne garantit PAS, et c'est important : les **wrappers**. Le fond d'une bande sombre,
+la gouttière gauche et la largeur d'un bouton ne vivent pas dans la classe du rôle mais dans
+des conteneurs intermédiaires qu'on ne sait pas deviner. Résultat observé : titre collé au
+bord gauche, bande sombre restée blanche, bouton étiré sur toute la largeur. La voie vers le
+pixel parfait serait de **cloner la coquille d'une section exemplaire** puis de la remplir,
+au lieu de la reconstruire — non fait.
 
 Deux niveaux d'ancres, posés à la capture ([`mark.ts`](../clone/1_acquire/mark.ts)) :
 `e<n>` pour le contenu (par balise) et `s<n>` pour les bandes de haut niveau (**par
@@ -86,10 +108,8 @@ Le delta par section ancré `data-lpws` (juge v2) réglera les deux côtés à l
 - Le delta global cascade (voir plus haut) — juge v2 par section à construire. Sur une
   restructuration, le ratio dépasse 50 % et ne veut plus rien dire : seule la preuve à
   l'œil compte.
-- On ne peut pas créer un bloc qui n'existe nulle part sur la page. `duplicate` réutilise
-  l'existant ; si la page n'a aucun bloc de témoignages, on ne peut pas en inventer un dans
-  son design system. Une bibliothèque de blocs par client viendra peut-être — ou pas :
-  c'est exactement là qu'on redeviendrait un builder.
+- `compose` crée une section absente de la page, mais sans garantie sur les wrappers (fond,
+  gouttière, largeur de bouton) — voir plus haut. Pour un rendu pixel-parfait, `duplicate`.
 - Pas de changement de style (couleurs, espacements, typo) : on manipule la structure et le
   contenu, jamais le CSS du client.
 - Rien n'est déployé : `variant.html` est un fichier local. La famille `deploy` viendra.

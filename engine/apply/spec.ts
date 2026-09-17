@@ -17,8 +17,9 @@ import { z } from "zod"
 import { Anchor } from "../clone/4_structure/schema.ts"
 
 /**
- * Les cinq verbes. Volontairement peu nombreux : chacun préserve le design system du
- * client par construction, parce qu'aucun ne fabrique de markup.
+ * Les six verbes. Volontairement peu nombreux : chacun préserve le design system du client
+ * par construction — les cinq premiers ne fabriquent aucun markup, et le sixième n'en
+ * fabrique qu'avec les classes récoltées sur la page même.
  *
  *   set        remplacer texte / href / src / placeholder
  *   remove     retirer l'élément (nav d'une LP payante, badge bloat, section hors-sujet)
@@ -28,12 +29,25 @@ import { Anchor } from "../clone/4_structure/schema.ts"
  *              Les descendants de la copie sont re-clés avec un suffixe (`e42` → `e42-b`),
  *              donc les éditions suivantes de la même spec peuvent les viser.
  *   swap       échanger deux blocs de place (inverser deux sections)
+ *   compose    CRÉER une section entière qui n'existe nulle part sur la page, à partir du
+ *              DESIGN SYSTEM récolté (cf. design.ts) : on n'écrit aucune règle CSS, on
+ *              réemploie les classes du client pour chaque rôle (titre, carte, bouton…).
+ *              C'est la seule façon d'ajouter un type de section absent de la page.
  */
+/** Le contenu d'une section composée — en langage humain, pas en HTML. */
+export const Contenu = z.object({
+  titre: z.string().min(2),
+  accroche: z.string().optional(),
+  colonnes: z.array(z.object({ titre: z.string().min(2), texte: z.string().min(2) })).optional(),
+  cta: z.object({ label: z.string().min(2), href: z.string().optional() }).optional(),
+})
+
 export const Edit = z.object({
-  anchor: Anchor,
+  /** la cible : requise partout SAUF pour `compose`, qui ne part d'aucun élément existant */
+  anchor: Anchor.optional(),
   /** pourquoi CETTE édition sert l'hypothèse (une ligne, lisible par un humain) */
   pourquoi: z.string().min(3),
-  op: z.enum(["set", "remove", "move", "duplicate", "swap"]).default("set"),
+  op: z.enum(["set", "remove", "move", "duplicate", "swap", "compose"]).default("set"),
 
   // op "set"
   text: z.string().optional(),
@@ -45,11 +59,26 @@ export const Edit = z.object({
   before: Anchor.optional(),
   after: Anchor.optional(),
 
-  // op "duplicate" : suffixe des ancres de la copie ("b" → e42-b) ; "swap" : l'autre bloc
+  // op "duplicate" : suffixe des ancres de la copie ("b" → e42-b) ; "compose" : nom de la
+  // nouvelle section ("objections" → data-lpws="c-objections") ; "swap" : l'autre bloc
   as: z.string().regex(/^[a-z0-9]+$/).optional(),
   with: Anchor.optional(),
+
+  // op "compose"
+  gabarit: z.enum(["colonnes", "bandeau"]).optional(),
+  ton: z.enum(["clair", "sombre"]).default("clair"),
+  contenu: Contenu.optional(),
 }).superRefine((e, ctx) => {
   const err = (message: string) => ctx.addIssue({ code: "custom", message })
+  if (e.op !== "compose" && !e.anchor) err(`op '${e.op}' : 'anchor' est requis`)
+  if (e.op === "compose") {
+    if (!e.gabarit) err("op 'compose' : 'gabarit' est requis (colonnes | bandeau)")
+    if (!e.contenu) err("op 'compose' : 'contenu' est requis")
+    if (!e.as) err("op 'compose' : 'as' est requis (nom de la nouvelle section)")
+    if (!e.before && !e.after) err("op 'compose' : il faut dire où — 'before' ou 'after'")
+    if (e.gabarit === "colonnes" && !e.contenu?.colonnes?.length)
+      err("gabarit 'colonnes' : il faut au moins une colonne dans 'contenu.colonnes'")
+  }
   if (e.op === "set" && e.text === undefined && e.href === undefined
       && e.src === undefined && e.placeholder === undefined)
     err("op 'set' : il faut changer au moins un attribut (text/href/src/placeholder)")
@@ -79,5 +108,6 @@ export const VariantSpec = z.object({
   edits: z.array(Edit).min(1),
 })
 
+export type Contenu = z.infer<typeof Contenu>
 export type Edit = z.infer<typeof Edit>
 export type VariantSpec = z.infer<typeof VariantSpec>

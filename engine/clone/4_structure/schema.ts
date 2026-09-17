@@ -16,9 +16,10 @@ import { z } from "zod"
 /**
  * Ancre vers le DOM capturé : la valeur d'un attribut data-lpws.
  *   "e42" → élément de contenu · "s3" → bande de haut niveau (cf. 1_acquire/mark.ts)
- * Le suffixe "-b", "-c"… désigne une copie produite par une duplication (famille apply).
+ *   "c-objections" → section COMPOSÉE par la famille apply (absente de la page d'origine)
+ * Le suffixe "-b", "-titre"… désigne une copie ou une partie produite par apply.
  */
-export const Anchor = z.string().regex(/^[es]\d+(-[a-z0-9]+)?$/)
+export const Anchor = z.string().regex(/^(?:[es]\d+|c-[a-z0-9]+)(?:-[a-z0-9]+)?$/)
 
 /** Un slot = un emplacement éditable par une variante. */
 export const Slot = z.object({
