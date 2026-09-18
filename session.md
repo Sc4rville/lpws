@@ -121,3 +121,4 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 - **02:29** — je comprends rien je debute dans tout ca c quoi omme domaine de linfo tout ca
 - **02:54** — mais du coup la le soucis si tu devais lexpliquer a un enfant de 5 ans c quoi? pourquoi ca marchait pas? je veux comprendre tehcniquement mais comprendre du cou
 - **03:47** — bah non attend cmoment on fait pour les sites comme Jira du coup/
+- **16:49** — mais alors ca va lag je comprends pas ce quil se passe?

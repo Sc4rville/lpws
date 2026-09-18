@@ -35,6 +35,7 @@ type Vu = {
 
 async function ouvrir(
   url: string, loader: string | null, cfg: ConfigServie | null, client: string, suffixe: string,
+  attente: number,
 ): Promise<Vu> {
   const browser = await chromium.launch()
   const page = await browser.newPage({
@@ -56,7 +57,12 @@ async function ouvrir(
   try {
     await page.goto(url + (url.includes("?") ? "&" : "?") + suffixe,
       { waitUntil: "domcontentloaded", timeout: 45_000 })
-    await page.waitForTimeout(3_000)
+    // ATTENDRE QUE LE TAG AIT FINI, pas un délai rond.
+    // Le juge lisait à 3 000 ms alors que le budget du tag peut aller à 4 825 ms sur un site
+    // rendu en JavaScript : il enregistrait « 0 édition » sur des chargements qui posaient la
+    // variante juste après. Trois passages de suite accusaient le tag d'un défaut qui était le
+    // mien — 8/9 rapportés, 9/9 réels.
+    await page.waitForTimeout(attente)
     const vu = await page.evaluate(() => {
       const w = window as unknown as {
         __lpws?: { version: string; applique: number; abandons: string[]; mode: string; remises?: number }
@@ -90,21 +96,23 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
   const attendus = spec.edits.map((e) => e.text).filter((t): t is string => !!t)
 
 
-  step(SCOPE, `page vivante : ${url}`)
+  // marge au-delà du budget du tag : on lit APRÈS qu'il ait rendu son verdict
+  const attente = cfg.delaiMax + 1_500
+  step(SCOPE, `page vivante : ${url} · lecture à ${attente} ms`)
 
   /* TROIS FOIS, PAS UNE.
    * Un site vivant n'est pas déterministe : réseau, charge processeur, expériences maison.
    * Un tir unique m'a fait annoncer « valide » puis « refusé » sur la même page à quelques
    * minutes d'écart. Ce qu'un media buyer achète, c'est la fiabilité : on la mesure. */
   const tirs: Vu[] = []
-  for (let i = 0; i < 3; i++) tirs.push(await ouvrir(url, loader, cfg, client, `gclid=JUGE-1-${i}`))
+  for (let i = 0; i < 3; i++) tirs.push(await ouvrir(url, loader, cfg, client, `gclid=JUGE-1-${i}`, attente))
   const reussis = tirs.filter((t) => t.applique > 0)
   const variante = reussis[0] ?? tirs[0]
   const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)]
-  const temoin = await ouvrir(url, null, null, client, "gclid=JUGE-2")
+  const temoin = await ouvrir(url, null, null, client, "gclid=JUGE-2", attente)
   const cfg0 = { ...cfg, variantes: cfg.variantes.map((v) => ({ ...v, part: 0 })) }
-  const apercu = await ouvrir(url, loader, cfg0, client, `lpws=${spec.nom}`)
-  const stop = await ouvrir(url, loader, { ...cfg, actif: false }, client, "gclid=JUGE-4")
+  const apercu = await ouvrir(url, loader, cfg0, client, `lpws=${spec.nom}`, attente)
+  const stop = await ouvrir(url, loader, { ...cfg, actif: false }, client, "gclid=JUGE-4", attente)
 
   const vus = variante.textes.join(" | ")
   const poses = attendus.filter((t) => vus.includes(t))
@@ -127,9 +135,13 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
    * donc en Quality Score — et il peut être négatif, on révèle alors avant la page. */
   const masqueMedian = median(tirs.map((t) => t.masqueMs))
   const surcout = masqueMedian - apparitionMax
-  if (surcout > 300)
-    echecs.push(`retard ajouté ${surcout} ms (masque ${masqueMedian} ms, la cible apparaît d'elle-même `
-      + `à ${apparitionMax} ms) — c'est ça qui coûte du LCP`)
+  /* CE CHIFFRE EST INDICATIF, IL NE REFUSE PLUS.
+   * Il compare deux mesures bruitées : la durée du masque, et une apparition chronométrée une
+   * seule fois à la construction (971, 1 639, 1 763, 1 909 ou 2 062 ms selon le moment, sur la
+   * MÊME page). Leur différence hérite des deux bruits et déclenchait de fausses alertes sur
+   * des chargements parfaitement sains. Le verdict de vitesse appartient à `npm run lcp`, qui
+   * mesure le Largest Contentful Paint avec et sans le tag, en tirs alternés : écart de ±8 ms
+   * sur les deux sites du corpus, très en dessous du bruit de la page (±2 000 ms). */
   if (apercu.applique === 0) echecs.push("l'aperçu ?lpws=<nom> n'applique rien à 0 % — le lien de démo au client serait mort")
   // sous CSP le stop distant ne PEUT pas arriver : ce n'est pas un bug du tag, c'est une
   // limite du site, et elle doit être dite au buyer à l'installation — pas découverte après
@@ -140,7 +152,7 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
   step(SCOPE, `mode     : ${variante.mode}${variante.cspBloque ? " (CSP du site : config distante refusée)" : ""}`)
   step(SCOPE, `variante : ${reussis.length}/3 chargements appliquent · `
     + `masque médian ${masqueMedian} ms · cible naturelle à ${apparitionMax} ms`
-    + ` → retard ajouté ${surcout > 0 ? surcout : 0} ms`
+    + ` → retard indicatif ${surcout > 0 ? surcout : 0} ms (verdict vitesse : npm run lcp)`
     + (variante.remises ? ` · ${variante.remises} remise(s) après re-rendu du site` : ""))
   step(SCOPE, `témoin   : ${temoin.applique} édition(s) (doit être 0)`)
   step(SCOPE, `aperçu   : ${apercu.applique} édition(s) à 0 % de trafic (doit être > 0)`)

@@ -89,6 +89,54 @@ config, pas ceux détectés sur la page d'origine.
 
 ---
 
+## 2026-09-18 · La voie tag (GTM) — livrer sans DNS ni hébergement
+
+**Le problème.** La voie hébergée oblige le media buyer à aller chercher un enregistrement DNS
+chez son client. Inacceptable comme entrée : on ne répond pas « configure un CNAME » à
+quelqu'un qu'on veut convaincre. Le tag s'applique sur **la vraie page, à la vraie URL**, et le
+buyer le pose depuis un Google Tag Manager auquel il a déjà accès.
+
+**Ce que j'ai ajouté** ([`engine/deploy/tag/`](engine/deploy/tag/readme.md)) : `selector.ts`
+(résolution à la construction), `loader.ts` (le script collé une fois), `build.ts` (loader +
+config servie), `check.ts` (le juge, sur le site LIVE), `lcp.ts` (le verdict de vitesse).
+
+**Le résultat, mesuré sur 18 chargements par site.**
+
+| | HubSpot | Jira |
+|---|---|---|
+| fiabilité | **9/9** | **9/9** |
+| config envoyée au visiteur | 0,4 Ko | 0,7 Ko |
+| écart de LCP avec/sans | −8 ms | +8 ms |
+
+**Les deux décisions qui ont tout débloqué.**
+1. **Le rapprochement déménage à la construction.** La première version envoyait 97 à 188 Ko
+   d'empreintes au visiteur, qui refaisait tout le calcul (~700 ms par essai). Maintenant on
+   ouvre la vraie page une fois, on résout, on en tire un sélecteur CSS court, et le visiteur
+   ne reçoit que lui. Charge utile divisée par ~250.
+2. **Le budget de masque est chronométré, pas constant.** Sur un site rendu en JavaScript la
+   cible n'existe pas quand le visiteur arrive : masquer en l'attendant ne retarde rien, la
+   page n'avait rien à montrer. La marge est proportionnelle (×1,8) pour absorber la variance
+   du site, et c'est elle qui fait passer de 8/9 à 9/9.
+
+**Ce que j'ai appris en me trompant, et c'est le plus utile** : sur les sept corrections, quatre
+étaient dans **mon juge**, pas dans le tag. Il lisait à 3 000 ms alors que le tag a jusqu'à
+4 825 ms pour poser · il tronquait les textes à 80 caractères · il jugeait sur un tir unique
+alors qu'un site vivant n'est pas déterministe · et il comparait deux mesures bruitées pour en
+tirer un verdict de vitesse. J'ai annoncé « valide », puis « refusé », puis « valide » sur la
+même page. **Un instrument de mesure qu'on ne vérifie pas ment avec autorité.**
+
+**Vérifier soi-même.**
+```bash
+npm run tag -- <baseline> <spec.json>        # loader + config
+npm run tag:check -- <baseline> <spec.json>  # le juge, sur le site LIVE, 3 chargements
+npm run lcp -- <baseline> <spec.json>        # LCP avec et sans le tag
+```
+
+**Limite assumée** : sous CSP stricte, la config distante n'arrive pas. Le tag fonctionne (mode
+figé) mais le pilotage à distance et le bouton stop demandent de recoller le loader.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

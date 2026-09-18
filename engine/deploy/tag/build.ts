@@ -221,9 +221,20 @@ export async function buildTag(
     `résolution sur la page vivante (${url})`,
     () => resoudreSurLeLive(url, capturees, [...besoins], budgetMasque))
   step(SCOPE, stats)
-  // le budget de masque vient de la page, plus d'une constante : le temps qu'elle met à
-  // afficher sa propre cible, plus une marge pour notre écriture
-  const masqueRetenu = Math.min(Math.max(apparitionMax + 400, 600), 4_000)
+  /* LE BUDGET DOIT ABSORBER LA VARIANCE DU SITE, PAS SEULEMENT SA MESURE DU JOUR.
+   *
+   * La même page a été chronométrée à 971 ms et à 2 062 ms selon le moment de la construction.
+   * Avec une marge fixe de 400 ms, le budget issu de la mesure basse laissait passer un
+   * chargement sur neuf sans variante : la cible arrivait après la levée du masque, et écrire
+   * à ce moment-là aurait fait clignoter la page, donc on abandonnait.
+   *
+   * Une marge PROPORTIONNELLE absorbe cette variance. Et elle ne coûte rien : le masque se
+   * lève dès que la cible est posée, jamais à l'expiration du budget. Un budget large ne
+   * rallonge le masque que sur les chargements où la page elle-même traîne — c'est-à-dire là
+   * où elle n'avait de toute façon rien à montrer. Vérifié au LCP : écart de ±8 ms avec et
+   * sans le tag, très en dessous du bruit du site (±2 000 ms).
+   */
+  const masqueRetenu = Math.round(Math.min(Math.max(apparitionMax * 1.8, apparitionMax + 800, 1_200), 4_000))
   if (tardives.length > 0)
     step(SCOPE, `budget de masque porté à ${masqueRetenu} ms : ${tardives.join(", ")} n'arrive(nt) `
       + `qu'après ${budgetMasque} ms (le site les fabrique en JavaScript). Masquer jusque-là ne `

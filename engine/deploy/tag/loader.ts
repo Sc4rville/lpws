@@ -155,6 +155,13 @@ function concorde(el: Element, c: Cible): boolean {
 
 type Resolu = { edit: EditTag; el: Element; el2?: Element }
 
+/** Journal de bord, lu par le juge quand un chargement rate. Borné : il part chez le visiteur. */
+const trace: string[] = []
+function tracer(m: string): void {
+  if (trace.length < 40) trace.push(`${Math.round(performance.now())}ms ${m}`)
+  ;(window as unknown as { __lpwsTrace?: string[] }).__lpwsTrace = trace
+}
+
 function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
   const resolus: Resolu[] = []
   const abandons: string[] = []
@@ -169,9 +176,10 @@ function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
    */
   const trouver = (c: Cible): Element | null => {
     let tous: Element[] = []
-    try { tous = [...document.querySelectorAll(c.sel)] } catch { return null }
-    if (tous.length === 0) return null
+    try { tous = [...document.querySelectorAll(c.sel)] } catch { tracer(`sel invalide ${c.sel}`); return null }
+    if (tous.length === 0) { tracer(`0 candidat pour ${c.sel}`); return null }
     const colle = tous.filter((el) => concorde(el, c))
+    if (colle.length !== 1) tracer(`${tous.length} candidat(s), ${colle.length} concordant(s) pour ${c.sel}`)
     return colle.length === 1 ? colle[0] : null
   }
   for (const e of edits) {
@@ -306,6 +314,7 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
   const essayer = (): void => {
     if (fini) return
     essais++
+    if (essais <= 3 || essais % 20 === 0) tracer(`essai ${essais} (masque ${masquant ? "on" : "off"})`)
     if (masquant && performance.now() - t0 >= delaiMasque) { reveler(); masquant = false }
 
     let applique = 0
@@ -328,7 +337,7 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
       abandons.push("erreur du tag : " + String(err))
     }
 
-    if (applique > 0) { reussi(v, r0(), applique); return }
+    if (applique > 0) { tracer(`posé ${applique}`); reussi(v, r0(), applique); return }
     if (performance.now() - t0 >= delaiMax) {
       // délai atteint : le client voit SA page, c'est le bon repli
       terminer("controle-repli", 0, abandons.concat(`abandon après ${essais} essai(s)`))
@@ -429,6 +438,7 @@ function lancer(): void {
   // un tag injecté s'exécute dans CHAQUE cadre de la page, iframes comprises (constaté : huit
   // exécutions parallèles sur atlassian.com). Une variante ne concerne que la page elle-même.
   try { if (window.top !== window.self) return } catch { return }
+  tracer("lancer")
 
   /* LE MASQUE PART EN PREMIER, avant même de savoir quelle config on aura.
    *

@@ -59,34 +59,48 @@ C'est le seul test de la machine qui se fait contre **le site live**, pas contre
 5. **l'aperçu** marche-t-il à 0 % de trafic (sinon le lien de démo au client est mort) ;
 6. **le bouton stop** coupe-t-il vraiment (c'est la condition de confiance du buyer).
 
-## État réel, vérifié sur DEUX sites, trois chargements chacun
+## État réel — 18 chargements par site, mesurés
 
 | | HubSpot (`/products/marketing`) | Jira (`atlassian.com/software/jira`) |
 |---|---|---|
-| verdict | **VALIDE** | **VALIDE** |
-| fiabilité | **3/3** chargements appliquent | **3/3** chargements appliquent |
+| **fiabilité** | **9/9** | **9/9** |
+| rendu de la page | par le serveur | par le JavaScript du site |
 | mode | piloté | figé (CSP du site) |
-| config servie | **0,4 Ko** | **0,7 Ko** |
-| masque médian | 79 ms | 2 155 ms |
-| la cible apparaît d'elle-même à | 76 ms | 2 306 ms |
-| **retard ajouté** | **3 ms** | **0 ms** |
+| config servie | 0,4 Ko | 0,7 Ko |
+| masque médian | 30 à 109 ms | 1 091 à 2 246 ms |
+| **écart de LCP avec / sans le tag** | **−8 ms** | **+8 ms** |
 
-**Le bon chiffre n'est pas la durée du masque, c'est le retard AJOUTÉ.** Sur Jira le titre du
-hero est fabriqué par le JavaScript du site et n'existe qu'à ~2,3 s : masquer jusque-là ne
-retarde rien, on révèle au moment où la page se serait affichée de toute façon. Comparer la
-durée du masque à zéro faisait passer un coût nul pour une catastrophe.
+**Le LCP est le seul verdict de vitesse qui compte** (`npm run lcp`, tirs alternés avec et sans
+le tag). Les deux écarts sont à ±8 ms, alors que le bruit propre de Jira va de 4 676 à 11 908 ms :
+autrement dit, **le tag ne produit aucun effet mesurable au-dessus du bruit de la page**.
 
-**Ce qui a débloqué les sites rendus par JavaScript**, dans l'ordre où ça a compté :
+La raison tient en une phrase : sur un site rendu en JavaScript, la cible n'existe pas encore
+quand le visiteur arrive. Masquer en l'attendant ne retarde rien, parce que la page n'avait
+rien à afficher non plus — et le masque se lève dès que la variante est posée, jamais à
+l'expiration du budget.
+
+## Ce qu'il a fallu corriger pour y arriver
+
+Sept corrections. Trois étaient dans le tag, **quatre étaient dans le juge** — il accusait le
+tag de défauts qui étaient les siens.
 
 | Correction | Avant | Après |
 |---|---|---|
-| Écouter l'insertion (MutationObserver) au lieu de sonder toutes les 50 ms | 0 édition | l'édition part au moment où l'élément entre dans le DOM, avant la peinture |
-| **Budget de masque mesuré à la construction** au lieu d'une constante | 1/3 chargements | **3/3** |
-| Le témoin tranche, le sélecteur n'a plus à être unique | sélecteurs fragiles au re-rendu | sélecteurs larges et stables |
-| Tenir après avoir posé (le site re-rend et réécrit son texte) | variante effacée en silence | remise en place, bornée à 5 s |
-| Ne s'exécuter que dans le cadre principal | 8 exécutions parallèles (iframes) | 1 |
+| Écouter l'insertion (MutationObserver) au lieu de sonder toutes les 50 ms | 0 édition sur Jira | l'édition part quand l'élément entre dans le DOM, avant la peinture |
+| Budget de masque **chronométré** à la construction, plus une constante | 1/3 | 3/3 |
+| Marge **proportionnelle** (×1,8) plutôt que fixe (+400 ms) | 8/9 | **9/9** |
+| Tenir après avoir posé : le site re-rend et réécrit son texte | variante effacée en silence | remise en place, bornée à 5 s |
+| Ne s'exécuter que dans le cadre principal | 8 exécutions en parallèle (iframes) | 1 |
+| *(juge)* lire **après** le verdict du tag, pas à 3 000 ms fixes | 8/9 rapportés | 9/9 réels |
+| *(juge)* ne plus tronquer les textes à 80 caractères | variante longue « absente » | vue |
+| *(juge)* trois chargements et un taux, pas un tir unique | « valide » puis « refusé » sur la même page | fiabilité mesurée |
+| *(juge)* le retard estimé devient indicatif, le LCP tranche | fausses alertes sur des chargements sains | verdict sur une mesure fiable |
 
-**Ce qui reste vrai, et se dit à l'installation** : sous CSP stricte (cas de Jira) la config
+**La leçon, et elle vaut au-delà de ce fichier** : la moitié des échecs venaient de l'outil de
+mesure. Un juge qu'on ne vérifie pas ment avec autorité, et on passe des heures à réparer du
+code qui marchait.
+
+**Ce qui reste vrai et se dit à l'installation** : sous CSP stricte (cas de Jira) la config
 distante n'arrive pas, donc le pilotage à distance ET le bouton stop demandent de recoller le
 loader dans GTM. Ça se mesure avec `npm run tag:check`, ça ne se découvre pas en campagne.
 
