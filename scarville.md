@@ -37,7 +37,23 @@ Natif : validé hors ligne sur Dawn, bloqué par le compte Partner.
 
 ---
 
-## En cours · L'interface du media buyer
+## 2026-09-18 (soir) · L'interface se repense POUR le media buyer
+
+**Le constat de Yann sur la première maquette** : elle affiche notre machine (règles kb-xx,
+signaux, ancres, masque, LCP…) à quelqu'un qui s'en fiche. Elle a été pensée pour nous, pas
+pour lui. Le playground est à refaire.
+
+**Ce qu'on fait** : une recherche métier (journée type, KPI — CPA, ROAS, CVR —, comment
+Unbounce / Instapage / Google Ads présentent un test, ses peurs — attribution, Quality Score,
+accès chez le client —, ce qu'il montre à son client), puis une réécriture complète de
+l'interface dans SON vocabulaire : ce qu'on teste, contre l'original, avec quel trafic,
+combien ça convertit, est-ce qu'on peut conclure, combien ça lui fait gagner. Le technique
+passe en détail repliable ou disparaît.
+
+**Hébergement** : `ui/` dans le repo (source + `build.ts`), sortie `ui/dist/` déployée sur
+Vercel. Les captures d'écran sont injectées au build depuis `clients/` — jamais commitées.
+
+## Fait · La première maquette (pour mémoire)
 
 Maquette HTML (artefact) de ce que voit le buyer : rail des clients · panneau (vue d'ensemble,
 page, variantes, mesure, **Connexion** avec les trois voies dépliables et leur marche à suivre)
