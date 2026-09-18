@@ -107,9 +107,28 @@ tag qui lit `lpws_kw`, la mesure intention × variante.
 clics par jour, ça tient sur deux ou trois intentions, pas dix. Le bandit par intention
 (Smart Traffic) aide, il ne fait pas de miracle.
 
+## 2026-09-18 (nuit) · V1 de l'interface : onboarder une page et lancer un test en Express
+
+**Le but.** Yann, dans le rôle du media buyer, appuie sur « + », colle l'URL d'une landing
+page, la page est copiée, il connecte Express (la vraie balise), crée un test — au minimum
+« changer un texte » —, le lance, et la variante s'affiche sur le vrai site via GTM.
+
+**Comment.** `ui/server.ts`, un serveur local (node:http, port 4700) qui sert l'interface et
+une API pilotant la machine existante : clone, apply, tag. L'état des tests vit dans
+`clients/<client>/<campagne>/tests.json`. Les fichiers du tag (`t/<client>.js`,
+`v/<client>.json`) sont poussés sur Vercel à chaque lancement ou arrêt : une URL stable en
+https, ce que GTM exige. L'interface lit `/api/etat` au lieu de données codées en dur ; le
+« + » ouvre l'onboarding ; « Nouveau test » propose les textes de la page (titres, boutons) à
+modifier. Pas de mesure réelle en v1 : les résultats se lisent dans GA4 (`lpws_variante`), et
+l'interface le dit au lieu d'inventer.
+
+**Reste simulé** : les résultats chiffrés des clients de démo. **Prérequis côté Yann** : un
+site avec un conteneur GTM sous la main pour le vrai test. **La brique intention** est
+reprise par un autre agent (fondations dans `engine/intent/`, commit `bf8fd7f`).
+
 ## Prochaines étapes, dans l'ordre
 
-1. **Maquette UI** → validation par Yann → transposition dans `engine/viewer` (ou un front dédié).
+1. **V1 de l'interface** (en cours) : `ui/server.ts`, onboarding par le « + », test « changer un texte », Express réel via Vercel.
 2. **Express en vrai** : un conteneur GTM réel + config hébergée, mesurer le clignotement réel.
 3. **Spike Intégral** : un relais devant une vraie page WordPress ou Webflow, vérifier que les
    formulaires et le suivi survivent.
