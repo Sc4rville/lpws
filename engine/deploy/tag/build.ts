@@ -34,11 +34,17 @@ const SCOPE = "deploy/tag"
 const VERBES_TAG = new Set(["set", "remove", "move", "swap", "duplicate"])
 
 /** Le script collé dans GTM. Il ne contient AUCUNE variante : juste où aller les chercher. */
-export async function buildLoader(client: string, base: string): Promise<string> {
+export async function buildLoader(client: string, base: string, cfg: ConfigServie): Promise<string> {
   const bundle = await build({
     entryPoints: [new URL("./loader.ts", import.meta.url).pathname],
     bundle: true, format: "iife", target: "es2019", minify: true, write: false,
-    define: { __LPWS_BASE__: JSON.stringify(base), __LPWS_CLIENT__: JSON.stringify(client) },
+    define: {
+      __LPWS_BASE__: JSON.stringify(base),
+      __LPWS_CLIENT__: JSON.stringify(client),
+      // la config est AUSSI figée dans le loader : sur un site à CSP stricte, le fetch est
+      // refusé par le navigateur et c'est le seul moyen que la variante s'applique quand même
+      __LPWS_CFG__: JSON.stringify(cfg),
+    },
     legalComments: "none",
   })
   return bundle.outputFiles[0].text
@@ -94,23 +100,39 @@ export async function buildTag(
   const variantes: VarianteServie[] = []
   for (const p of specPaths) variantes.push(await traduire(baseline, p, part))
 
-  const cfg: ConfigServie = { actif: true, delaiMax: opts.delaiMax ?? 1500, variantes }
+  /**
+   * TOUTES les empreintes de la capture partent avec la config, pas seulement les cibles.
+   *
+   * Mesuré, et c'est contre-intuitif : envoyer les trois cibles d'une variante (même
+   * entourées de 80 repères choisis) donne 0 cible résolue sur Jira, alors que le jeu
+   * complet en résout 471 sur 471. La raison est dans le rapprochement lui-même : il
+   * attribue un pour un. Quand les jumeaux d'un élément sont dans le jeu, ils se font
+   * prendre par leur propre meilleur candidat et libèrent la cible ; quand ils manquent, ils
+   * restent en concurrence pour toujours et la cible est déclarée ambiguë à vie.
+   *
+   * Le prix est raisonnable : 97 Ko pour Jira, 188 Ko pour HubSpot, soit 10 à 22 Ko une fois
+   * gzippés sur le fil — et GTM sert son conteneur gzippé.
+   */
+  const amers: Empreinte[] = JSON.parse(await readFile(join(baseline, "anchors.json"), "utf8"))
+  const cfg: ConfigServie = { actif: true, delaiMax: opts.delaiMax ?? 1500, amers, variantes }
 
   const dir = join(baseline, "..", "tags")
   await mkdir(join(dir, "v"), { recursive: true })
   const fLoader = join(dir, "loader.js")
   const fConfig = join(dir, "v", `${client}.json`)
 
-  const loader = await buildLoader(client, base)
+  const loader = await buildLoader(client, base, cfg)
   const entete = `/* LPWS — à coller UNE FOIS dans le Google Tag Manager de ${client}.\n`
     + `   Ensuite, lancer/changer/arrêter une variante ne touche plus jamais à GTM.\n`
     + `   Bouton stop : passer "actif" à false dans ${base}/v/${client}.json\n`
+    + `   Si la CSP du site interdit ce domaine, le loader repasse sur la config figée ci-dessous\n`
+    + `   et il faut alors RECOLLER ce fichier pour changer quoi que ce soit, stop compris.\n`
     + `   Prévisualiser : ?lpws=<nom-de-variante> · voir l'original : ?lpws=off */\n`
   await writeFile(fLoader, entete + loader)
   await writeFile(fConfig, JSON.stringify(cfg, null, 2))
 
   step(SCOPE, `loader → ${fLoader} (${(loader.length / 1024).toFixed(1)} Ko, collé une seule fois)`)
-  step(SCOPE, `config → ${fConfig} · ${variantes.length} variante(s) : ${variantes.map((v) => `${v.nom} ${v.part}%`).join(" · ")}`)
+  step(SCOPE, `config → ${fConfig} · ${variantes.length} variante(s) : ${variantes.map((v) => `${v.nom} ${v.part}%`).join(" · ")} · ${cfg.amers.length} amers`)
   return { fLoader, fConfig, cfg, client, loader }
 }
 

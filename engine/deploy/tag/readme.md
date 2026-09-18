@@ -59,9 +59,32 @@ C'est le seul test de la machine qui se fait contre **le site live**, pas contre
 5. **l'aperçu** marche-t-il à 0 % de trafic (sinon le lien de démo au client est mort) ;
 6. **le bouton stop** coupe-t-il vraiment (c'est la condition de confiance du buyer).
 
-**Mesuré sur `hubspot.com/products/marketing`** (page jamais marquée) : cible retrouvée par
-empreinte, 1/1 édition posée au bon endroit, **masque 39 ms**, témoin à 0 édition, aperçu
+## État réel, après vérification sur DEUX sites
+
+**HubSpot** (`/products/marketing`, une édition de texte) : les quatre scénarios passent.
+Cible retrouvée par empreinte, édition au bon endroit, masque 39 ms, témoin intact, aperçu
 fonctionnel à 0 % de trafic, bouton stop effectif.
+
+**Jira** (`atlassian.com/software/jira`, trois verbes dont deux sur des bandes) : **REFUSÉ**.
+Et c'est ce second site qui dit la vérité sur l'architecture actuelle.
+
+| Problème trouvé | Ce que ça veut dire |
+|---|---|
+| **CSP** | `connect-src` interdit notre domaine : la config distante n'arrive jamais. Le loader repasse sur la config figée, donc plus de pilotage à distance **ni de bouton stop** sans recoller le loader. Traité, mais c'est une limite du site, pas un bug |
+| **Coût du rapprochement** | ~700 ms de calcul par essai dans le navigateur du visiteur (471 empreintes × 471 éléments), plus 97 à 188 Ko de charge utile. Inacceptable sur une page qu'on veut rapide |
+| **Moment** | à `DOMContentLoaded` la mise en page n'est pas finie : les bandes, repérées par géométrie, n'existent pas encore. On repique, mais on masque jusqu'à 1,5 s — ce qu'on paie en LCP, donc en Quality Score |
+| **Bandes** | `s5`/`s6` restent non résolues au chargement, alors que le même rapprochement est parfait (471/471) trois secondes plus tard sur la même page |
+
+**Ce que ça dit, et c'est la vraie conclusion** : rapprocher toute la page **au moment du
+chargement** est la mauvaise idée. Le rapprochement doit se faire **à la construction**, où
+700 ms ne coûtent rien et où on a déjà un navigateur : on ouvre la page vivante, on résout une
+fois, on en déduit un sélecteur stable par cible, on le vérifie, et on n'embarque que ça. Le
+runtime redevient un `querySelector` plus un contrôle d'identité à deux champs : quelques
+millisecondes, aucune charge utile, presque plus de masque.
+
+L'empreinte ne disparaît pas dans cette refonte, elle en est le socle : c'est elle qui permet
+de dériver le sélecteur, de vérifier qu'il désigne encore la bonne chose, et de le refaire
+quand la page du client bouge.
 
 Le chrono est pris **dans** le tag, autour des vraies opérations DOM : un observateur extérieur
 regroupe ses lots et rendait 0 ms alors que le masque avait bien été posé.

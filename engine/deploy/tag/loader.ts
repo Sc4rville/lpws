@@ -15,6 +15,20 @@
  *   · la config de la dernière visite est gardée en local, donc la visite suivante applique
  *     sans attendre le réseau (le clignotement d'un aller-retour serait le prix caché du loader).
  *
+ * LE MUR : beaucoup de sites sérieux servent une Content-Security-Policy stricte, dont un
+ * `connect-src` qui interdit toute requête vers un domaine non listé. Constaté en jugeant sur
+ * atlassian.com : notre fetch de config est refusé net par le navigateur. On ne peut pas
+ * demander à chaque client d'ajouter notre domaine à sa CSP, ce serait recréer la friction
+ * qu'on vient d'enlever.
+ *
+ * Donc deux modes, et le loader dit lequel il a utilisé :
+ *   PILOTÉ   la config est allée chercher au réseau : bouton stop, part de trafic et nouvelles
+ *            variantes changent sans jamais rouvrir GTM ;
+ *   FIGÉ     le réseau est interdit par la CSP : le loader applique la config embarquée à la
+ *            construction. Ça marche, mais changer quoi que ce soit demande de recoller le
+ *            loader dans GTM — Y COMPRIS LE BOUTON STOP. À dire au buyer à l'installation,
+ *            jamais à lui laisser découvrir.
+ *
  * Aucun import node : ce fichier part dans le navigateur du visiteur.
  */
 import { markDom } from "../../clone/1_acquire/mark.ts"
@@ -48,11 +62,22 @@ export type ConfigServie = {
   /** le bouton stop : tout s'arrête, sans republier le conteneur GTM */
   actif: boolean
   delaiMax: number
+  /**
+   * TOUTES les empreintes de la capture, pas seulement celles que la variante édite.
+   *
+   * Le rapprochement attribue un pour un : les jumeaux d'une cible doivent être présents pour
+   * se faire prendre par leur propre meilleur candidat et la libérer. Sans eux ils restent en
+   * concurrence et la cible est ambiguë à vie. Mesuré sur Jira : 0 cible résolue avec les
+   * seules cibles, 471 sur 471 avec le jeu complet.
+   */
+  amers: Empreinte[]
   variantes: VarianteServie[]
 }
 
 declare const __LPWS_BASE__: string
 declare const __LPWS_CLIENT__: string
+/** la config figée au build : le repli quand le réseau nous est interdit (cf. plus bas) */
+declare const __LPWS_CFG__: ConfigServie
 
 const CLE_CONFIG = "lpws_cfg"
 const CLE_ID = "lpws_id"
@@ -106,11 +131,21 @@ function masque(delaiMax: number): () => void {
 
 type Resolu = { edit: EditTag; el: Element; el2?: Element }
 
-function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
+function resoudre(edits: EditTag[], amers: Empreinte[]): { resolus: Resolu[]; abandons: string[] } {
+  // repartir propre : markDom garde une bande déjà marquée et se contente d'incrémenter son
+  // compteur, donc un second passage sur une page qui a grandi décale toute la numérotation
+  document.querySelectorAll("[data-lpws]").forEach((e) => e.removeAttribute("data-lpws"))
   markDom()
   const vivantes = fingerprintDom()
+
+  // les cibles ET les amers, dans l'ordre du document : c'est cet ordre que le rapprochement
+  // exploite pour trancher entre deux éléments qui se ressemblent
+  const vues = new Set<string>()
   const voulues: Empreinte[] = []
-  for (const e of edits) { voulues.push(e.emp); if (e.emp2) voulues.push(e.emp2) }
+  const ajoute = (e?: Empreinte) => { if (e && !vues.has(e.a)) { vues.add(e.a); voulues.push(e) } }
+  for (const e of edits) { ajoute(e.emp); ajoute(e.emp2) }
+  for (const a of amers) ajoute(a)
+  voulues.sort((x, y) => (parseInt(x.a.slice(1), 10) || 0) - (parseInt(y.a.slice(1), 10) || 0))
 
   const lien = new Map(relier(voulues, vivantes).retrouves.map((l) => [l.avant, l.apres]))
   const el = (emp: Empreinte): Element | null => {
@@ -191,52 +226,102 @@ function choisir(cfg: ConfigServie): VarianteServie | null {
   return null
 }
 
+let mode: "pilote" | "figé" | "cache" = "figé"
+
 function annonce(version: string, applique: number, abandons: string[]): void {
   const w = window as unknown as { dataLayer?: unknown[]; __lpws?: unknown }
   w.dataLayer = w.dataLayer || []
   w.dataLayer.push({
     event: "lpws_variante", lpws_variante: version,
-    lpws_editions: applique, lpws_abandons: abandons.length,
+    lpws_editions: applique, lpws_abandons: abandons.length, lpws_mode: mode,
   })
-  w.__lpws = { version, applique, abandons }
+  w.__lpws = { version, applique, abandons, mode }
 }
 
+/**
+ * RÉESSAYER, et c'est la leçon la plus chère de cette famille.
+ *
+ * Au premier essai, à DOMContentLoaded, la mise en page n'est pas finie : les images n'ont pas
+ * de hauteur, donc les bandes de haut niveau (repérées par géométrie) n'existent pas encore et
+ * la moitié de la page manque à l'appel. Mesuré sur atlassian.com : 0 cible résolue à
+ * DOMContentLoaded, alors que le rapprochement est parfait (471 sur 471) trois secondes plus
+ * tard sur exactement la même page.
+ *
+ * On garde donc le masque et on repique jusqu'à ce que la page soit assez formée — ou jusqu'au
+ * délai, où on rend la main au client. Le coût se paie en millisecondes de masque, et il est
+ * mesuré par le juge plutôt que supposé.
+ */
 function poser(cfg: ConfigServie): void {
   const v = choisir(cfg)
   if (!v) { annonce("controle", 0, []); return }
 
-  const reveler = masque(cfg.delaiMax ?? 1500)
-  let applique = 0
-  let abandons: string[] = []
-  try {
-    const r = resoudre(v.edits)
-    abandons = r.abandons
-    // tout ou rien : une variante à moitié posée se jugerait comme si elle était complète
-    if (abandons.length === 0) for (const x of r.resolus) { appliquer(x); applique++ }
-  } catch (err) {
-    abandons.push("erreur du tag : " + String(err))
-  } finally { reveler() }
-  annonce(applique > 0 ? v.nom : "controle-repli", applique, abandons)
+  const delaiMax = cfg.delaiMax ?? 1500
+  const reveler = masque(delaiMax)
+  const t0 = performance.now()
+  let essais = 0
+
+  const essayer = (): void => {
+    essais++
+    let applique = 0
+    let abandons: string[] = []
+    try {
+      const r = resoudre(v.edits, cfg.amers ?? [])
+      abandons = r.abandons
+      // tout ou rien : une variante à moitié posée se jugerait comme si elle était complète
+      if (abandons.length === 0) for (const x of r.resolus) { appliquer(x); applique++ }
+    } catch (err) {
+      abandons.push("erreur du tag : " + String(err))
+    }
+
+    if (applique > 0) { reveler(); annonce(v.nom, applique, []); return }
+    if (performance.now() - t0 < delaiMax - 120) { setTimeout(essayer, 120); return }
+    // le délai est atteint : le client voit SA page, c'est le bon repli
+    reveler()
+    annonce("controle-repli", 0, abandons.concat(`abandon après ${essais} essai(s)`))
+  }
+  essayer()
 }
 
 /* ————— l'enchaînement ————— */
 
+/** Une seule pose par page : deux poses appliqueraient les éditions deux fois. */
+let pose = false
+function poserUneFois(cfg: ConfigServie, m: typeof mode): void {
+  if (pose) return
+  pose = true
+  mode = m
+  poser(cfg)
+}
+
 function lancer(): void {
-  // la config de la dernière visite d'abord : sinon chaque visiteur paierait un aller-retour
-  // réseau en clignotement. Le rafraîchissement se fait après coup, pour la visite suivante.
   const cache = local.lire(CLE_CONFIG)
-  if (cache) { try { poser(JSON.parse(cache) as ConfigServie) } catch { /* cache abîmé */ } }
+
+  // la course : le réseau d'abord s'il répond vite, sinon on n'attend pas. Sous CSP le fetch
+  // échoue immédiatement, donc le repli est instantané et le visiteur ne paie rien.
+  let fini = false
+  const secours = setTimeout(() => {
+    if (fini) return
+    fini = true
+    try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé") }
+    catch { poserUneFois(__LPWS_CFG__, "figé") }
+  }, 300)
 
   fetch(`${__LPWS_BASE__}/v/${__LPWS_CLIENT__}.json`, { cache: "no-cache" })
     .then((r) => (r.ok ? r.text() : null))
     .then((t) => {
-      if (!t) return
-      if (t === cache) return
+      if (!t) throw new Error("config illisible")
       local.ecrire(CLE_CONFIG, t)
-      // première visite (aucun cache) : on pose tout de suite, sinon elle serait perdue
-      if (!cache) poser(JSON.parse(t) as ConfigServie)
+      if (fini) return          // le repli a déjà posé : la config fraîche servira au prochain chargement
+      fini = true; clearTimeout(secours)
+      poserUneFois(JSON.parse(t) as ConfigServie, "pilote")
     })
-    .catch(() => { /* réseau coupé : le client voit sa page, c'est le bon repli */ })
+    .catch(() => {
+      // CSP, réseau coupé, config absente : on applique quand même ce qu'on a
+      if (fini) return
+      fini = true; clearTimeout(secours)
+      try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé") }
+      catch { poserUneFois(__LPWS_CFG__, "figé") }
+    })
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", lancer)

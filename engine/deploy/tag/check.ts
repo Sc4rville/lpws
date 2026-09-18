@@ -28,7 +28,7 @@ import { step, fail } from "../../shared/log.ts"
 const SCOPE = "deploy/tag/check"
 const BASE = "https://cfg.lpws.test"
 
-type Vu = { version: string; applique: number; abandons: string[]; masqueMs: number; textes: string[] }
+type Vu = { version: string; applique: number; abandons: string[]; masqueMs: number; mode: string; cspBloque: boolean; textes: string[] }
 
 async function ouvrir(
   url: string, loader: string | null, cfg: ConfigServie | null, client: string, suffixe: string,
@@ -37,6 +37,12 @@ async function ouvrir(
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
     userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  })
+  // la CSP du site peut refuser notre domaine AVANT que l'interception serve quoi que ce soit :
+  // on note le refus, c'est lui qui décide du mode piloté ou figé
+  let cspBloque = false
+  page.on("console", (m) => {
+    if (m.type() === "error" && /Content Security Policy/i.test(m.text())) cspBloque = true
   })
   if (cfg) {
     await page.route(`${BASE}/v/${client}.json`, (r) =>
@@ -48,9 +54,9 @@ async function ouvrir(
     await page.goto(url + (url.includes("?") ? "&" : "?") + suffixe,
       { waitUntil: "domcontentloaded", timeout: 45_000 })
     await page.waitForTimeout(3_000)
-    return await page.evaluate(() => {
+    const vu = await page.evaluate(() => {
       const w = window as unknown as {
-        __lpws?: { version: string; applique: number; abandons: string[] }
+        __lpws?: { version: string; applique: number; abandons: string[]; mode: string }
         __lpwsMasque?: number
       }
       return {
@@ -58,10 +64,12 @@ async function ouvrir(
         applique: w.__lpws?.applique ?? 0,
         abandons: w.__lpws?.abandons ?? [],
         masqueMs: w.__lpwsMasque ?? 0,
+        mode: w.__lpws?.mode ?? "aucun",
         textes: [...document.querySelectorAll("[data-lpws-edited],[data-lpws-added]")]
           .map((el) => (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80)),
       }
     })
+    return { ...vu, cspBloque }
   } finally { await browser.close() }
 }
 
@@ -96,13 +104,17 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
   if (fuites.length > 0) echecs.push(`FUITE sur le témoin : ${fuites.join(", ")}`)
   if (variante.masqueMs > 1000) echecs.push(`page masquée ${variante.masqueMs} ms — trop long, ça coûte du LCP`)
   if (apercu.applique === 0) echecs.push("l'aperçu ?lpws=<nom> n'applique rien à 0 % — le lien de démo au client serait mort")
-  if (stop.applique > 0) echecs.push("le bouton stop ne coupe pas — inacceptable, c'est la condition de confiance")
+  // sous CSP le stop distant ne PEUT pas arriver : ce n'est pas un bug du tag, c'est une
+  // limite du site, et elle doit être dite au buyer à l'installation — pas découverte après
+  if (stop.applique > 0 && !stop.cspBloque)
+    echecs.push("le bouton stop ne coupe pas — inacceptable, c'est la condition de confiance")
 
   const ok = echecs.length === 0
+  step(SCOPE, `mode     : ${variante.mode}${variante.cspBloque ? " (CSP du site : config distante refusée)" : ""}`)
   step(SCOPE, `variante : ${variante.applique} édition(s) · masque ${variante.masqueMs} ms`)
   step(SCOPE, `témoin   : ${temoin.applique} édition(s) (doit être 0)`)
   step(SCOPE, `aperçu   : ${apercu.applique} édition(s) à 0 % de trafic (doit être > 0)`)
-  step(SCOPE, `stop     : ${stop.applique} édition(s) (doit être 0)`)
+  step(SCOPE, `stop     : ${stop.applique} édition(s)${stop.cspBloque ? " — CSP : le stop distant n'arrive pas, il faut recoller le loader" : " (doit être 0)"}`)
   for (const e of echecs) step(SCOPE, `ÉCHEC : ${e}`)
   step(SCOPE, ok ? "TAG VALIDE sur la page vivante" : "tag REFUSÉ")
   return { ok, variante, temoin, apercu, stop, echecs }
