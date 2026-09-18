@@ -353,7 +353,7 @@ const STEPS = {
 };
 
 /* ---------- les clients ---------- */
-const CLIENTS = [
+const DEMO = [
   {
     id: 'atlassian', ini: 'A', nom: 'Atlassian', marque: 'Jira', url: 'www.atlassian.com/software/jira', site: 'atlassian.com', img: 'atlassian',
     capture: { date: '17 sept. 2026', ok: true, conforme: '99,9 %', blocs: 9 },
@@ -479,6 +479,7 @@ const CLIENTS = [
     ],
   },
 ];
+let CLIENTS = DEMO; let LIVE = false; let BASE = 'https://lpws.vercel.app';
 const byId = id => CLIENTS.find(c => c.id === id);
 
 /* ---------- état ---------- */
@@ -494,6 +495,8 @@ const eur = n => Math.round(n).toLocaleString('fr-FR') + ' €';
 const pct = (x, d = 1) => (x * 100).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' %';
 const signed = (x, d = 0) => (x >= 0 ? '+' : '−') + pct(Math.abs(x), d);
 const img = k => (typeof IMG !== 'undefined' && IMG[k]) || null;
+const imgOf = c => c.imgUrl || img(c.img);
+const imgTest = (c, t) => t.imgUrl || img('v:' + t.id);
 const toast = t => { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1800); };
 async function copier(t, msg = 'Copié') { try { await navigator.clipboard.writeText(t); toast(msg); } catch { toast('Impossible de copier ici'); } }
 const GO = (label, extra = '') => `<button class="go" ${extra}><span class="halo"></span><span class="clip"><span class="sheen"></span></span>${label}</button>`;
@@ -522,6 +525,7 @@ function verdict(c, t) {
 const ETATS = {
   live: ['ok', 'En ligne · collecte', true], gagnant: ['ok', 'Gagnant · déployé', false], pret: ['', 'Prêt à lancer', false],
   stop: ['', 'Arrêté', false], integral: ['warn', 'Demande Intégral', false], attente: ['warn', 'Boutique à connecter', false],
+  prep: ['warn', 'En préparation', true], echec: ['bad', 'À reprendre', false],
 };
 const chipEtat = t => { const [k, l, p] = ETATS[t.etat]; return `<span class="chip ${k}">${k ? `<span class="dot ${p ? 'pulse' : ''}"></span>` : ''}${l}${t.etat === 'live' ? ' · ' + t.part + ' %' : ''}</span>`; };
 const chipPot = t => `<span class="chip ${t.potentiel === 'Fort' ? 'ink' : ''}">${I.sparkle(12)}Potentiel ${t.potentiel.toLowerCase()}</span>`;
@@ -530,6 +534,7 @@ const chipConn = c => { const m = voieDe(c); const x = c.connexion[m]; const k =
 const statutClient = c => {
   const live = c.tests.find(t => t.etat === 'live');
   if (live) return '<span class="chip ok"><span class="dot pulse"></span>Test en ligne</span>';
+  if (c.capture.enCours) return '<span class="chip warn"><span class="dot pulse" style="background:var(--warn)"></span>Copie en cours</span>';
   if (c.capture.ok === false) return '<span class="chip">Copie en cours de mise au point</span>';
   if (c.capture.ok === null) return '<span class="chip">Copie à relancer</span>';
   if (c.shopify) return '<span class="chip warn"><span class="dot"></span>Accès à demander</span>';
@@ -544,7 +549,7 @@ function renderRail() {
     <button class="rb mark" data-go="ctx:home" title="Vue d’ensemble" aria-label="Vue d’ensemble">${I.mark(20)}</button>
     <hr class="sep">
     ${CLIENTS.map(c => `<button class="rb av ${S.ctx === c.id ? 'on' : ''}" data-go="ctx:${c.id}" title="${esc(c.nom)}" aria-label="${esc(c.nom)}">${c.ini}${c.tests.some(t => t.etat === 'live') ? '<span class="live-dot"></span>' : ''}</button>`).join('')}
-    <button class="rb plus" title="Ajouter un client" aria-label="Ajouter un client" data-act="add">${I.plus()}</button>
+    <button class="rb plus" title="Ajouter une page" aria-label="Ajouter une page" data-go="ctx:home;view:ajout">${I.plus()}</button>
     <div class="sp"></div>
     <button class="rb" title="Réglages" aria-label="Réglages">${I.sliders()}</button>
     <button class="rb av" title="Yann" aria-label="Compte">Y</button>`;
@@ -620,7 +625,7 @@ function liveCard(c, t, { compact = false } = {}) {
 function guards(c, t) {
   const ex = c.connexion.express;
   const stopTxt = c.shopify ? 'La version d’origine reste publiée : un clic et elle reprend tout.' : ex.stopGtm ? 'Un clic dans LPWS. Sur ce site, la commande passe par GTM : elle prend 30 secondes.' : 'Un clic, sans rouvrir GTM : l’original reprend 100 % du trafic.';
-  const vit = c.shopify ? 'Page native de la boutique, rien d’ajouté.' : ex.etat === 'ok' ? (ex.vitesse === 'aucun' ? 'Aucun ralentissement mesuré, pas de clignotement.' : `${ex.vitesse} mesurés, invisible pour le visiteur. Pas de clignotement.`) : 'Mesuré à l’installation, avant le premier test.';
+  const vit = c.shopify ? 'Page native de la boutique, rien d’ajouté.' : ex.vitesse === 'non mesurée' ? 'La balise attend que la page ait fini d’afficher avant d’écrire ; la mesure précise vient avec la vérification.' : ex.etat === 'ok' ? (ex.vitesse === 'aucun' ? 'Aucun ralentissement mesuré, pas de clignotement.' : `${ex.vitesse} mesurés, invisible pour le visiteur. Pas de clignotement.`) : 'Mesuré à l’installation, avant le premier test.';
   return `<div class="guards">
     <div class="guard"><span class="i">${I.shield(15)}</span><div><b>Tracking intact</b><span>${c.shopify ? 'Panier, paiement et pixels restent ceux de la boutique.' : 'Le gclid arrive sur la page : vos conversions Google Ads ne changent pas.'}</span></div></div>
     <div class="guard"><span class="i">${I.gauge(15)}</span><div><b>Page pas ralentie</b><span>${vit}</span></div></div>
@@ -642,20 +647,21 @@ function testCard(c, t, { withClient = false } = {}) {
 function vHome() {
   const lives = CLIENTS.flatMap(c => c.tests.filter(t => t.etat === 'live').map(t => [c, t]));
   const prets = CLIENTS.flatMap(c => c.tests.filter(t => t.etat === 'pret').map(t => [c, t]));
-  const todo = [
+  if (LIVE && !CLIENTS.length) return vAjout(true);
+  const todo = LIVE ? [] : [
     { id: 'dawn', t: 'Dawn · demander l’accès collaborateur', m: 'Le test est prêt. Un code à envoyer au client, il accepte en un clic.' },
     { id: 'monday', t: 'Monday · copie en cours de mise au point', m: 'La page anime ses blocs au défilement. On la refait — rien à faire de votre côté.' },
     { id: 'asana', t: 'Asana · copie à relancer', m: 'Interrompue en cours de route. On la relance.' },
   ];
   return `
-    <div class="hd"><div><h2>Aujourd’hui</h2><p class="lede">${lives.length} tests en ligne, ${prets.length} prêts à lancer. Tracking et vitesse vérifiés sur tous les sites connectés.</p></div><span class="date">18 sept. 2026</span></div>
+    <div class="hd"><div><h2>Aujourd’hui</h2><p class="lede">${lives.length} test${lives.length > 1 ? 's' : ''} en ligne, ${prets.length} prêt${prets.length > 1 ? 's' : ''} à lancer.${LIVE ? '' : ' Tracking et vitesse vérifiés sur tous les sites connectés.'}</p></div><span class="date">18 sept. 2026</span></div>
     <div class="grid g2">${lives.map(([c, t]) => liveCard(c, t, { compact: true })).join('')}</div>
-    <div class="sec"><h3>Prêts à lancer <span class="n">${prets.length}</span></h3>
-      <div class="tests">${prets.map(([c, t]) => testCard(c, t, { withClient: true })).join('')}</div></div>
+    ${prets.length ? `<div class="sec"><h3>Prêts à lancer <span class="n">${prets.length}</span></h3>
+      <div class="tests">${prets.map(([c, t]) => testCard(c, t, { withClient: true })).join('')}</div></div>` : ''}
     <div class="grid g2 sec">
-      <div class="card"><h3>À faire <span class="n">${todo.length}</span></h3>
+      ${todo.length ? `<div class="card"><h3>À faire <span class="n">${todo.length}</span></h3>
         <div class="list">${todo.map(a => `<button class="li" data-go="ctx:${a.id}" style="padding-left:10px"><span><div class="t">${esc(a.t)}</div><div class="m">${esc(a.m)}</div></span><span class="cv">${I.chevr(16)}</span></button>`).join('')}</div>
-      </div>
+      </div>` : ''}
       <div class="card"><h3>Clients <span class="n">${CLIENTS.length}</span></h3>
         <div class="list">${CLIENTS.map(c => `<button class="li" data-go="ctx:${c.id}" style="padding-left:10px"><span class="rb av" style="width:32px;height:32px;font-size:12px;flex:none">${c.ini}</span><span style="min-width:0"><div class="t">${esc(c.nom)} <span class="m" style="display:inline">· ${esc(c.marque)}</span></div><div class="m">${c.tests.length ? c.tests.length + ' test' + (c.tests.length > 1 ? 's' : '') : 'aucun test'} · ${esc(c.url)}</div></span><span style="margin-left:auto">${statutClient(c)}</span></button>`).join('')}</div>
       </div>
@@ -668,13 +674,16 @@ function vDash(c) {
   const prets = c.tests.filter(t => t.etat === 'pret');
   const first = prets[0];
   const ex = c.connexion.express, na = c.connexion.natif;
-  const hero = live ? liveCard(c, live)
+  const hero = c.capture.enCours ? heroCapture(c)
+    : c.live && c.capture.ok === null ? heroRelancer(c)
+    : live ? liveCard(c, live)
+    : c.live && !c.tests.length ? heroPremierTest(c)
     : first ? `<div class="live calm"><div style="display:flex;gap:6px">${chipEtat(first)}${chipPot(first)}</div><h3>${esc(first.titre)}</h3><div class="say">${esc(first.teste)}</div><div class="act">${GO(I.play(16) + 'Lancer ce test', `data-act="launch" data-test="${first.id}" data-client="${c.id}"`)}<button class="btn" data-go="test:${first.id}">Voir d’abord ${I.arrow(15)}</button></div></div>`
     : c.shopify ? `<div class="live calm"><span class="chip warn"><span class="dot"></span>Accès à demander</span><h3>Un test attend la boutique</h3><div class="say">Le client vous ajoute comme collaborateur en un clic, et le test part sur sa fiche produit — panier et paiement intacts.</div><div class="act">${GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')}<button class="btn" data-go="guide:natif">Comment ça marche ${I.arrow(15)}</button></div></div>`
     : `<div class="live calm"><span class="chip">${c.capture.ok === false ? 'Copie en cours de mise au point' : 'Copie à relancer'}</span><h3>${esc(c.nom)} arrive</h3><div class="say">${esc(c.capture.cause)}</div><div class="act"><button class="btn" data-go="view:page">Voir la page ${I.arrow(15)}</button></div></div>`;
   return `
     <div class="hd"><div><h2>${esc(c.nom)} <span class="muted" style="font-weight:500">· ${esc(c.marque)}</span></h2><div class="u">${esc(c.url)}</div><div class="chips">${statutClient(c)}${chipConn(c)}</div></div>
-      <div class="act">${c.tests.length ? `<button class="btn" data-go="view:tests">${I.ab(16)}Tests</button>` : ''}<button class="btn" data-go="view:resultats">${I.bars(16)}Résultats</button></div></div>
+      <div class="act">${c.live && c.capture.ok !== null && !c.capture.enCours ? `<button class="btn pri" data-go="view:nouveau">${I.sparkle(16)}Nouveau test</button>` : ''}${c.tests.length ? `<button class="btn" data-go="view:tests">${I.ab(16)}Tests</button>` : ''}<button class="btn" data-go="view:resultats">${I.bars(16)}Résultats</button></div></div>
     ${hero}
     ${(ex.etat === 'ok' || c.shopify) ? `<div class="sec"><h3>Ce qui est garanti</h3>${guards(c)}</div>` : ''}
     ${gagnant ? `<div class="sec"><h3>Dernier gagnant</h3>${liveCard(c, gagnant)}</div>` : ''}
@@ -683,6 +692,7 @@ function vDash(c) {
       <div class="card"><h3>Connexion <span class="r">${chipConn(c)}</span></h3>
         ${c.shopify ? `<p>Un accès collaborateur suffit : le client l’accorde en un clic depuis sa boutique. Ensuite chaque test est une version native de la fiche produit.</p><div style="margin-top:16px"><button class="btn glow" data-act="shopify">${I.send(15)}Envoyer la demande d’accès</button></div>`
         : ex.etat === 'ok' ? `<p>Express est installé et vérifié le ${ex.verifie} : tracking intact, ${ex.vitesse === 'aucun' ? 'aucun ralentissement' : ex.vitesse + ' de chargement'}. Textes, boutons, ordre des blocs, menu : tout se teste sans rien redemander au client.</p><p>Pour tester des sections entières, passez en Intégral : une ligne DNS à transmettre au client, une fois.</p><div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-go="guide:express">${I.bolt(14)}Express</button><button class="btn sm glow" data-go="guide:integral">${I.relay(14)}Passer en Intégral</button></div>`
+        : c.live && c.capture.ok !== null && !c.capture.enCours ? `<p>Une balise à coller dans le Google Tag Manager du client — vous y avez déjà accès pour le suivi des conversions. Collez, publiez, puis vérifiez ici : LPWS ouvre la vraie page et confirme.</p><div style="margin-top:16px"><button class="btn sm glow" data-go="guide:express">${I.bolt(14)}Installer la balise</button></div>`
         : `<p>La connexion se fait une fois la copie de la page conforme. Express ne demande rien au client : une balise dans son Google Tag Manager.</p><div style="margin-top:16px"><button class="btn sm" data-go="guide:express">${I.bolt(14)}Comment ça marche</button></div>`}
       </div>
       <div class="card"><h3>Landing page <span class="r">${c.capture.ok === true ? `<span class="chip ok"><span class="dot"></span>Copie conforme${c.shopify ? '' : ' · ' + c.capture.conforme}</span>` : c.capture.ok === false ? '<span class="chip">Mise au point</span>' : '<span class="chip">À relancer</span>'}</span></h3>
@@ -693,12 +703,12 @@ function vDash(c) {
 }
 
 function vTests(c) {
-  if (!c.tests.length) return `<div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div></div></div><div class="empty"><b>Pas encore de test</b>${c.capture.ok === false ? 'La copie de la page est en cours de mise au point. Les tests se préparent dessus.' : 'La copie de la page doit d’abord aboutir.'}</div>`;
+  if (!c.tests.length) return `<div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div></div>${c.live && c.capture.ok !== null ? `<div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div>` : ''}</div><div class="empty"><b>Pas encore de test</b>${c.live && c.capture.ok !== null ? 'Changez un titre ou un bouton : c’est le premier test.' : c.capture.ok === false ? 'La copie de la page est en cours de mise au point. Les tests se préparent dessus.' : 'La copie de la page doit d’abord aboutir.'}</div>`;
   const grp = (k) => c.tests.filter(t => t.etat === k);
   const sec = (titre, arr) => arr.length ? `<div class="sec"><h3>${titre} <span class="n">${arr.length}</span></h3><div class="tests">${arr.map(t => testCard(c, t)).join('')}</div></div>` : '';
   return `
-    <div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div><p class="lede">Chaque test oppose une variante à l’original, sur la même adresse, avec le trafic que vous choisissez.</p></div></div>
-    ${sec('En ligne', grp('live'))}${sec('Prêts à lancer', grp('pret'))}${sec('Gagnants déployés', grp('gagnant'))}${sec('Demandent Intégral', grp('integral'))}${sec('En attente de la boutique', grp('attente'))}${sec('Arrêtés', grp('stop'))}`;
+    <div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div><p class="lede">Chaque test oppose une variante à l’original, sur la même adresse, avec le trafic que vous choisissez.</p></div>${c.live ? `<div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div>` : ''}</div>
+    ${sec('En préparation', grp('prep'))}${sec('En ligne', grp('live'))}${sec('Prêts à lancer', grp('pret'))}${sec('Gagnants déployés', grp('gagnant'))}${sec('Demandent Intégral', grp('integral'))}${sec('En attente de la boutique', grp('attente'))}${sec('Arrêtés', grp('stop'))}${sec('À reprendre', grp('echec'))}`;
 }
 
 function vTest(c) {
@@ -707,15 +717,17 @@ function vTest(c) {
   S.test = t.id;
   const live = t.etat === 'live';
   const url = previewUrl(c, t);
-  const o = img(c.img), v = img('v:' + t.id);
+  const o = imgOf(c), v = imgTest(c, t);
   const ex = c.connexion.express;
   const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="0" max="100" step="5" value="${t.part}" aria-label="Part du trafic"><span class="v" id="partv">${t.part} %</span></label>` : '';
-  const principal = live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(16)}Arrêter — l’original reprend 100 %</button>`
+  const principal = t.etat === 'prep' ? `<button class="btn lg" disabled>${I.clock(16)}En préparation</button>`
+    : t.etat === 'echec' ? `<button class="btn lg" data-go="view:nouveau">${I.sparkle(16)}Refaire un test</button>`
+    : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(16)}Arrêter — l’original reprend 100 %</button>`
     : (t.etat === 'pret' || t.etat === 'stop') ? GO(I.play(16) + 'Lancer le test', `data-act="launch" data-test="${t.id}" data-client="${c.id}"`)
     : t.etat === 'integral' ? GO(I.relay(16) + 'Passer en Intégral', 'data-go="guide:integral"')
     : t.etat === 'attente' ? GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')
     : `<button class="btn lg" data-act="restore" data-test="${t.id}" data-client="${c.id}">${I.back(16)}Remettre l’original</button>`;
-  let results = '';
+  let results = c.live && !t.res ? resultatsLive(c, t) : '';
   if (t.res) {
     const vd = verdict(c, t); const s = vd.s2;
     const cpc = c.ads ? c.ads.cpc : null;
@@ -738,6 +750,7 @@ function vTest(c) {
       <h2>${esc(t.titre)}</h2>
       <p class="lede"><b>Ce qu’on teste.</b> ${esc(t.teste)}</p>
       <p class="lede" style="margin-top:8px"><b>Pourquoi.</b> ${esc(t.pourquoi)}</p>
+      ${etatTest(t)}
     </div></div>
     <div class="hd" style="margin-bottom:0"><div class="act" style="margin-left:0;margin-top:14px;gap:10px">
       <button class="btn lg glow" data-copy="${esc(url)}" data-msg="Lien d’aperçu copié — à envoyer au client" title="${esc(url)}">${I.eye(16)}Lien d’aperçu pour le client</button>
@@ -761,7 +774,7 @@ function vTest(c) {
 }
 
 function vPage(c) {
-  const k = c.capture; const o = img(c.img);
+  const k = c.capture; const o = imgOf(c);
   const facts = k.ok === true && !c.shopify ? `
       <div class="stats">
         <div class="stat"><div class="l">Copie conforme</div><div class="v">${k.conforme}</div><div class="s">ordinateur et mobile</div></div>
@@ -844,7 +857,7 @@ function vGuide(c, m) {
       <div class="lab">Prêt en</div><div>10 min</div><div>1 jour</div><div>1 h</div>
     </div></div>`;
   if (m === 'express') {
-    const script = `<script src="https://cdn.lpws.io/t/${c ? c.id : 'client'}.js" async><\/script>`;
+    const script = (x && x.script) || `<script src="${BASE}/t/${c ? (c.clientSlug || c.id) : 'client'}.js" async><\/script>`;
     const acces = `Bonjour,\n\nPour lancer les tests de landing page, j’ai besoin d’un accès à votre Google Tag Manager :\ntagmanager.google.com → Admin → Gestion des utilisateurs → Ajouter → mon adresse e-mail → autorisation « Publier ».\n\nUne seule balise sera ajoutée, sans modification de votre site, retirable à tout moment.\n\nMerci !`;
     return head + `
       <div class="grid g2">
@@ -865,7 +878,7 @@ function vGuide(c, m) {
             <div class="ck"><span class="i">${I.check(12)}</span><div><b>Page pas ralentie</b><div class="d">${x.vitesse === 'aucun' ? 'aucun ralentissement mesuré' : x.vitesse + ' mesurés'}, pas de clignotement</div></div></div>
             <div class="ck"><span class="i">${I.check(12)}</span><div><b>Original intact</b><div class="d">les visiteurs hors test voient la page telle quelle</div></div></div>
             ${x.stopGtm ? `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Arrêt possible à tout moment</b><div class="d">sur ce site, la commande passe par GTM : retirer la balise, 30 secondes</div></div></div>` : `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Arrêt en un clic</b><div class="d">sans rouvrir GTM</div></div></div>`}`
-          : `<p>LPWS ouvre la page trois fois comme Google Ads le ferait et confirme : tracking intact, page pas ralentie, original intact.</p><div style="margin-top:16px">${GO(I.check(16) + 'Vérifier l’installation', 'data-act="verify"')}</div>`}
+          : `<p>LPWS ouvre la vraie page et cherche la balise : si GTM l’a publiée, elle répond.</p>${x && x.detail ? `<p class="muted" style="margin-top:10px">${esc(x.detail)}</p>` : ''}<div style="margin-top:16px">${GO(I.check(16) + 'Vérifier l’installation', 'data-act="verify"')}</div><div id="job-zone"></div>`}
         </div>
         ${peut}
       </div>${tableau}`;
@@ -908,11 +921,121 @@ function vGuide(c, m) {
     </div>${tableau}`;
 }
 
+/* ---------- la v1 : quand le serveur est là, l'interface pilote la machine ---------- */
+async function chargerEtat() {
+  try {
+    const r = await fetch('/api/etat', { cache: 'no-store' }); if (!r.ok) throw 0;
+    const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE;
+    if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
+  } catch { CLIENTS = DEMO; LIVE = false; }
+}
+async function api(path, data) {
+  const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erreur || ('Erreur ' + r.status));
+  return j;
+}
+const ETAPES = [['clone/1_acquire', 'Copie de la page'], ['clone/2_styles', 'Styles'], ['clone/3_assets', 'Images et polices'], ['clone/5_verify', 'Vérification'], ['clone', 'Copie'], ['apply', 'Variante'], ['deploy/tag', 'Balise'], ['ui', '']];
+function humaniser(l) {
+  if (l.startsWith('$')) return '';
+  const m = l.match(/^\[([^\]]+)\]\s*(.*)$/); if (!m) return l.trim();
+  const e = ETAPES.find(([k]) => m[1].startsWith(k)); return (e && e[1] ? e[1] + ' — ' : '') + m[2];
+}
+const jobBox = id => `<div class="card" id="job-card" data-job="${id}" style="margin-top:14px"><div style="display:flex;align-items:center;gap:10px"><span class="dot pulse" style="background:var(--warn)"></span><b id="job-etat">En cours…</b></div><div class="mono muted" id="job-lignes" style="margin-top:10px;white-space:pre-wrap;line-height:1.6;max-height:200px;overflow:auto"></div></div>`;
+function suivreJob(id, fin) {
+  clearInterval(suivreJob.t);
+  const tick = async () => {
+    try {
+      const r = await fetch('/api/jobs/' + id, { cache: 'no-store' }); if (!r.ok) return;
+      const j = await r.json();
+      const box = document.querySelector(`[data-job="${id}"]`);
+      if (box) {
+        box.querySelector('#job-lignes').textContent = j.lignes.map(humaniser).filter(Boolean).slice(-8).join('\n');
+        box.querySelector('#job-etat').textContent = j.etat === 'en cours' ? 'En cours…' : j.etat === 'ok' ? 'Terminé' : 'Ça n’a pas marché';
+        if (j.etat !== 'en cours') box.querySelector('.dot').style.background = j.etat === 'ok' ? 'var(--ok)' : 'var(--bad)';
+      }
+      if (j.etat !== 'en cours') { clearInterval(suivreJob.t); fin && fin(j); }
+    } catch {}
+  };
+  tick(); suivreJob.t = setInterval(tick, 1500);
+}
+function vAjout(premiere = false) {
+  return `
+    <div class="hd"><div><h2>${premiere ? 'Votre première page' : 'Nouvelle page'}</h2><p class="lede">Collez l’adresse de la landing page du client. LPWS l’ouvre comme un visiteur, la copie avec ses styles et ses images, et vérifie que la copie est conforme. Quelques minutes.</p></div></div>
+    <div class="card" style="max-width:720px">
+      <label class="fld">Adresse de la page<input class="inp mono" id="url" placeholder="https://www.client.com/landing" autocomplete="off" value="${esc(S.urlSaisie || '')}"></label>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.page(16) + 'Copier la page', 'data-act="capturer"')}<span class="muted" id="url-err"></span></div>
+    </div>
+    <div class="sec"><h3>Ce qui se passe ensuite</h3>
+      <div class="guards">
+        <div class="guard"><span class="i">${I.page(15)}</span><div><b>La copie</b><span>fidèle au pixel : c’est sur elle que les tests se préparent et se montrent</span></div></div>
+        <div class="guard"><span class="i">${I.bolt(15)}</span><div><b>La balise Express</b><span>une ligne à coller dans GTM, une fois</span></div></div>
+        <div class="guard"><span class="i">${I.ab(15)}</span><div><b>Le premier test</b><span>changez un titre ou un bouton, lancez : l’original reste intact</span></div></div>
+      </div></div>`;
+}
+function vNouveau(c) {
+  const liste = (S.textes || {})[c.id];
+  const choix = S.choix && liste ? liste.find(x => x.anchor === S.choix) : null;
+  const rows = !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
+    : !liste.length ? '<div class="empty"><b>Aucun texte trouvé</b>La copie doit avoir abouti pour proposer des textes.</div>'
+    : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${S.choix === x.anchor ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span></button>`).join('')}</div>`;
+  const genre = choix ? (choix.tag.startsWith('h') ? 'titre' : choix.tag === 'p' ? 'texte' : 'bouton') : '';
+  return `
+    <div class="hd"><div><h2>Nouveau test</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez un texte de la page, écrivez celui que vous voulez tester. L’original reste tel quel pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start">
+      <div class="card"><h3>1 · Le texte à changer</h3>${rows}</div>
+      <div class="card"><h3>2 · La nouvelle version</h3>
+        ${choix ? `<p class="muted" style="margin-bottom:12px">Aujourd’hui : « ${esc(choix.text)} »</p>` : '<p class="muted">Choisissez d’abord un texte à gauche.</p>'}
+        <label class="fld">Nouveau ${genre || 'texte'}<textarea class="inp" id="nt-text" rows="3" ${choix ? '' : 'disabled'}>${choix ? esc(S.ntText ?? choix.text) : ''}</textarea></label>
+        <label class="fld" style="margin-top:12px">Pourquoi ce changement<input class="inp" id="nt-why" placeholder="ex. reprendre la promesse de l’annonce" value="${esc(S.ntWhy || '')}" ${choix ? '' : 'disabled'}></label>
+        <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="nt-titre" value="${esc(S.ntTitre || (choix ? 'Nouveau ' + genre : ''))}" ${choix ? '' : 'disabled'}></label>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${choix ? GO(I.sparkle(16) + 'Créer le test', 'data-act="creer-test"') : ''}<span class="muted" id="nt-err"></span></div>
+      </div>
+    </div>`;
+}
+function heroCapture(c) {
+  return `<div class="live calm"><span class="chip warn"><span class="dot pulse" style="background:var(--warn)"></span>Copie en cours</span><h3>On copie ${esc(c.url)}</h3><div class="say">La page s’ouvre comme pour un visiteur, ses styles et ses images sont récupérés, puis la copie est vérifiée contre l’original. Quelques minutes.</div>${jobBox(c.job)}</div>`;
+}
+function heroPremierTest(c) {
+  const ex = c.connexion.express;
+  return `<div class="live calm"><div style="display:flex;gap:6px;flex-wrap:wrap">${c.capture.ok ? `<span class="chip ok"><span class="dot"></span>Copie conforme · ${c.capture.conforme}</span>` : `<span class="chip warn">Copie à ${c.capture.conforme}</span>`}${ex.etat === 'ok' ? '<span class="chip ok"><span class="dot"></span>Balise installée</span>' : '<span class="chip">Balise à installer</span>'}</div>
+    <h3>Prête pour un premier test</h3><div class="say">Changez un titre ou un bouton, lancez : l’original reste intact pour les autres visiteurs.${c.capture.ok ? '' : ' La copie n’est pas parfaite au pixel : les aperçus peuvent différer, la balise, elle, agit sur la vraie page.'}</div>
+    <div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}${ex.etat === 'ok' ? '' : `<button class="btn" data-go="guide:express">${I.bolt(15)}Installer la balise</button>`}</div></div>`;
+}
+function heroRelancer(c) {
+  return `<div class="live calm"><span class="chip">Copie à relancer</span><h3>${esc(c.nom)} n’a pas abouti</h3><div class="say">${esc(c.capture.cause)}</div><div class="act">${GO(I.refresh(16) + 'Relancer la copie', `data-act="recapturer" data-url="https://${esc(c.url)}"`)}</div></div>`;
+}
+function resultatsLive(c, t) {
+  if (t.etat !== 'live' && t.etat !== 'stop') return '';
+  return `<div class="sec"><h3>Résultats</h3><div class="card"><p><b>Les résultats se lisent dans GA4 et Google Ads.</b> La balise envoie la version vue par chaque visiteur (<span class="mono">lpws_variante</span>) : une dimension GA4 suffit pour comparer les conversions des deux versions. La lecture automatique arrivera ici.</p></div></div>`;
+}
+function etatTest(t) {
+  if (t.etat === 'prep') return `<div class="card" style="margin-top:16px"><p><b>Le test se prépare.</b> La variante se construit sur la copie, la cible est retrouvée sur la vraie page, la balise se publie. Une à deux minutes.</p></div>${jobBox(t.job)}`;
+  if (t.etat === 'echec') return `<div class="card" style="margin-top:16px;border:1px solid var(--bad)"><p><b>Ça n’a pas marché.</b> ${esc(t.erreur || '')}</p></div>`;
+  return '';
+}
+function apresRendu() {
+  clearInterval(suivreJob.t);
+  const c = S.ctx === 'home' ? null : byId(S.ctx);
+  const recharger = async () => { await chargerEtat(); render(); };
+  if (S.view === 'test' && c) { const t = c.tests.find(x => x.id === S.test); if (t && t.etat === 'prep' && t.job) suivreJob(t.job, recharger); }
+  if (S.view === 'dash' && c && c.job) suivreJob(c.job, recharger);
+  if (S.view === 'nouveau' && c) chargerTextes(c);
+}
+async function chargerTextes(c) {
+  S.textes = S.textes || {};
+  if (S.textes[c.id]) return;
+  try { const r = await fetch(`/api/clients/${c.id}/textes`); S.textes[c.id] = await r.json(); } catch { S.textes[c.id] = []; }
+  if (S.view === 'nouveau' && S.ctx === c.id) render();
+}
+
 function renderMain() {
   const m = document.getElementById('main');
   const c = S.ctx === 'home' ? null : byId(S.ctx);
   let html;
-  if (S.view === 'guide') html = vGuide(c, S.mode);
+  if (S.view === 'ajout') html = vAjout();
+  else if (S.view === 'nouveau' && c) html = vNouveau(c);
+  else if (S.view === 'guide') html = vGuide(c, S.mode);
   else if (!c) html = vHome();
   else if (S.view === 'tests') html = vTests(c);
   else if (S.view === 'test') html = vTest(c);
@@ -921,6 +1044,7 @@ function renderMain() {
   else html = vDash(c);
   m.innerHTML = html; m.scrollTop = 0;
   if (S.view === 'resultats') calcSS();
+  apresRendu();
 }
 function calcSS() {
   const num = id => parseFloat(String(document.getElementById(id)?.value ?? '').replace(/\s/g, '').replace(',', '.'));
@@ -955,15 +1079,39 @@ document.addEventListener('click', e => {
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
   const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
   switch (act.dataset.act) {
-    case 'launch': if (t) { t.etat = 'live'; t.jours = 0; if (!t.part) t.part = 50; c.tests.forEach(o => { if (o !== t && o.etat === 'live') o.etat = 'stop'; }); toast(`Test en ligne — ${t.part} % des visiteurs voient la variante`); S.ctx = c.id; S.view = 'test'; S.test = t.id; render(); } break;
-    case 'stop': if (t) { t.etat = 'stop'; toast('Arrêté — l’original reprend 100 % du trafic'); render(); } break;
+    case 'launch': if (!t) break;
+      if (c.live) { api(`/api/clients/${c.id}/tests/${t.id}`, { etat: 'live', part: t.part || 50 }).then(async r => { toast('Mise en ligne — la balise se met à jour, ~15 s'); await chargerEtat(); render(); suivreJob(r.job, j => toast(j.etat === 'ok' ? `En ligne : ${t.part || 50} % des visiteurs voient la variante` : 'La mise en ligne a échoué')); }).catch(e => toast(e.message)); break; }
+      t.etat = 'live'; t.jours = 0; if (!t.part) t.part = 50; c.tests.forEach(o => { if (o !== t && o.etat === 'live') o.etat = 'stop'; }); toast(`Test en ligne — ${t.part} % des visiteurs voient la variante`); S.ctx = c.id; S.view = 'test'; S.test = t.id; render(); break;
+    case 'stop': if (!t) break;
+      if (c.live) { api(`/api/clients/${c.id}/tests/${t.id}`, { etat: 'stop' }).then(async r => { toast('Arrêt demandé — l’original reprend 100 %, ~15 s'); await chargerEtat(); render(); suivreJob(r.job, j => toast(j.etat === 'ok' ? 'Arrêté — l’original reprend 100 % du trafic' : 'L’arrêt n’a pas été publié')); }).catch(e => toast(e.message)); break; }
+      t.etat = 'stop'; toast('Arrêté — l’original reprend 100 % du trafic'); render(); break;
     case 'deploy': if (t) { t.etat = 'gagnant'; t.part = 100; t.fin = '18 sept.'; toast('Gagnant déployé sur 100 % du trafic'); render(); } break;
     case 'restore': if (t) { t.etat = 'stop'; t.part = 0; toast('Original remis en place'); render(); } break;
-    case 'verify': toast('Vérification lancée — résultat dans une minute'); break;
+    case 'verify':
+      if (c && c.live) { api(`/api/clients/${c.id}/verifier`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Balise trouvée sur la page' : 'Balise pas encore visible sur la page'); await chargerEtat(); render(); }); }).catch(e => toast(e.message)); }
+      else toast('Vérification lancée — résultat dans une minute');
+      break;
+    case 'capturer': case 'recapturer': {
+      const u = act.dataset.url || document.getElementById('url')?.value || ''; S.urlSaisie = u;
+      api('/api/clients', { url: u }).then(async r => { S.urlSaisie = ''; await chargerEtat(); S.ctx = r.id; S.view = 'dash'; render(); })
+        .catch(e => { const z = document.getElementById('url-err'); if (z) z.textContent = e.message; else toast(e.message); });
+      break;
+    }
+    case 'choisir': S.choix = act.dataset.anchor; S.ntText = undefined; render(); break;
+    case 'creer-test': {
+      const titre = document.getElementById('nt-titre')?.value.trim(), text = document.getElementById('nt-text')?.value.trim(), why = document.getElementById('nt-why')?.value.trim();
+      const err = document.getElementById('nt-err');
+      if (!titre || !text) { if (err) err.textContent = 'Il faut un nom et un texte.'; break; }
+      if (err) err.textContent = 'Création…';
+      api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits: [{ anchor: S.choix, text }] })
+        .then(async r => { S.choix = null; S.ntText = S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
+        .catch(e => { if (err) err.textContent = e.message; });
+      break;
+    }
     case 'dns': toast('La ligne DNS ne répond pas encore — on réessaie toutes les heures'); break;
     case 'shopify': toast('Demande d’accès envoyée au client'); break;
     case 'gads': toast('Connexion Google Ads'); break;
-    case 'recapture': toast('Copie relancée — quelques minutes'); break;
+    case 'recapture': if (c && c.live) { api('/api/clients', { url: 'https://' + c.url }).then(async () => { await chargerEtat(); render(); }).catch(e => toast(e.message)); } else toast('Copie relancée — quelques minutes'); break;
     case 'report': toast('Rapport en préparation'); break;
     case 'send-report': toast('Rapport envoyé au client'); break;
     case 'add': toast('Nouveau client : collez l’adresse de sa landing page'); break;
@@ -973,6 +1121,10 @@ document.addEventListener('input', e => {
   if (e.target.id === 'part') { const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test); if (t) t.part = +e.target.value; document.getElementById('partv').textContent = e.target.value + ' %'; return; }
   if (e.target.id?.startsWith('ss-')) calcSS();
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
+  if (e.target.id === 'nt-text') S.ntText = e.target.value;
+  if (e.target.id === 'nt-why') S.ntWhy = e.target.value;
+  if (e.target.id === 'nt-titre') S.ntTitre = e.target.value;
+  if (e.target.id === 'url') S.urlSaisie = e.target.value;
 });
 /* les deux captures défilent ensemble */
 let syncLock = false;
@@ -983,7 +1135,7 @@ document.addEventListener('scroll', e => {
   if (!other) return;
   syncLock = true; other.scrollTop = el.scrollTop; requestAnimationFrame(() => { syncLock = false; });
 }, true);
-render();
+chargerEtat().finally(render);
 </script>
 </body>
 </html>

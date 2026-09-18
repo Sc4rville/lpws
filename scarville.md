@@ -123,7 +123,15 @@ modifier. Pas de mesure réelle en v1 : les résultats se lisent dans GA4 (`lpws
 l'interface le dit au lieu d'inventer.
 
 **Reste simulé** : les résultats chiffrés des clients de démo. **Prérequis côté Yann** : un
-site avec un conteneur GTM sous la main pour le vrai test. **La brique intention** est
+site avec un conteneur GTM sous la main pour le vrai test.
+
+**Fait (18 sept., nuit)** — `npm run ui:serve` → http://localhost:4700. Vérifié de bout en
+bout sur hubspot.com/products/marketing : « + » → capture (99,9 %) → « Nouveau test » (le titre)
+→ variante produite → cible retrouvée sur la vraie page → balise publiée sur
+`https://lpws.vercel.app/t/hubspot.js` avec sa config → Lancer (part 50) / Arrêter (part 0)
+republiés en ~15 s. À l'écran : original et variante côte à côte, lien d'aperçu, garanties.
+**Ce qui manque** : coller la balise dans un vrai GTM (Yann), la mesure (GA4 pour l'instant,
+dit à l'écran), les autres verbes à l'écran, une page par client seulement. **La brique intention** est
 reprise par un autre agent (fondations dans `engine/intent/`, commit `bf8fd7f`).
 
 ## Prochaines étapes, dans l'ordre
