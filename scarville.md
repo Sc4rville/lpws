@@ -84,6 +84,29 @@ connexion (Shopify, DNS, vérification) qui n'appellent rien.
 
 ---
 
+## 2026-09-18 (nuit) · La piste « intention » : la requête avant le clic
+
+**D'où ça vient.** Message de Kusaila après une session sur le marché : le cœur ne change pas,
+mais les termes de recherche Google Ads disent l'intention *avant* le clic, et on peut tester
+par intention plutôt qu'en bloc. Cible YC au 2 novembre : 15 à 30 buyers actifs, des tests
+réels, une démo « requête → groupe d'intention → variantes → résultat ».
+
+**Ce qu'on sait.** Google ne donne PAS la requête au clic — seulement le mot-clé acheté
+(`{keyword}`, `{matchtype}`, `{adgroupid}` via ValueTrack). Les vraies requêtes viennent après,
+du rapport des termes de recherche : export CSV, Google Ads Script, ou API (token développeur,
+des semaines). Google masque la longue traîne. Le pont entre les deux : mot-clé → intention.
+
+**Ce qu'on construit, séparément, dans `engine/intent/`** : import du rapport (CSV FR/EN, et
+l'export du script) → `termes.json` ; classement heuristique en sept intentions (prix,
+alternative, comparaison, marque, information, transaction, catégorie) → `intents.json` avec
+les stats par groupe et la table mot-clé → intention ; le suffixe ValueTrack à coller dans
+Google Ads. Sans toucher au tag ni au clone. Ensuite : le skill qui affine le classement, le
+tag qui lit `lpws_kw`, la mesure intention × variante.
+
+**Le point dur** : le volume. Par intention, chaque test a besoin de conversions ; à 900
+clics par jour, ça tient sur deux ou trois intentions, pas dix. Le bandit par intention
+(Smart Traffic) aide, il ne fait pas de miracle.
+
 ## Prochaines étapes, dans l'ordre
 
 1. **Maquette UI** → validation par Yann → transposition dans `engine/viewer` (ou un front dédié).
@@ -94,3 +117,4 @@ connexion (Shopify, DNS, vérification) qui n'appellent rien.
    GTM présent · CSP stricte — tout est déjà sous la main dans `1_acquire`.
 5. `compose` v2 (coquilles) → `kit.json`.
 6. **Shopify** : compte Partner + boutique de dev (Yann).
+7. **Intention** : skill de classement, `lpws_kw` lu par le tag, mesure intention × variante.
