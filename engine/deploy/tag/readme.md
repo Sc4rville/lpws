@@ -59,32 +59,47 @@ C'est le seul test de la machine qui se fait contre **le site live**, pas contre
 5. **l'aperçu** marche-t-il à 0 % de trafic (sinon le lien de démo au client est mort) ;
 6. **le bouton stop** coupe-t-il vraiment (c'est la condition de confiance du buyer).
 
-## État réel, après vérification sur DEUX sites
+## État réel, vérifié sur DEUX sites
 
-**HubSpot** (`/products/marketing`, une édition de texte) : les quatre scénarios passent.
-Cible retrouvée par empreinte, édition au bon endroit, masque 39 ms, témoin intact, aperçu
-fonctionnel à 0 % de trafic, bouton stop effectif.
+| | HubSpot (`/products/marketing`) | Jira (`atlassian.com/software/jira`) |
+|---|---|---|
+| verdict | **VALIDE**, les quatre scénarios | **REFUSÉ** |
+| mode | piloté | figé (CSP du site) |
+| config servie | **0,4 Ko** (avant refonte : 188 Ko) | **0,7 Ko** (avant : 97 Ko) |
+| masque mesuré | **52 ms** | 1 169 ms |
+| résolution des ancres à la construction | 100 % | **471/471** |
 
-**Jira** (`atlassian.com/software/jira`, trois verbes dont deux sur des bandes) : **REFUSÉ**.
-Et c'est ce second site qui dit la vérité sur l'architecture actuelle.
+**Ce que la refonte a gagné, mesuré** : le rapprochement ne tourne plus chez le visiteur mais à
+la construction. La charge utile est divisée par ~250, et le coût processeur par essai passe de
+~700 ms à un `querySelector`.
 
-| Problème trouvé | Ce que ça veut dire |
-|---|---|
-| **CSP** | `connect-src` interdit notre domaine : la config distante n'arrive jamais. Le loader repasse sur la config figée, donc plus de pilotage à distance **ni de bouton stop** sans recoller le loader. Traité, mais c'est une limite du site, pas un bug |
-| **Coût du rapprochement** | ~700 ms de calcul par essai dans le navigateur du visiteur (471 empreintes × 471 éléments), plus 97 à 188 Ko de charge utile. Inacceptable sur une page qu'on veut rapide |
-| **Moment** | à `DOMContentLoaded` la mise en page n'est pas finie : les bandes, repérées par géométrie, n'existent pas encore. On repique, mais on masque jusqu'à 1,5 s — ce qu'on paie en LCP, donc en Quality Score |
-| **Bandes** | `s5`/`s6` restent non résolues au chargement, alors que le même rapprochement est parfait (471/471) trois secondes plus tard sur la même page |
+**Pourquoi Jira reste refusé, et c'est une vraie limite, pas un réglage** : le JavaScript
+d'Atlassian sature le fil principal. Notre relance toutes les 50 ms devient ~100 ms, le budget
+de masque de 800 ms s'étire à 1 169 ms de temps réel, et les cibles ne sont pas résolues dans
+cette fenêtre. Le juge refuse alors d'écrire au-dessus du pli plutôt que de faire clignoter la
+page sous les yeux d'un visiteur payé au clic.
 
-**Ce que ça dit, et c'est la vraie conclusion** : rapprocher toute la page **au moment du
-chargement** est la mauvaise idée. Le rapprochement doit se faire **à la construction**, où
-700 ms ne coûtent rien et où on a déjà un navigateur : on ouvre la page vivante, on résout une
-fois, on en déduit un sélecteur stable par cible, on le vérifie, et on n'embarque que ça. Le
-runtime redevient un `querySelector` plus un contrôle d'identité à deux champs : quelques
-millisecondes, aucune charge utile, presque plus de masque.
+**La règle qui en sort, et elle est vendable** : la voie tag dépend de la vitesse à laquelle le
+site du client rend son propre contenu. Sur une page servie par le serveur, c'est 52 ms et tout
+marche. Sur une page très lourde en JavaScript, le tag ne peut éditer que ce qui est **sous le
+pli** ; le reste passe par la voie hébergée. Ça se **mesure à l'installation** (`npm run
+tag:check`), on ne le découvre pas en campagne.
 
-L'empreinte ne disparaît pas dans cette refonte, elle en est le socle : c'est elle qui permet
-de dériver le sélecteur, de vérifier qu'il désigne encore la bonne chose, et de le refaire
-quand la page du client bouge.
+## Comment la résolution marche maintenant
+
+1. **À la construction**, on ouvre la vraie page, on la laisse se former (scroll compris), on
+   marque, on relève les empreintes et on rapproche : 471/471 sur Jira.
+2. On en dérive un **sélecteur CSS court, vérifié unique**. On refuse un chemin purement
+   positionnel : unique sur la page finie, il désigne autre chose sur la page en formation.
+   Il faut une poignée stable (id, attribut de test, classe non hachée) pour l'ancrer.
+3. On **rouvre la page telle qu'elle s'ouvre** et on revérifie chaque sélecteur au budget de
+   masque. Ce qui ne tient pas est refait **depuis le témoin** (rôle + texte), qui ne dépend
+   d'aucune structure. Ce qui n'existe qu'après est déclaré **tardif** et signalé.
+4. **Chez le visiteur** : `querySelector`, contrôle du témoin, écriture. Le sélecteur dit où
+   regarder, le témoin dit si c'est bien lui.
+
+L'empreinte n'a pas disparu, elle est le socle : c'est elle qui permet de dériver le sélecteur,
+de vérifier qu'il désigne encore la bonne chose, et de le refaire quand la page du client bouge.
 
 Le chrono est pris **dans** le tag, autour des vraies opérations DOM : un observateur extérieur
 regroupe ses lots et rendait 0 ms alors que le masque avait bien été posé.

@@ -1,44 +1,39 @@
 /**
  * loader.ts — LE SEUL CODE QUE LE MEDIA BUYER COLLE, ET IL LE COLLE UNE FOIS.
  *
- * La version précédente produisait un tag par variante : il fallait retourner dans Google Tag
- * Manager à chaque test, refaire une balise, republier le conteneur. Personne ne teste dix
- * variantes à ce prix-là — et tester dix variantes, c'est exactement ce qu'on vend.
+ * Il le colle une fois par client dans son Google Tag Manager, auquel il a déjà accès puisque
+ * c'est par là qu'il pose son suivi de conversion. Ensuite, lancer une variante, changer sa
+ * part de trafic ou tout arrêter ne touche plus jamais à GTM : ça se décide dans la config.
  *
- * Ici il colle ce loader une fois par client. Ensuite, lancer une variante, changer sa part
- * de trafic ou tout arrêter ne touche plus jamais à GTM : ça se décide dans la config qu'on
- * sert. Trois conséquences qui comptent pour lui :
+ * CE QUE CE FICHIER NE FAIT PLUS, ET POURQUOI. La première version refaisait ici tout le
+ * rapprochement d'empreintes. Mesuré sur atlassian.com : ~700 ms de calcul par essai et 97 à
+ * 188 Ko de charge utile, page masquée 1,5 s, et les bandes toujours pas résolues. Le
+ * rapprochement se fait maintenant à la construction (cf. selector.ts) et le runtime ne reçoit
+ * plus qu'un sélecteur CSS par cible. Il regarde, il vérifie, il écrit.
  *
- *   · le bouton stop est immédiat (`actif: false`) et ne demande pas de republier un conteneur ;
- *   · `?lpws=<nom>` force une variante — le lien qu'il envoie à son client pour montrer avant
- *     de dépenser un euro ; `?lpws=off` montre l'original ;
- *   · la config de la dernière visite est gardée en local, donc la visite suivante applique
- *     sans attendre le réseau (le clignotement d'un aller-retour serait le prix caché du loader).
+ * Le sélecteur dit OÙ regarder, le témoin dit SI C'EST BIEN LUI. Sans le témoin, un sélecteur
+ * périmé écrirait dans le mauvais élément en silence — exactement le mode d'échec qu'on a
+ * passé la journée à éliminer.
  *
- * LE MUR : beaucoup de sites sérieux servent une Content-Security-Policy stricte, dont un
- * `connect-src` qui interdit toute requête vers un domaine non listé. Constaté en jugeant sur
- * atlassian.com : notre fetch de config est refusé net par le navigateur. On ne peut pas
- * demander à chaque client d'ajouter notre domaine à sa CSP, ce serait recréer la friction
- * qu'on vient d'enlever.
- *
- * Donc deux modes, et le loader dit lequel il a utilisé :
- *   PILOTÉ   la config est allée chercher au réseau : bouton stop, part de trafic et nouvelles
- *            variantes changent sans jamais rouvrir GTM ;
- *   FIGÉ     le réseau est interdit par la CSP : le loader applique la config embarquée à la
- *            construction. Ça marche, mais changer quoi que ce soit demande de recoller le
- *            loader dans GTM — Y COMPRIS LE BOUTON STOP. À dire au buyer à l'installation,
- *            jamais à lui laisser découvrir.
+ * LE MUR DE LA CSP : beaucoup de sites servent un `connect-src` qui interdit toute requête
+ * vers un domaine non listé (constaté sur atlassian.com). On ne peut pas demander à chaque
+ * client de nous ajouter à sa CSP, ce serait recréer la friction qu'on vient d'enlever. D'où
+ * deux modes, et le loader dit lequel il a utilisé :
+ *   piloté  la config vient du réseau : stop, part de trafic et nouvelles variantes changent
+ *           sans jamais rouvrir GTM ;
+ *   figé    le réseau est interdit : on applique la config embarquée à la construction. Ça
+ *           marche, mais changer quoi que ce soit demande de recoller le loader — Y COMPRIS
+ *           LE BOUTON STOP. À dire au buyer à l'installation, jamais à lui laisser découvrir.
  *
  * Aucun import node : ce fichier part dans le navigateur du visiteur.
  */
-import { markDom } from "../../clone/1_acquire/mark.ts"
-import { fingerprintDom, type Empreinte } from "../../clone/1_acquire/fingerprint.ts"
-import { relier } from "../../clone/1_acquire/relink.ts"
+import type { Cible } from "./selector.ts"
 
 export type EditTag = {
   op: "set" | "remove" | "move" | "swap" | "duplicate"
-  emp: Empreinte
-  emp2?: Empreinte
+  cible: Cible
+  /** cible secondaire (move/duplicate : où poser · swap : l'autre bloc) */
+  cible2?: Cible
   sens?: "before" | "after"
   text?: string
   href?: string
@@ -47,42 +42,36 @@ export type EditTag = {
   pourquoi: string
 }
 
-/** Une variante servie par la config. */
 export type VarianteServie = {
   nom: string
   /** part du trafic, en pourcentage */
   part: number
-  /** l'URL (ou le motif) des pages où elle s'applique */
+  /** l'URL de la page où elle s'applique */
   page: string
   edits: EditTag[]
 }
 
-/** Ce que le loader va chercher. C'est ça qu'on change pour piloter, jamais le tag. */
 export type ConfigServie = {
   /** le bouton stop : tout s'arrête, sans republier le conteneur GTM */
   actif: boolean
-  delaiMax: number
   /**
-   * TOUTES les empreintes de la capture, pas seulement celles que la variante édite.
-   *
-   * Le rapprochement attribue un pour un : les jumeaux d'une cible doivent être présents pour
-   * se faire prendre par leur propre meilleur candidat et la libérer. Sans eux ils restent en
-   * concurrence et la cible est ambiguë à vie. Mesuré sur Jira : 0 cible résolue avec les
-   * seules cibles, 471 sur 471 avec le jeu complet.
+   * Budget de MASQUE, en millisecondes. Court exprès : c'est du temps volé au visiteur, et
+   * il se paie en LCP donc en Quality Score. Passé ce délai on révèle et on continue à
+   * chercher sans masquer.
    */
-  amers: Empreinte[]
+  delaiMasque: number
+  /** budget TOTAL de recherche : du contenu peut arriver longtemps après le chargement */
+  delaiMax: number
   variantes: VarianteServie[]
 }
 
 declare const __LPWS_BASE__: string
 declare const __LPWS_CLIENT__: string
-/** la config figée au build : le repli quand le réseau nous est interdit (cf. plus bas) */
+/** la config figée au build : le repli quand le réseau nous est interdit */
 declare const __LPWS_CFG__: ConfigServie
 
 const CLE_CONFIG = "lpws_cfg"
 const CLE_ID = "lpws_id"
-
-/* ————— outils ————— */
 
 const local = {
   lire(k: string): string | null { try { return localStorage.getItem(k) } catch { return null } },
@@ -97,8 +86,9 @@ function hash(s: string): number {
 
 /**
  * L'identité de répartition : le `gclid` d'abord, pour qu'un clic payant voie une version et
- * une seule. C'est ce qui permet de tester sur UNE Final URL, sans laisser Google réoptimiser
- * la diffusion entre deux annonces et biaiser la comparaison avant qu'elle commence.
+ * une seule. C'est ce qui permet de tester sur UNE Final URL, au lieu de deux annonces vers
+ * deux pages — où Google réoptimise la diffusion et biaise la comparaison avant qu'elle
+ * commence.
  */
 function identite(): string {
   const q = new URLSearchParams(location.search)
@@ -117,9 +107,14 @@ function masque(delaiMax: number): () => void {
   st.textContent = "body{opacity:0 !important}"
   ;(document.head || document.documentElement).appendChild(st)
   // chrono pris ICI, autour des vraies opérations : un observateur extérieur regroupe ses
-  // lots et rendrait une mesure fausse
+  // lots et rendait 0 ms alors que le masque avait bien été posé
   const t0 = performance.now()
+  // idempotent : la levée peut venir du filet OU du code, et la seconde ne doit pas
+  // réécrire la mesure (constaté : 1 641 ms rapportés pour un masque de 300 ms)
+  let leve = false
   const fin = () => {
+    if (leve) return
+    leve = true
     st.remove()
     ;(window as unknown as { __lpwsMasque?: number }).__lpwsMasque = Math.round(performance.now() - t0)
   }
@@ -127,43 +122,59 @@ function masque(delaiMax: number): () => void {
   return () => { clearTimeout(secours); fin() }
 }
 
-/* ————— retrouver les cibles sur la page vivante ————— */
+/* ————— regarder, puis vérifier ————— */
+
+const roleDe = (n: Element): string => {
+  const t = n.tagName.toLowerCase()
+  if (/^h[1-6]$/.test(t)) return "heading"
+  if (t === "a" || t === "button") return "link"
+  if (t === "img" || t === "picture" || t === "video" || t === "svg") return "media"
+  if (t === "input" || t === "textarea" || t === "select" || t === "label") return "field"
+  if (t === "p" || t === "li" || t === "blockquote" || t === "figcaption") return "text"
+  return "bande"
+}
+
+/**
+ * Le témoin ne réclame pas l'identique : le client a le droit de corriger une coquille ou de
+ * faire tourner un titre. Il réclame que ce soit encore LE MÊME élément.
+ */
+function concorde(el: Element, c: Cible): boolean {
+  if (roleDe(el) !== c.role) return false
+  const a = c.texte
+  const b = (el.textContent ?? "").replace(/\s+/g, " ").trim().toLowerCase().slice(0, 60)
+  if (!a && !b) return true
+  if (!a || !b) return false
+  if (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0) return true
+  const mots = (t: string) => t.split(/[^0-9a-zà-ÿ]+/).filter((m) => m.length > 2)
+  const A = mots(a), B = mots(b)
+  if (!A.length || !B.length) return false
+  let inter = 0
+  for (const m of A) if (B.indexOf(m) >= 0) inter++
+  return inter / Math.max(A.length + B.length - inter, 1) >= 0.4
+}
 
 type Resolu = { edit: EditTag; el: Element; el2?: Element }
 
-function resoudre(edits: EditTag[], amers: Empreinte[]): { resolus: Resolu[]; abandons: string[] } {
-  // repartir propre : markDom garde une bande déjà marquée et se contente d'incrémenter son
-  // compteur, donc un second passage sur une page qui a grandi décale toute la numérotation
-  document.querySelectorAll("[data-lpws]").forEach((e) => e.removeAttribute("data-lpws"))
-  markDom()
-  const vivantes = fingerprintDom()
-
-  // les cibles ET les amers, dans l'ordre du document : c'est cet ordre que le rapprochement
-  // exploite pour trancher entre deux éléments qui se ressemblent
-  const vues = new Set<string>()
-  const voulues: Empreinte[] = []
-  const ajoute = (e?: Empreinte) => { if (e && !vues.has(e.a)) { vues.add(e.a); voulues.push(e) } }
-  for (const e of edits) { ajoute(e.emp); ajoute(e.emp2) }
-  for (const a of amers) ajoute(a)
-  voulues.sort((x, y) => (parseInt(x.a.slice(1), 10) || 0) - (parseInt(y.a.slice(1), 10) || 0))
-
-  const lien = new Map(relier(voulues, vivantes).retrouves.map((l) => [l.avant, l.apres]))
-  const el = (emp: Empreinte): Element | null => {
-    const a = lien.get(emp.a)
-    return a ? document.querySelector(`[data-lpws="${a}"]`) : null
-  }
-
+function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
   const resolus: Resolu[] = []
   const abandons: string[] = []
+  const trouver = (c: Cible): Element | null => {
+    let el: Element | null = null
+    try { el = document.querySelector(c.sel) } catch { return null }
+    if (!el) return null
+    return concorde(el, c) ? el : null
+  }
   for (const e of edits) {
-    const c = el(e.emp)
-    if (!c) { abandons.push(`${e.emp.a} (${e.emp.role}) introuvable ou ambigu`); continue }
-    const c2 = e.emp2 ? el(e.emp2) : undefined
-    if (e.emp2 && !c2) { abandons.push(`${e.emp2.a} (cible secondaire) introuvable ou ambiguë`); continue }
-    resolus.push({ edit: e, el: c, el2: c2 ?? undefined })
+    const el = trouver(e.cible)
+    if (!el) { abandons.push(`${e.cible.role} « ${e.cible.texte.slice(0, 30)} » absent ou changé`); continue }
+    const el2 = e.cible2 ? trouver(e.cible2) : undefined
+    if (e.cible2 && !el2) { abandons.push(`cible secondaire « ${e.cible2.texte.slice(0, 30)} » absente ou changée`); continue }
+    resolus.push({ edit: e, el, el2: el2 ?? undefined })
   }
   return { resolus, abandons }
 }
+
+/* ————— écrire ————— */
 
 function appliquer(r: Resolu): void {
   const { edit: e, el, el2 } = r
@@ -185,17 +196,17 @@ function appliquer(r: Resolu): void {
     else el2.parentNode?.insertBefore(el, el2.nextSibling)
     return
   }
-  // duplicate : on ne génère AUCUN markup, on recopie un bloc du client et on le repose
+  // duplicate : on ne génère AUCUN markup, on recopie un bloc du client et on le repose.
+  // Le design system est conservé au pixel par construction.
   if (e.op === "duplicate") {
     if (!el2) return
     const copie = el.cloneNode(true) as Element
-    copie.removeAttribute("data-lpws")
-    copie.querySelectorAll("[data-lpws]").forEach((n) => n.removeAttribute("data-lpws"))
     copie.setAttribute("data-lpws-added", "")
     if (e.sens === "before") el2.parentNode?.insertBefore(copie, el2)
     else el2.parentNode?.insertBefore(copie, el2.nextSibling)
     return
   }
+  // set — texte seulement, jamais de balise : « aucune réécriture libre » tient ici aussi
   if (e.text !== undefined) {
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = e.text
     else el.textContent = e.text
@@ -209,17 +220,16 @@ function appliquer(r: Resolu): void {
 /* ————— choisir ————— */
 
 const memePage = (motif: string): boolean => {
-  const ici = location.origin + location.pathname.replace(/\/$/, "")
-  const la = motif.replace(/\/$/, "")
-  return ici === la || ici === la.replace(/^https?:\/\/www\./, location.protocol + "//")
-    || location.href.indexOf(la) === 0
+  const ici = (location.origin + location.pathname).replace(/\/$/, "")
+  const la = motif.split("?")[0].replace(/\/$/, "")
+  return ici === la || ici === la.replace(/^(https?:\/\/)www\./, "$1")
 }
 
 function choisir(cfg: ConfigServie): VarianteServie | null {
   const force = new URLSearchParams(location.search).get("lpws")
   if (force === "off") return null
   const candidates = cfg.variantes.filter((v) => memePage(v.page))
-  if (force) return candidates.find((v) => v.nom === force) ?? null
+  if (force) return candidates.filter((v) => v.nom === force)[0] ?? null
   if (!cfg.actif) return null
   const id = identite()
   for (const v of candidates) if (hash(v.nom + id) * 100 < v.part) return v
@@ -238,45 +248,71 @@ function annonce(version: string, applique: number, abandons: string[]): void {
   w.__lpws = { version, applique, abandons, mode }
 }
 
-/**
- * RÉESSAYER, et c'est la leçon la plus chère de cette famille.
- *
- * Au premier essai, à DOMContentLoaded, la mise en page n'est pas finie : les images n'ont pas
- * de hauteur, donc les bandes de haut niveau (repérées par géométrie) n'existent pas encore et
- * la moitié de la page manque à l'appel. Mesuré sur atlassian.com : 0 cible résolue à
- * DOMContentLoaded, alors que le rapprochement est parfait (471 sur 471) trois secondes plus
- * tard sur exactement la même page.
- *
- * On garde donc le masque et on repique jusqu'à ce que la page soit assez formée — ou jusqu'au
- * délai, où on rend la main au client. Le coût se paie en millisecondes de masque, et il est
- * mesuré par le juge plutôt que supposé.
- */
-function poser(cfg: ConfigServie): void {
-  const v = choisir(cfg)
-  if (!v) { annonce("controle", 0, []); return }
+/** Visible sans scroller ? C'est la seule zone où un changement tardif se voit. */
+function dansLeViseur(el: Element): boolean {
+  const r = el.getBoundingClientRect()
+  return r.bottom > 0 && r.top < (window.innerHeight || 0)
+}
 
-  const delaiMax = cfg.delaiMax ?? 1500
-  const reveler = masque(delaiMax)
-  const t0 = performance.now()
+/**
+ * RÉESSAYER SANS RANÇONNER LE VISITEUR.
+ *
+ * Deux problèmes se mélangeaient, et les séparer règle les deux.
+ *
+ * 1. Un sélecteur peut viser un élément qui n'est pas encore là. À `DOMContentLoaded` le
+ *    navigateur a lu le HTML mais la page n'est pas finie : du contenu arrive encore, et les
+ *    bandes de bas de page apparaissent bien plus tard. Un essai unique déclarerait
+ *    « introuvable » ce qui existe une seconde après. Donc on repique.
+ * 2. Mais masquer la page pendant qu'on repique, c'est voler ce temps au visiteur. Mesuré sur
+ *    atlassian.com : 1 259 ms de page blanche pour éditer deux bandes situées à des milliers
+ *    de pixels sous le pli. Absurde — personne ne les regardait.
+ *
+ * Donc le masque a son propre budget, court. Au-delà, on révèle et on continue à chercher à
+ * découvert. Et à découvert, on n'écrit plus que HORS du viseur : un changement sous le pli
+ * est invisible, un changement sous les yeux du visiteur serait un clignotement. Celui-là est
+ * refusé et rapporté plutôt que subi.
+ */
+function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
+  const v = choisir(cfg)
+  if (!v) { reveler(); annonce("controle", 0, []); return }
+
+  const delaiMasque = cfg.delaiMasque || 800
+  const delaiMax = Math.max(cfg.delaiMax || 3000, delaiMasque)
+  let masquant = true
   let essais = 0
 
   const essayer = (): void => {
     essais++
+    const ecoule = performance.now() - t0
+    if (masquant && ecoule >= delaiMasque) { reveler(); masquant = false }
+
     let applique = 0
-    let abandons: string[] = []
+    const abandons: string[] = []
     try {
-      const r = resoudre(v.edits, cfg.amers ?? [])
-      abandons = r.abandons
-      // tout ou rien : une variante à moitié posée se jugerait comme si elle était complète
-      if (abandons.length === 0) for (const x of r.resolus) { appliquer(x); applique++ }
+      const r = resoudre(v.edits)
+      for (const a of r.abandons) abandons.push(a)
+      if (r.abandons.length === 0) {
+        // à découvert, un changement visible serait un clignotement : on ne le fait pas
+        const visible = !masquant && r.resolus.some((x) => dansLeViseur(x.el) || (x.el2 && dansLeViseur(x.el2)))
+        if (visible) {
+          abandons.push("cible visible à l'écran après la levée du masque : refusé pour ne pas faire clignoter")
+        } else {
+          // tout ou rien : une variante à moitié posée se jugerait comme si elle était complète
+          for (const x of r.resolus) { appliquer(x); applique++ }
+        }
+      }
     } catch (err) {
       abandons.push("erreur du tag : " + String(err))
     }
 
-    if (applique > 0) { reveler(); annonce(v.nom, applique, []); return }
-    if (performance.now() - t0 < delaiMax - 120) { setTimeout(essayer, 120); return }
-    // le délai est atteint : le client voit SA page, c'est le bon repli
-    reveler()
+    if (applique > 0) {
+      if (masquant) { reveler(); masquant = false }
+      annonce(v.nom, applique, [])
+      return
+    }
+    if (performance.now() - t0 < delaiMax - 60) { setTimeout(essayer, 50); return }
+    if (masquant) reveler()
+    // délai atteint : le client voit SA page, c'est le bon repli
     annonce("controle-repli", 0, abandons.concat(`abandon après ${essais} essai(s)`))
   }
   essayer()
@@ -284,43 +320,52 @@ function poser(cfg: ConfigServie): void {
 
 /* ————— l'enchaînement ————— */
 
-/** Une seule pose par page : deux poses appliqueraient les éditions deux fois. */
 let pose = false
-function poserUneFois(cfg: ConfigServie, m: typeof mode): void {
+function poserUneFois(cfg: ConfigServie, m: typeof mode, reveler: () => void, t0: number): void {
   if (pose) return
   pose = true
   mode = m
-  poser(cfg)
+  poser(cfg, reveler, t0)
 }
 
 function lancer(): void {
+  /* LE MASQUE PART EN PREMIER, avant même de savoir quelle config on aura.
+   *
+   * Il était posé après la course réseau, donc 300 ms plus tard sous CSP — et ces 300 ms
+   * étaient prises sur un budget de 800. Sur atlassian.com, dont le JavaScript bloque le fil
+   * principal, le masque effectif dépassait 1 280 ms et les éditions arrivaient après sa
+   * levée : refusées pour ne pas faire clignoter. Le budget doit courir depuis l'instant où
+   * la page est cachée, pas depuis l'instant où on a fini de s'organiser. */
+  const budget = (__LPWS_CFG__ && __LPWS_CFG__.delaiMasque) || 800
+  const t0 = performance.now()
+  const reveler = masque(budget)
+
+  const repli = (cache: string | null): void => {
+    try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé", reveler, t0) }
+    catch { poserUneFois(__LPWS_CFG__, "figé", reveler, t0) }
+  }
+
   const cache = local.lire(CLE_CONFIG)
 
   // la course : le réseau d'abord s'il répond vite, sinon on n'attend pas. Sous CSP le fetch
   // échoue immédiatement, donc le repli est instantané et le visiteur ne paie rien.
   let fini = false
-  const secours = setTimeout(() => {
-    if (fini) return
-    fini = true
-    try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé") }
-    catch { poserUneFois(__LPWS_CFG__, "figé") }
-  }, 300)
+  const secours = setTimeout(() => { if (!fini) { fini = true; repli(cache) } }, 300)
 
   fetch(`${__LPWS_BASE__}/v/${__LPWS_CLIENT__}.json`, { cache: "no-cache" })
     .then((r) => (r.ok ? r.text() : null))
     .then((t) => {
       if (!t) throw new Error("config illisible")
       local.ecrire(CLE_CONFIG, t)
-      if (fini) return          // le repli a déjà posé : la config fraîche servira au prochain chargement
+      if (fini) return   // le repli a déjà posé : la config fraîche servira au prochain chargement
       fini = true; clearTimeout(secours)
-      poserUneFois(JSON.parse(t) as ConfigServie, "pilote")
+      poserUneFois(JSON.parse(t) as ConfigServie, "pilote", reveler, t0)
     })
     .catch(() => {
       // CSP, réseau coupé, config absente : on applique quand même ce qu'on a
       if (fini) return
       fini = true; clearTimeout(secours)
-      try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé") }
-      catch { poserUneFois(__LPWS_CFG__, "figé") }
+      repli(cache)
     })
 }
 
