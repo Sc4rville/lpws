@@ -59,6 +59,13 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   chaque `i` ouvre le détail technique. C'est la préfiguration de la KB : quand elle sera un
   fichier de données validé par schéma, la page le lira au lieu de le contenir.
 
+## Décidé le 2026-09-18 (Yann) — plan dans [scarville.md](scarville.md)
+Trois voies de livraison, trois noms : **Express** (tag GTM, porte d'entrée, retouches),
+**Intégral** (relais DNS, régime non-Shopify, tout, sans clignotement — à construire),
+**Natif** (template Shopify). Parcours : clone pour convaincre → Express → Intégral/Natif.
+En cours : maquette de l'interface du media buyer (rail clients, connexion dépliable,
+playground, mesure), sur les données réelles du corpus.
+
 ## Fait le 2026-09-18 (kabylesystem) — journal détaillé dans [kusaila.md](kusaila.md)
 
 ### La voie TAG existe et marche : livrer SANS DNS ni hébergement
@@ -113,8 +120,9 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
    et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.
 3. Sur la boutique : pousser la variante Dawn, la rendre, vérifier que Shopify accepte/rejette ce
    que notre validateur accepte/rejette. Si OK → backend Shopify dans `engine/apply`.
-4. Livraison SaaS : la voie tag est l'entrée par défaut (aucun accès nouveau). L'hébergement
-   sur sous-domaine reste à câbler pour les variantes que le tag ne peut pas porter.
+4. Livraison SaaS : **Express** (tag) est l'entrée par défaut ; **Intégral** (relais DNS) reste
+   à construire pour tout ce que le tag ne peut pas porter — d'abord un spike sur une vraie
+   page WordPress/Webflow. Express lui-même n'a jamais tourné via un vrai GTM : à mesurer.
 5. Le brain : `4_structure` (sur Shopify, le template JSON EST déjà le page.json), `context.json`,
    KB, premier `/diagnose`.
 6. **Arrêté** : rendre le clone « production-ready » (réinjection JS/pixels) — pas avant d'avoir
