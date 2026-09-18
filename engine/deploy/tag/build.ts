@@ -70,7 +70,7 @@ export async function buildLoader(client: string, base: string, cfg: ConfigServi
  */
 async function resoudreSurLeLive(
   url: string, capturees: Empreinte[], ancres: string[], budgetMasque: number,
-): Promise<{ cibles: Record<string, Cible>; manquees: string[]; tardives: string[]; stats: string }> {
+): Promise<{ cibles: Record<string, Cible>; manquees: string[]; tardives: string[]; apparitionMax: number; stats: string }> {
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage({
@@ -118,28 +118,45 @@ async function resoudreSurLeLive(
     await tot.addInitScript({ content: "window.__name = (f) => f" })
     await tot.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
 
-    // on vérifie au BUDGET DE MASQUE : c'est le seul moment où le tag peut écrire sans que le
-    // visiteur voie quoi que ce soit bouger. Ce qui n'est pas là à cet instant est « tardif ».
-    await tot.waitForTimeout(budgetMasque)
-    const auMasque = await tot.evaluate(resoudreCibles, { cibles: brutes })
-    // puis une seconde fois, plus tard : ça distingue « arrive en retard » de « n'existe pas »
-    await tot.waitForTimeout(2_000)
-    const plusTard = await tot.evaluate(resoudreCibles, { cibles: brutes })
+    /* ON MESURE QUAND LA CIBLE ARRIVE, ON NE LE DEVINE PAS.
+     *
+     * C'est la correction qui débloque les sites rendus par JavaScript. Le budget de masque
+     * était une constante (800 ms, puis 1 500) : sur atlassian.com le titre du hero est
+     * fabriqué par le JS du site et arrive après, le masque se levait avant, et l'édition
+     * était alors refusée pour ne pas faire clignoter une zone déjà peinte. Résultat mesuré :
+     * 1 chargement sur 3.
+     *
+     * Et masquer pendant que le site n'a lui-même rien affiché ne coûte RIEN : on révèle au
+     * moment où sa page se serait affichée de toute façon. Le budget doit donc venir de la
+     * page, pas d'une constante. On chronomètre ici, une fois, et on l'inscrit dans la config.
+     */
+    const apparitions: Record<string, number> = {}
+    const t0 = Date.now()
+    let auMasque: Record<string, Cible | null> = {}
+    for (let i = 0; i < 24; i++) {
+      auMasque = await tot.evaluate(resoudreCibles, { cibles: brutes })
+      for (const [a, c] of Object.entries(auMasque))
+        if (c && apparitions[a] === undefined) apparitions[a] = Date.now() - t0
+      if (Object.keys(brutes).every((a) => apparitions[a] !== undefined)) break
+      await tot.waitForTimeout(150)
+    }
 
     const cibles: Record<string, Cible> = {}
     const tardives: string[] = []
     for (const a of Object.keys(brutes)) {
-      const tot0 = auMasque[a]
-      if (tot0) { cibles[a] = tot0; continue }
-      if (plusTard[a]) { cibles[a] = plusTard[a]!; tardives.push(a); continue }
-      manquees.push(a)
+      const c = auMasque[a]
+      if (c) {
+        cibles[a] = c
+        if (apparitions[a] > budgetMasque) tardives.push(a)
+      } else manquees.push(a)
     }
+    const apparitionMax = Math.max(0, ...Object.values(apparitions))
 
     const s = rapport.stats
     return {
-      cibles, manquees, tardives,
+      cibles, manquees, tardives, apparitionMax,
       stats: `${s.retrouves}/${s.avant} ancres re-liées sur le live · ${s.ambigus} ambiguës · ${s.perdus} perdues`
-        + (tardives.length ? ` · ${tardives.length} cible(s) tardive(s)` : ""),
+        + ` · cible la plus tardive à ${apparitionMax} ms`,
     }
   } finally { await browser.close() }
 }
@@ -199,15 +216,18 @@ export async function buildTag(
   for (const a of besoins)
     if (!parAncre.has(a)) fail(SCOPE, `ancre ${a} absente d'anchors.json — la spec et la capture ne vont pas ensemble`)
 
-  const budgetMasque = opts.delaiMasque ?? 800
-  const { cibles, manquees, tardives, stats } = await timed(SCOPE,
+  const budgetMasque = opts.delaiMasque ?? 1500
+  const { cibles, manquees, tardives, apparitionMax, stats } = await timed(SCOPE,
     `résolution sur la page vivante (${url})`,
     () => resoudreSurLeLive(url, capturees, [...besoins], budgetMasque))
   step(SCOPE, stats)
+  // le budget de masque vient de la page, plus d'une constante : le temps qu'elle met à
+  // afficher sa propre cible, plus une marge pour notre écriture
+  const masqueRetenu = Math.min(Math.max(apparitionMax + 400, 600), 4_000)
   if (tardives.length > 0)
-    step(SCOPE, `ATTENTION — ${tardives.join(", ")} n'existe(nt) pas encore à ${budgetMasque} ms : `
-      + `le tag ne pourra les éditer qu'après avoir levé le masque, donc seulement si elles sont `
-      + `hors de l'écran. Au-dessus du pli, cette variante passe par la voie hébergée.`)
+    step(SCOPE, `budget de masque porté à ${masqueRetenu} ms : ${tardives.join(", ")} n'arrive(nt) `
+      + `qu'après ${budgetMasque} ms (le site les fabrique en JavaScript). Masquer jusque-là ne `
+      + `retarde rien, la page ne les avait pas affichées non plus.`)
 
   // échec franc ICI plutôt qu'en silence chez le visiteur : c'est tout l'intérêt de résoudre
   // à la construction
@@ -226,8 +246,8 @@ export async function buildTag(
 
   const cfg: ConfigServie = {
     actif: true,
-    delaiMasque: budgetMasque,
-    delaiMax: opts.delaiMax ?? 3000,
+    delaiMasque: masqueRetenu,
+    delaiMax: opts.delaiMax ?? masqueRetenu + 2_000,
     variantes,
   }
 
@@ -250,7 +270,7 @@ export async function buildTag(
   step(SCOPE, `loader → ${fLoader} (${(loader.length / 1024).toFixed(1)} Ko, collé une seule fois)`)
   step(SCOPE, `config → ${fConfig} (${(octetsCfg / 1024).toFixed(1)} Ko) · ${variantes.map((v) => `${v.nom} ${v.part}%`).join(" · ")}`)
   for (const [a, c] of Object.entries(cibles)) step(SCOPE, `  ${a} → ${c.sel}`)
-  return { fLoader, fConfig, cfg, client, loader, cibles }
+  return { fLoader, fConfig, cfg, client, loader, cibles, apparitionMax }
 }
 
 /* CLI */

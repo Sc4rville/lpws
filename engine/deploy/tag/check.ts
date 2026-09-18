@@ -28,7 +28,10 @@ import { step, fail } from "../../shared/log.ts"
 const SCOPE = "deploy/tag/check"
 const BASE = "https://cfg.lpws.test"
 
-type Vu = { version: string; applique: number; abandons: string[]; masqueMs: number; mode: string; cspBloque: boolean; textes: string[] }
+type Vu = {
+  version: string; applique: number; abandons: string[]; masqueMs: number; mode: string
+  cspBloque: boolean; textes: string[]; remises: number
+}
 
 async function ouvrir(
   url: string, loader: string | null, cfg: ConfigServie | null, client: string, suffixe: string,
@@ -56,7 +59,7 @@ async function ouvrir(
     await page.waitForTimeout(3_000)
     const vu = await page.evaluate(() => {
       const w = window as unknown as {
-        __lpws?: { version: string; applique: number; abandons: string[]; mode: string }
+        __lpws?: { version: string; applique: number; abandons: string[]; mode: string; remises?: number }
         __lpwsMasque?: number
       }
       return {
@@ -65,8 +68,10 @@ async function ouvrir(
         abandons: w.__lpws?.abandons ?? [],
         masqueMs: w.__lpwsMasque ?? 0,
         mode: w.__lpws?.mode ?? "aucun",
+        remises: w.__lpws?.remises ?? 0,
+        // pas de troncature : un texte de variante plus long que la limite passait pour absent
         textes: [...document.querySelectorAll("[data-lpws-edited],[data-lpws-added]")]
-          .map((el) => (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80)),
+          .map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
       }
     })
     return { ...vu, cspBloque }
@@ -80,12 +85,22 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
 
   // 100 % pour que le scénario « variante » tombe toujours du bon côté ; l'aperçu et le stop
   // sont testés séparément, eux, avec 0 %
-  const { cfg, client, loader } = await buildTag(baseline, specPaths, { part: 100, base: BASE })
+  const { cfg, client, loader, apparitionMax } = await buildTag(baseline, specPaths, { part: 100, base: BASE })
   const spec = VariantSpec.parse(JSON.parse(await readFile(specPaths[0], "utf8")))
   const attendus = spec.edits.map((e) => e.text).filter((t): t is string => !!t)
 
+
   step(SCOPE, `page vivante : ${url}`)
-  const variante = await ouvrir(url, loader, cfg, client, "gclid=JUGE-1")
+
+  /* TROIS FOIS, PAS UNE.
+   * Un site vivant n'est pas déterministe : réseau, charge processeur, expériences maison.
+   * Un tir unique m'a fait annoncer « valide » puis « refusé » sur la même page à quelques
+   * minutes d'écart. Ce qu'un media buyer achète, c'est la fiabilité : on la mesure. */
+  const tirs: Vu[] = []
+  for (let i = 0; i < 3; i++) tirs.push(await ouvrir(url, loader, cfg, client, `gclid=JUGE-1-${i}`))
+  const reussis = tirs.filter((t) => t.applique > 0)
+  const variante = reussis[0] ?? tirs[0]
+  const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)]
   const temoin = await ouvrir(url, null, null, client, "gclid=JUGE-2")
   const cfg0 = { ...cfg, variantes: cfg.variantes.map((v) => ({ ...v, part: 0 })) }
   const apercu = await ouvrir(url, loader, cfg0, client, `lpws=${spec.nom}`)
@@ -96,13 +111,25 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
   const fuites = attendus.filter((t) => temoin.textes.some((x) => x.includes(t)))
 
   const echecs: string[] = []
+  if (reussis.length < 3)
+    echecs.push(`fiabilité ${reussis.length}/3 : la variante ne s'applique pas à tous les chargements`)
   if (variante.version === "aucun-tag") echecs.push("le loader ne s'est pas exécuté")
   if (variante.abandons.length > 0)
     echecs.push(`cibles non résolues sur la page vivante : ${variante.abandons.join(" · ")}`)
   if (poses.length !== attendus.length)
     echecs.push(`${attendus.length - poses.length}/${attendus.length} texte(s) attendus absents de la page rendue`)
   if (fuites.length > 0) echecs.push(`FUITE sur le témoin : ${fuites.join(", ")}`)
-  if (variante.masqueMs > 1000) echecs.push(`page masquée ${variante.masqueMs} ms — trop long, ça coûte du LCP`)
+  /* LE BON CHIFFRE N'EST PAS LA DURÉE DU MASQUE.
+   * Sur atlassian.com la cible n'existe qu'à ~2 000 ms, fabriquée par le JavaScript du site :
+   * masquer jusque-là ne retarde rien, on révèle au moment où la page se serait affichée de
+   * toute façon. Ce qu'on coûte vraiment, c'est l'ÉCART entre l'apparition naturelle de la
+   * cible (chronométrée à la construction) et notre révélation. C'est lui qui se paie en LCP,
+   * donc en Quality Score — et il peut être négatif, on révèle alors avant la page. */
+  const masqueMedian = median(tirs.map((t) => t.masqueMs))
+  const surcout = masqueMedian - apparitionMax
+  if (surcout > 300)
+    echecs.push(`retard ajouté ${surcout} ms (masque ${masqueMedian} ms, la cible apparaît d'elle-même `
+      + `à ${apparitionMax} ms) — c'est ça qui coûte du LCP`)
   if (apercu.applique === 0) echecs.push("l'aperçu ?lpws=<nom> n'applique rien à 0 % — le lien de démo au client serait mort")
   // sous CSP le stop distant ne PEUT pas arriver : ce n'est pas un bug du tag, c'est une
   // limite du site, et elle doit être dite au buyer à l'installation — pas découverte après
@@ -111,7 +138,10 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
 
   const ok = echecs.length === 0
   step(SCOPE, `mode     : ${variante.mode}${variante.cspBloque ? " (CSP du site : config distante refusée)" : ""}`)
-  step(SCOPE, `variante : ${variante.applique} édition(s) · masque ${variante.masqueMs} ms`)
+  step(SCOPE, `variante : ${reussis.length}/3 chargements appliquent · `
+    + `masque médian ${masqueMedian} ms · cible naturelle à ${apparitionMax} ms`
+    + ` → retard ajouté ${surcout > 0 ? surcout : 0} ms`
+    + (variante.remises ? ` · ${variante.remises} remise(s) après re-rendu du site` : ""))
   step(SCOPE, `témoin   : ${temoin.applique} édition(s) (doit être 0)`)
   step(SCOPE, `aperçu   : ${apercu.applique} édition(s) à 0 % de trafic (doit être > 0)`)
   step(SCOPE, `stop     : ${stop.applique} édition(s)${stop.cspBloque ? " — CSP : le stop distant n'arrive pas, il faut recoller le loader" : " (doit être 0)"}`)

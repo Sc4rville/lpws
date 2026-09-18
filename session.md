@@ -120,3 +120,4 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 - **01:29** — clignotement? reponse courte, OVH aussi pour domain connect? on pourrait le rajouter s'il y est pas? toi tu ferais quoi concernant tout ca du coup? et le but po
 - **02:29** — je comprends rien je debute dans tout ca c quoi omme domaine de linfo tout ca
 - **02:54** — mais du coup la le soucis si tu devais lexpliquer a un enfant de 5 ans c quoi? pourquoi ca marchait pas? je veux comprendre tehcniquement mais comprendre du cou
+- **03:47** — bah non attend cmoment on fait pour les sites comme Jira du coup/

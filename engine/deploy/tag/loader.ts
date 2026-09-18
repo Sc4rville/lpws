@@ -158,11 +158,21 @@ type Resolu = { edit: EditTag; el: Element; el2?: Element }
 function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
   const resolus: Resolu[] = []
   const abandons: string[] = []
+  /**
+   * Le sélecteur n'a pas besoin d'être unique : c'est le TÉMOIN qui tranche.
+   *
+   * Exiger l'unicité à la construction produisait des sélecteurs très spécifiques, donc
+   * fragiles — un `div.a.b div > p` unique sur la page finie désigne plusieurs paragraphes
+   * quand le site re-rend. On prend donc TOUS les candidats du sélecteur et on garde ceux qui
+   * concordent avec le témoin. Un seul survivant : c'est lui. Plusieurs : ambigu, on
+   * s'abstient plutôt que de deviner.
+   */
   const trouver = (c: Cible): Element | null => {
-    let el: Element | null = null
-    try { el = document.querySelector(c.sel) } catch { return null }
-    if (!el) return null
-    return concorde(el, c) ? el : null
+    let tous: Element[] = []
+    try { tous = [...document.querySelectorAll(c.sel)] } catch { return null }
+    if (tous.length === 0) return null
+    const colle = tous.filter((el) => concorde(el, c))
+    return colle.length === 1 ? colle[0] : null
   }
   for (const e of edits) {
     const el = trouver(e.cible)
@@ -276,20 +286,33 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
   const v = choisir(cfg)
   if (!v) { reveler(); annonce("controle", 0, []); return }
 
-  const delaiMasque = cfg.delaiMasque || 800
+  const delaiMasque = cfg.delaiMasque || 1500
   const delaiMax = Math.max(cfg.delaiMax || 3000, delaiMasque)
   let masquant = true
   let essais = 0
 
+  let observateur: MutationObserver | null = null
+  let fini = false
+  let dernier: Resolu[] = []
+  const r0 = () => dernier
+  const terminer = (version: string, applique: number, abandons: string[]) => {
+    if (fini) return
+    fini = true
+    if (observateur) observateur.disconnect()
+    if (masquant) { reveler(); masquant = false }
+    annonce(version, applique, abandons)
+  }
+
   const essayer = (): void => {
+    if (fini) return
     essais++
-    const ecoule = performance.now() - t0
-    if (masquant && ecoule >= delaiMasque) { reveler(); masquant = false }
+    if (masquant && performance.now() - t0 >= delaiMasque) { reveler(); masquant = false }
 
     let applique = 0
     const abandons: string[] = []
     try {
       const r = resoudre(v.edits)
+      dernier = r.resolus
       for (const a of r.abandons) abandons.push(a)
       if (r.abandons.length === 0) {
         // à découvert, un changement visible serait un clignotement : on ne le fait pas
@@ -305,17 +328,91 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
       abandons.push("erreur du tag : " + String(err))
     }
 
-    if (applique > 0) {
-      if (masquant) { reveler(); masquant = false }
-      annonce(v.nom, applique, [])
-      return
+    if (applique > 0) { reussi(v, r0(), applique); return }
+    if (performance.now() - t0 >= delaiMax) {
+      // délai atteint : le client voit SA page, c'est le bon repli
+      terminer("controle-repli", 0, abandons.concat(`abandon après ${essais} essai(s)`))
     }
-    if (performance.now() - t0 < delaiMax - 60) { setTimeout(essayer, 50); return }
-    if (masquant) reveler()
-    // délai atteint : le client voit SA page, c'est le bon repli
-    annonce("controle-repli", 0, abandons.concat(`abandon après ${essais} essai(s)`))
   }
+
+  /* TENIR APRÈS AVOIR POSÉ.
+   *
+   * Un site rendu par React ou équivalent peut re-rendre un morceau de page après coup, et il
+   * réécrit alors SON texte par-dessus le nôtre : la variante disparaît sans bruit, le visiteur
+   * voit l'original, et le test compte quand même ce visiteur comme exposé — un résultat faux,
+   * pas un résultat manquant.
+   *
+   * On garde donc l'observateur quelques secondes après la pose, et on remet l'édition dès que
+   * le contenu qu'on a écrit n'est plus là. C'est borné : au-delà, le visiteur est parti lire.
+   */
+  const PERSISTANCE = 5_000
+  function reussi(v2: VarianteServie, resolus: Resolu[], applique: number): void {
+    if (fini) return
+    fini = true
+    if (masquant) { reveler(); masquant = false }
+    annonce(v2.nom, applique, [])
+
+    // on garde la RÉFÉRENCE de l'élément qu'on a édité, pas seulement son sélecteur : si le
+    // site réécrit son texte sur place, c'est le chemin le plus court et le plus sûr ; s'il
+    // remplace carrément le nœud, on le retrouve par le sélecteur et le témoin
+    const attendu = resolus
+      .filter((x) => x.edit.op === "set" && x.edit.text !== undefined)
+      .map((x) => ({ el: x.el, texte: (x.edit.text as string).trim(), cible: x.edit.cible }))
+    if (attendu.length === 0) { if (observateur) observateur.disconnect(); return }
+
+    let remises = 0
+    const lu = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim()
+    const verifier = () => {
+      for (const a of attendu) {
+        if (a.el.isConnected) {
+          if (lu(a.el) === a.texte) continue
+          a.el.textContent = a.texte
+          a.el.setAttribute("data-lpws-edited", "")
+          remises++
+          continue
+        }
+        // le nœud a été remplacé : on le retrouve
+        let tous: Element[] = []
+        try { tous = [...document.querySelectorAll(a.cible.sel)] } catch { continue }
+        if (tous.some((el) => lu(el) === a.texte)) continue
+        const repris = tous.filter((el) => concorde(el, a.cible))
+        if (repris.length === 0) continue
+        repris[0].textContent = a.texte
+        repris[0].setAttribute("data-lpws-edited", "")
+        a.el = repris[0]
+        remises++
+      }
+    }
+    if (observateur) { observateur.disconnect(); observateur = null }
+    const obs2 = new MutationObserver(verifier)
+    obs2.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+    setTimeout(() => {
+      obs2.disconnect()
+      const w = window as unknown as { __lpws?: Record<string, unknown> }
+      if (w.__lpws) w.__lpws.remises = remises
+    }, PERSISTANCE)
+  }
+
+  /* ÉCOUTER L'INSERTION, NE PAS SONDER.
+   *
+   * Mesuré sur atlassian.com : le titre du hero n'existe PAS avant ~700 ms, il est fabriqué
+   * par le JavaScript du site. Un sondage toutes les 50 ms le rate tant que le fil principal
+   * est saturé, et quand il finit par le voir la page est déjà peinte : trop tard, écrire
+   * ferait clignoter.
+   *
+   * Un observateur de mutations, lui, se déclenche À L'INSERTION, dans le même tour de boucle,
+   * donc avant que le navigateur ne peigne l'élément. Et ça change la façon de compter le
+   * coût : masquer jusqu'à 700 ms sur une page dont le titre n'arrive qu'à 700 ms ne retarde
+   * rien du tout. Ce qu'on coûte vraiment, c'est l'écart entre le moment où l'élément
+   * apparaît et celui où on révèle — pas la durée absolue du masque.
+   */
   essayer()
+  if (!fini && typeof MutationObserver !== "undefined") {
+    observateur = new MutationObserver(essayer)
+    observateur.observe(document.documentElement, { childList: true, subtree: true })
+    setTimeout(() => { if (!fini) { essayer(); terminer("controle-repli", 0, [`aucune cible après ${essais} essai(s)`]) } },
+      delaiMax)
+  }
 }
 
 /* ————— l'enchaînement ————— */
@@ -329,6 +426,10 @@ function poserUneFois(cfg: ConfigServie, m: typeof mode, reveler: () => void, t0
 }
 
 function lancer(): void {
+  // un tag injecté s'exécute dans CHAQUE cadre de la page, iframes comprises (constaté : huit
+  // exécutions parallèles sur atlassian.com). Une variante ne concerne que la page elle-même.
+  try { if (window.top !== window.self) return } catch { return }
+
   /* LE MASQUE PART EN PREMIER, avant même de savoir quelle config on aura.
    *
    * Il était posé après la course réseau, donc 300 ms plus tard sous CSP — et ces 300 ms
@@ -336,7 +437,7 @@ function lancer(): void {
    * principal, le masque effectif dépassait 1 280 ms et les éditions arrivaient après sa
    * levée : refusées pour ne pas faire clignoter. Le budget doit courir depuis l'instant où
    * la page est cachée, pas depuis l'instant où on a fini de s'organiser. */
-  const budget = (__LPWS_CFG__ && __LPWS_CFG__.delaiMasque) || 800
+  const budget = (__LPWS_CFG__ && __LPWS_CFG__.delaiMasque) || 1500
   const t0 = performance.now()
   const reveler = masque(budget)
 

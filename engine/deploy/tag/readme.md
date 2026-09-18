@@ -59,31 +59,36 @@ C'est le seul test de la machine qui se fait contre **le site live**, pas contre
 5. **l'aperçu** marche-t-il à 0 % de trafic (sinon le lien de démo au client est mort) ;
 6. **le bouton stop** coupe-t-il vraiment (c'est la condition de confiance du buyer).
 
-## État réel, vérifié sur DEUX sites
+## État réel, vérifié sur DEUX sites, trois chargements chacun
 
 | | HubSpot (`/products/marketing`) | Jira (`atlassian.com/software/jira`) |
 |---|---|---|
-| verdict | **VALIDE**, les quatre scénarios | **REFUSÉ** |
+| verdict | **VALIDE** | **VALIDE** |
+| fiabilité | **3/3** chargements appliquent | **3/3** chargements appliquent |
 | mode | piloté | figé (CSP du site) |
-| config servie | **0,4 Ko** (avant refonte : 188 Ko) | **0,7 Ko** (avant : 97 Ko) |
-| masque mesuré | **52 ms** | 1 169 ms |
-| résolution des ancres à la construction | 100 % | **471/471** |
+| config servie | **0,4 Ko** | **0,7 Ko** |
+| masque médian | 79 ms | 2 155 ms |
+| la cible apparaît d'elle-même à | 76 ms | 2 306 ms |
+| **retard ajouté** | **3 ms** | **0 ms** |
 
-**Ce que la refonte a gagné, mesuré** : le rapprochement ne tourne plus chez le visiteur mais à
-la construction. La charge utile est divisée par ~250, et le coût processeur par essai passe de
-~700 ms à un `querySelector`.
+**Le bon chiffre n'est pas la durée du masque, c'est le retard AJOUTÉ.** Sur Jira le titre du
+hero est fabriqué par le JavaScript du site et n'existe qu'à ~2,3 s : masquer jusque-là ne
+retarde rien, on révèle au moment où la page se serait affichée de toute façon. Comparer la
+durée du masque à zéro faisait passer un coût nul pour une catastrophe.
 
-**Pourquoi Jira reste refusé, et c'est une vraie limite, pas un réglage** : le JavaScript
-d'Atlassian sature le fil principal. Notre relance toutes les 50 ms devient ~100 ms, le budget
-de masque de 800 ms s'étire à 1 169 ms de temps réel, et les cibles ne sont pas résolues dans
-cette fenêtre. Le juge refuse alors d'écrire au-dessus du pli plutôt que de faire clignoter la
-page sous les yeux d'un visiteur payé au clic.
+**Ce qui a débloqué les sites rendus par JavaScript**, dans l'ordre où ça a compté :
 
-**La règle qui en sort, et elle est vendable** : la voie tag dépend de la vitesse à laquelle le
-site du client rend son propre contenu. Sur une page servie par le serveur, c'est 52 ms et tout
-marche. Sur une page très lourde en JavaScript, le tag ne peut éditer que ce qui est **sous le
-pli** ; le reste passe par la voie hébergée. Ça se **mesure à l'installation** (`npm run
-tag:check`), on ne le découvre pas en campagne.
+| Correction | Avant | Après |
+|---|---|---|
+| Écouter l'insertion (MutationObserver) au lieu de sonder toutes les 50 ms | 0 édition | l'édition part au moment où l'élément entre dans le DOM, avant la peinture |
+| **Budget de masque mesuré à la construction** au lieu d'une constante | 1/3 chargements | **3/3** |
+| Le témoin tranche, le sélecteur n'a plus à être unique | sélecteurs fragiles au re-rendu | sélecteurs larges et stables |
+| Tenir après avoir posé (le site re-rend et réécrit son texte) | variante effacée en silence | remise en place, bornée à 5 s |
+| Ne s'exécuter que dans le cadre principal | 8 exécutions parallèles (iframes) | 1 |
+
+**Ce qui reste vrai, et se dit à l'installation** : sous CSP stricte (cas de Jira) la config
+distante n'arrive pas, donc le pilotage à distance ET le bouton stop demandent de recoller le
+loader dans GTM. Ça se mesure avec `npm run tag:check`, ça ne se découvre pas en campagne.
 
 ## Comment la résolution marche maintenant
 
