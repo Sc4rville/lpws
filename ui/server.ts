@@ -81,6 +81,19 @@ const lireJson = async <T>(f: string, defaut: T): Promise<T> => { try { return J
 const ecrireJson = (f: string, v: unknown) => writeFile(f, JSON.stringify(v, null, 2))
 const dossier = (c: string, camp: string) => join(ROOT, CLIENTS_ROOT, c, camp)
 const dateFr = (iso?: string) => iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : undefined
+/** BASE_TAGS/t/<client>.js répond-il ? true / false, ou null si BASE_TAGS est injoignable. Mémoire 60 s. */
+const _publie = new Map<string, { at: number; v: boolean | null }>()
+async function tagPublie(slug: string): Promise<boolean | null> {
+  const m = _publie.get(slug)
+  if (m && Date.now() - m.at < 60_000) return m.v
+  let v: boolean | null = null
+  try {
+    const r = await fetch(`${BASE_TAGS}/t/${slug}.js`, { method: "HEAD", signal: AbortSignal.timeout(4_000) })
+    v = r.ok
+  } catch { v = null }
+  _publie.set(slug, { at: Date.now(), v })
+  return v
+}
 const joursDepuis = (iso?: string) => iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)) : 0
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -103,14 +116,21 @@ async function etat() {
       const url = (meta?.source ?? encours?.url ?? "").replace(/^https?:\/\//, "")
       const site = url.split("/")[0].replace(/^www\./, "")
       const clientSlug = slugify(meta?.client ?? c)
+      // la balise que le buyer colle pointe sur BASE_TAGS/t/<client>.js : si cette adresse ne
+      // répond pas (constaté : 404 sur lpws.vercel.app après un déploiement de la démo seule),
+      // il collerait une balise morte sans aucun message. On le vérifie ici, une fois par minute.
+      const publie = await tagPublie(clientSlug)
       // un job inconnu (serveur relancé) n'est pas « en cours » : il est interrompu, et on le dit
       const captureEnCours = !!encours && jobs.get(encours.job)?.etat === "en cours"
       const capture = meta
         ? { date: dateFr(meta.capturedAt), ok: meta.fidele === true ? true : false, conforme: meta.diff ? `${(100 - meta.diff.desktop * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : undefined,
             blocs: meta.marked?.sections ?? 0,
-            cause: meta.fidele ? undefined : "La copie n’est pas encore assez conforme à la page en ligne. On la refait avec un réglage adapté — rien à faire de votre côté." }
+            // pas de promesse que la machine ne tient pas : rien ne « refait » la copie tout seul.
+            // Et la vérité utile : un test Express s'applique sur la VRAIE page, la copie ne sert
+            // qu'à préparer et montrer — une copie approximative n'empêche pas de tester.
+            cause: meta.fidele ? undefined : `La copie est conforme à ${meta.diff ? `${(100 - meta.diff.desktop * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : "moins de 97 %"} : cette page anime ses blocs au défilement, ce que la copie ne rejoue pas. Les tests Express restent possibles (ils s’appliquent sur la vraie page) ; seul l’aperçu sera approximatif.` }
         : captureEnCours ? { date: dateFr(encours!.debut), ok: null, enCours: true, cause: "Copie en cours — quelques minutes." }
-        : { date: dateFr(encours?.debut), ok: null, cause: "La copie s’est interrompue. Relancez-la — rien à faire côté client." }
+        : { date: dateFr(encours?.debut), ok: null, cause: "La copie s’est interrompue avant la fin. Relancez-la depuis cette page : rien à faire côté client." }
       clients.push({
         id: `${c}/${camp}`, client: c, campagne: camp, clientSlug, ini: cap(c.slice(0, 1)), nom: cap(c), marque: camp.replace(/-/g, " "),
         url, site, live: true,
@@ -118,7 +138,9 @@ async function etat() {
         capture,
         job: captureEnCours ? encours!.job : undefined,
         connexion: {
-          express: { etat: express.installe ? "ok" : "off", label: express.installe ? "Installé" : "À installer", verifie: dateFr(express.verifieLe), vitesse: "non mesurée", stopGtm: false,
+          express: { etat: express.installe ? "ok" : "off",
+            label: express.installe ? "Installé" : publie === false ? "Balise pas encore publiée" : "À installer",
+            publie, verifie: dateFr(express.verifieLe), vitesse: "non mesurée", stopGtm: false,
             steps: [1, express.installe ? 1 : 0, express.installe ? 1 : 0, express.installe ? 1 : 0],
             script: `<script src="${BASE_TAGS}/t/${clientSlug}.js" async></script>`, detail: express.detail },
           integral: { etat: "off", label: "Pas encore", hote: `lp.${site}`, steps: [0, 0, 0, 0] },
@@ -277,7 +299,43 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
   const slug = slugify(meta.client ?? c)
   await mkdir(join(DIST, "t"), { recursive: true }); await mkdir(join(DIST, "v"), { recursive: true })
   await copyFile(join(d, "tags", "loader.js"), join(DIST, "t", `${slug}.js`))
-  await copyFile(join(d, "tags", "v", `${slug}.json`), join(DIST, "v", `${slug}.json`))
+
+  /* UN CLIENT, PLUSIEURS PAGES, UNE SEULE CONFIG.
+   * La balise est par client (t/<client>.js) et sa config aussi (v/<client>.json), mais chaque
+   * page construit la sienne dans son dossier : publier la config d'une page écrasait les
+   * variantes de l'autre — le test de la page A disparaissait dès qu'on touchait à la page B.
+   * On fusionne donc ici toutes les pages du client ; le loader sait déjà filtrer par URL. */
+  const cdir = join(CLIENTS_ROOT, c)
+  const fusion: any = { actif: true, delaiMasque: 0, delaiMax: 0, variantes: [] as any[] }
+  for (const camp of await readdir(cdir)) {
+    const f = join(cdir, camp, "tags", "v", `${slug}.json`)
+    const cfg = await lireJson<any>(f, null)
+    if (!cfg) continue
+    // seule tests.json fait foi : une config construite par un outil (tag:check, un essai à la
+    // main) sans test derrière est un reste, pas une variante à servir — constaté : une variante
+    // de Jira partait à 100 % du trafic sans qu'aucun test n'existe
+    const testsCamp = await lireJson<Test[]>(join(cdir, camp, "tests.json"), [])
+    fusion.delaiMasque = Math.max(fusion.delaiMasque, Math.round(cfg.delaiMasque ?? 0))
+    fusion.delaiMax = Math.max(fusion.delaiMax, Math.round(cfg.delaiMax ?? 0))
+    for (const v of cfg.variantes ?? []) {
+      const t = testsCamp.find((x) => x.id === v.nom)
+      if (!t || t.etat === "echec") continue
+      if (fusion.variantes.some((x: any) => x.nom === v.nom && x.page === v.page)) continue
+      fusion.variantes.push({ ...v, part: t.etat === "live" ? t.part : 0 })
+    }
+  }
+  if (!fusion.delaiMasque) fusion.delaiMasque = 1200
+  if (!fusion.delaiMax) fusion.delaiMax = fusion.delaiMasque + 2000
+  await ecrireJson(join(DIST, "v", `${slug}.json`), fusion)
+
+  // le même dossier sert AUSSI la démo statique (ui:deploy) : déployer l'un sans l'autre
+  // efface l'autre en production — c'est ainsi que t/<client>.js est passé en 404 sur Vercel.
+  // On garantit donc que la page d'accueil est là avant de pousser quoi que ce soit.
+  if (!existsSync(join(DIST, "index.html"))) {
+    dire(job, "la démo statique n’est pas dans ui/dist : on la reconstruit pour ne pas l’effacer en ligne")
+    const code = await lancer(job, TSX, [join(ROOT, "ui", "build.ts")])
+    if (code !== 0) return code
+  }
   await ecrireJson(join(DIST, "vercel.json"), {
     headers: [
       { source: "/v/(.*)", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }, { key: "Cache-Control", value: "no-cache" }] },
@@ -293,6 +351,17 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
   const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
   const t = tests.find((x) => x.id === id)
   if (!t) throw new Error("test inconnu")
+  /* PAS DE MISE EN LIGNE SANS BALISE.
+   * Constaté en rejouant le parcours : le test passait « En ligne · 50 % » alors que la balise
+   * n'était sur aucune page. Le buyer croyait tester, personne ne voyait la variante. On sonde
+   * donc la vraie page au moment de lancer (il vient peut-être de publier GTM sans cliquer
+   * « Vérifier »), et on refuse franchement si elle ne répond pas. */
+  if (etat === "live") {
+    const ex = await lireJson<Express>(join(d, "express.json"), { installe: false })
+    const sonde = ex.installe ? ex : await sonderBalise(c, camp)
+    if (!sonde.installe)
+      throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
+  }
   if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
   else { t.etat = "stop" }
   await ecrireJson(join(d, "tests.json"), tests)
@@ -307,26 +376,34 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
 }
 
 /* ---------- la balise est-elle vraiment posée ? on ouvre la vraie page ---------- */
-async function verifier(c: string, camp: string): Promise<Job> {
+/** Ouvre la vraie page et cherche la balise. Le résultat est écrit dans express.json. */
+async function sonderBalise(c: string, camp: string, job?: Job): Promise<Express> {
   const d = dossier(c, camp)
   const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    let demande = false
+    page.on("request", (r) => { if (r.url().startsWith(BASE_TAGS + "/t/")) demande = true })
+    if (job) dire(job, `ouverture de ${meta.source}`)
+    await page.goto(meta.source, { waitUntil: "domcontentloaded", timeout: 45_000 })
+    await page.waitForFunction(() => (window as any).__lpws, { timeout: 12_000 }).catch(() => null)
+    const info = await page.evaluate(() => (window as any).__lpws ?? null)
+    const ex: Express = { installe: !!info || demande, verifieLe: new Date().toISOString(), version: info?.version, mode: info?.mode,
+      detail: info ? `balise active (${info.mode}), version servie : ${info.version}` : demande ? "balise demandée par la page, mais pas encore exécutée au moment de la lecture" : "aucune trace de la balise sur la page : GTM ne l’a pas encore publiée" }
+    await ecrireJson(join(d, "express.json"), ex)
+    return ex
+  } finally { await browser.close() }
+}
+
+async function verifier(c: string, camp: string): Promise<Job> {
   const job = nouveauJob("verification")
   ;(async () => {
-    const browser = await chromium.launch()
     try {
-      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-      let demande = false
-      page.on("request", (r) => { if (r.url().startsWith(BASE_TAGS + "/t/")) demande = true })
-      dire(job, `ouverture de ${meta.source}`)
-      await page.goto(meta.source, { waitUntil: "domcontentloaded", timeout: 45_000 })
-      await page.waitForFunction(() => (window as any).__lpws, { timeout: 12_000 }).catch(() => null)
-      const info = await page.evaluate(() => (window as any).__lpws ?? null)
-      const ex: Express = { installe: !!info || demande, verifieLe: new Date().toISOString(), version: info?.version, mode: info?.mode,
-        detail: info ? `balise active (${info.mode}), version servie : ${info.version}` : demande ? "balise demandée par la page, mais pas encore exécutée au moment de la lecture" : "aucune trace de la balise sur la page : GTM ne l’a pas encore publiée" }
-      await ecrireJson(join(d, "express.json"), ex)
+      const ex = await sonderBalise(c, camp, job)
       dire(job, ex.detail!)
       finir(job, ex.installe, ex)
-    } catch (e) { dire(job, String(e)); finir(job, false) } finally { await browser.close() }
+    } catch (e) { dire(job, String(e)); finir(job, false) }
   })()
   return job
 }
@@ -379,5 +456,5 @@ createServer(async (req, res) => {
     }
     if ((seg[0] === "t" || seg[0] === "v") && seg[1]) return fichier(res, join(DIST, seg[0], normalize(seg[1])), true)
     res.writeHead(404); res.end()
-  } catch (e) { json(res, 500, { erreur: String((e as Error)?.message ?? e) }) }
+  } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e) }) }
 }).listen(PORT, "127.0.0.1", () => step(SCOPE, `interface → http://localhost:${PORT} · tag publié sur ${BASE_TAGS}`))

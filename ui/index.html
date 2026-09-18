@@ -513,6 +513,9 @@ function stats(r) {
 }
 /** le verdict, dans ses mots — calqué sur ce que Google Ads / VWO / AB Tasty disent */
 function verdict(c, t) {
+  // un test réel n'a pas encore de résultats : ils se lisent dans GA4 (dimension lpws_variante).
+  // Sans ce garde, la page d'un client plantait dès qu'un test était en ligne (r.o sur null).
+  if (!t.res) return { k: 'wait', b: 'En ligne, en attente des premières données', s: `${t.part} % des visiteurs voient la variante — les conversions se lisent dans GA4 (dimension lpws_variante) et le verdict s’affichera ici dès qu’elles remontent`, s2: null };
   const s = stats(t.res); const minConv = Math.min(t.res.o.c, t.res.v.c);
   const need = nParBranche(s.p1, Math.max(Math.abs(s.lift), 0.05)); const reste = Math.max(0, need - Math.min(t.res.o.n, t.res.v.n));
   const clicsJour = c.ads ? c.ads.clics : 800; const jours = Math.ceil(reste * 2 / clicsJour);
@@ -610,11 +613,15 @@ function liveCard(c, t, { compact = false } = {}) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chipEtat(t)}<span class="chip">${I.clock(12)}${t.jours} jours</span>${compact ? `<span class="chip">${esc(c.nom)}</span>` : ''}</div>
     <h3>${esc(t.titre)}</h3>
     <div class="who">${esc(c.marque)} · ${esc(c.url)}</div>
-    <div class="row">
+    ${s ? `<div class="row">
       <div><div class="n">${signed(s.lift)}<small>de conversions</small></div></div>
       <div><div class="n">${pct(s.conf, 0)}<small>de certitude</small></div><div class="bar" style="width:180px"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div></div>
-    </div>
+    </div>` : `<div class="row">
+      <div><div class="n">${t.part} %<small>des visiteurs voient la variante</small></div></div>
+      <div><div class="n">—<small>pas encore de conversions remontées</small></div></div>
+    </div>`}
     <div class="say"><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
+    ${t.etat === 'live' && c.live && c.connexion.express.etat !== 'ok' ? `<div class="say" style="color:var(--bad)"><b>Personne ne voit encore la variante.</b> La balise Express n’a pas été trouvée sur la page — installez-la, publiez dans GTM, puis vérifiez.</div>` : ''}
     <div class="act">
       <button class="btn" data-go="ctx:${c.id};test:${t.id}">Voir le test ${I.arrow(15)}</button>
       ${v.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}
@@ -679,6 +686,12 @@ function vDash(c) {
     : live ? liveCard(c, live)
     : c.live && !c.tests.length ? heroPremierTest(c)
     : first ? `<div class="live calm"><div style="display:flex;gap:6px">${chipEtat(first)}${chipPot(first)}</div><h3>${esc(first.titre)}</h3><div class="say">${esc(first.teste)}</div><div class="act">${GO(I.play(16) + 'Lancer ce test', `data-act="launch" data-test="${first.id}" data-client="${c.id}"`)}<button class="btn" data-go="test:${first.id}">Voir d’abord ${I.arrow(15)}</button></div></div>`
+    // la copie est là et des tests existent, mais aucun n'est prêt ni en ligne (arrêtés, en
+    // préparation, à reprendre) : la page est prête pour la suite — le repli « Copie à relancer »
+    // s'affichait ici à tort (constaté sur HubSpot avec un test arrêté et une copie à 99,9 %)
+    : c.live && c.capture.ok !== null ? (() => { const d = c.tests.find(t => t.etat === 'stop'); return d
+        ? `<div class="live calm"><div style="display:flex;gap:6px">${chipEtat(d)}${chipPot(d)}</div><h3>${esc(d.titre)}</h3><div class="say">${esc(d.teste)} — arrêté, l’original reçoit 100 % du trafic.</div><div class="act">${GO(I.play(16) + 'Relancer ce test', `data-act="launch" data-test="${d.id}" data-client="${c.id}"`)}<button class="btn" data-go="view:nouveau">${I.sparkle(15)}Nouveau test</button></div></div>`
+        : `<div class="live calm"><span class="chip">Prête pour un test</span><h3>${esc(c.marque)} est prête</h3><div class="say">Changez un titre ou un bouton, lancez : l’original reste intact pour les autres visiteurs.</div><div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div></div>`; })()
     : c.shopify ? `<div class="live calm"><span class="chip warn"><span class="dot"></span>Accès à demander</span><h3>Un test attend la boutique</h3><div class="say">Le client vous ajoute comme collaborateur en un clic, et le test part sur sa fiche produit — panier et paiement intacts.</div><div class="act">${GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')}<button class="btn" data-go="guide:natif">Comment ça marche ${I.arrow(15)}</button></div></div>`
     : `<div class="live calm"><span class="chip">${c.capture.ok === false ? 'Copie en cours de mise au point' : 'Copie à relancer'}</span><h3>${esc(c.nom)} arrive</h3><div class="say">${esc(c.capture.cause)}</div><div class="act"><button class="btn" data-go="view:page">Voir la page ${I.arrow(15)}</button></div></div>`;
   return `
@@ -727,7 +740,9 @@ function vTest(c) {
     : t.etat === 'integral' ? GO(I.relay(16) + 'Passer en Intégral', 'data-go="guide:integral"')
     : t.etat === 'attente' ? GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')
     : `<button class="btn lg" data-act="restore" data-test="${t.id}" data-client="${c.id}">${I.back(16)}Remettre l’original</button>`;
-  let results = c.live && !t.res ? resultatsLive(c, t) : '';
+  // un test « en ligne » sans balise sur la page ne touche personne : on le dit là où le buyer regarde
+  const alerteBalise = live && c.live && ex.etat !== 'ok' ? `<div class="card" style="border-color:var(--bad)"><h3>Personne ne voit encore la variante</h3><p>La balise Express n’a pas été trouvée sur ${esc(c.url)}. Installez-la dans Google Tag Manager, publiez, puis vérifiez : le test démarre vraiment à ce moment-là.</p><div class="act"><button class="btn pri" data-go="guide:express">${I.bolt(15)}Installer la balise</button><button class="btn" data-act="verify" data-client="${c.id}">Vérifier l’installation</button></div></div>` : '';
+  let results = alerteBalise + (c.live && !t.res ? resultatsLive(c, t) : '');
   if (t.res) {
     const vd = verdict(c, t); const s = vd.s2;
     const cpc = c.ads ? c.ads.cpc : null;
@@ -899,7 +914,8 @@ function vGuide(c, m) {
         </div>
         <div class="card"><h3>3 · Vérification <span class="r"><span class="chip">${x && x.steps && x.steps[1] ? 'En cours' : 'En attente de la ligne DNS'}</span></span></h3>
           <p>Dès que la ligne répond, le certificat est émis et la page du client passe par LPWS, à l’identique. Vous êtes prévenu.</p>
-          <div style="margin-top:16px"><button class="btn" data-act="dns">${I.refresh(15)}Vérifier maintenant</button></div>
+          <div style="margin-top:16px"><button class="btn" disabled title="Le relais Intégral n’est pas encore en service">${I.clock(15)}Intégral arrive — vous serez prévenu</button></div>
+          <p class="muted" style="margin-top:10px">Ne transmettez pas encore cette ligne au client : l’adresse <code>edge.lpws.io</code> ne répond pas tant que le relais n’est pas en service. Express couvre déjà les textes, les boutons et l’ordre des blocs.</p>
         </div>
         ${peut}
       </div>${tableau}`;
