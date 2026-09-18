@@ -48,6 +48,12 @@ Dawn ; les chiffres Google Ads sont des exemples et marqués comme tels.
 
 Direction visuelle : tech, épuré, icônes dessinées à la main, rien qui ne serve.
 
+**Première maquette publiée** (18 sept., soir) : https://claude.ai/artifact/DUhnF76pbi2D3muLbHRkTd
+— cinq clients (les quatre du corpus + Dawn), playground sur les vraies specs, connexion
+dépliable par voie. Ce qui est simulé : les comptes et résultats Google Ads (marqués
+« exemple »), les états « en ligne », l'hypothèse de la variante Dawn, et les boutons de
+connexion (Shopify, DNS, vérification) qui n'appellent rien.
+
 ---
 
 ## Prochaines étapes, dans l'ordre
