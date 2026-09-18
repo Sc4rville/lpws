@@ -59,10 +59,33 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   chaque `i` ouvre le détail technique. C'est la préfiguration de la KB : quand elle sera un
   fichier de données validé par schéma, la page le lira au lieu de le contenir.
 
-## Fait le 2026-09-18 (kabylesystem)
-- **L'identité des ancres (1.1.3) est comblée.** `e231` voulait dire « 231ᵉ élément », pas
-  « titre du héros » : mesuré sur Jira, une bannière ajoutée en tête de page et **293 ancres
-  sur 471 désignaient un autre contenu**, sans qu'`apply` s'en aperçoive.
+## Fait le 2026-09-18 (kabylesystem) — journal détaillé dans [kusaila.md](kusaila.md)
+
+### La voie TAG existe et marche : livrer SANS DNS ni hébergement
+Le buyer colle **un seul script, une fois**, dans le GTM du client (accès qu'il a déjà). La
+variante s'applique sur **la vraie page, à la vraie URL** : domaine, suivi et Quality Score du
+client intacts. Ensuite, lancer/changer/arrêter une variante ne rouvre plus jamais GTM.
+**Mesuré, 18 chargements par site : HubSpot 9/9, atlassian.com 9/9** · écart de LCP avec et
+sans le tag : −8 ms et +8 ms, pour un bruit propre de Jira allant de 4 676 à 11 908 ms.
+- Le rapprochement se fait **à la construction**, pas chez le visiteur : config servie 0,4 à
+  0,7 Ko (contre 97 à 188 Ko), et le runtime redevient un `querySelector` + un témoin.
+- Le budget de masque est **chronométré sur la page**, avec une marge proportionnelle : sur un
+  site rendu en JS la cible n'existe pas encore à l'arrivée, masquer en l'attendant ne retarde
+  rien. C'est cette marge qui fait passer de 8/9 à 9/9.
+- Verbes : `set`, `remove`, `move`, `swap`, `duplicate`. `compose` reste hébergé.
+- Répartition **collante par gclid** → une seule Final URL, plus de biais de diffusion Google.
+- `?lpws=<nom>` = lien d'aperçu pour son client · `actif:false` = bouton stop.
+- **Limite dite à l'installation** : sous CSP stricte (cas d'Atlassian) la config distante
+  n'arrive pas — le tag marche en mode figé, mais stop et pilotage demandent de recoller.
+
+### La famille `deploy` : une variante livrable sans coûter sa mesure au buyer
+gclid/gbraid/wbraid/msclkid/fbclid/utm_* relayés vers les domaines du client, pixels remis,
+Consent Mode v2 en refus par défaut, `noindex` + `canonical`. **Un juge tourne avant la mise en
+ligne** et refuse une livraison où un CTA perd l'identifiant de clic.
+
+### L'identité des ancres (1.1.3) : comblée et prouvée
+`e231` voulait dire « 231ᵉ élément », pas « titre du héros » : une bannière ajoutée en tête de
+page et **293 ancres sur 471 désignaient un autre contenu**, sans qu'`apply` s'en aperçoive.
   - `1_acquire/fingerprint.ts` : empreinte par élément (rôle, texte, classes hors hachages de
     build, chemin des parents, section, rang) → `anchors.json`, écrit à la capture.
   - `1_acquire/relink.ts` : re-liage de deux captures. Ossature des correspondances franches
@@ -82,19 +105,28 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 référence ; la liste courte ci-dessous n'en garde que le haut.
 
 ## À faire (dans l'ordre)
-0. **Remplir `attendu` automatiquement** à l'écriture d'une spec, et **traduire une spec ancienne**
-   vers une capture neuve via le rapport de re-liage — sans ça le garde-fou existe mais reste vide.
-   Puis versionner les captures au lieu de les écraser, et tester le re-liage sur deux captures
-   réelles à deux dates (la mutation synthétique prouve le mécanisme, pas la dérive d'un vrai site).
-1. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
+0. **Le brain** est maintenant le seul vrai trou : la machine sait exécuter une variante, pas
+   décider laquelle. Les specs sont écrites à la main.
+1. Remplir `attendu` automatiquement à l'écriture d'une spec · versionner les captures ·
+   éprouver le re-liage sur deux captures réelles à deux dates.
+2. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
    et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.
-2. Sur la boutique : pousser la variante Dawn, la rendre, vérifier que Shopify accepte/rejette ce
+3. Sur la boutique : pousser la variante Dawn, la rendre, vérifier que Shopify accepte/rejette ce
    que notre validateur accepte/rejette. Si OK → backend Shopify dans `engine/apply`.
-3. Trancher la livraison SaaS selon les stacks réelles des clients.
-4. Le brain : `4_structure` (sur Shopify, le template JSON EST déjà le page.json), `context.json`,
+4. Livraison SaaS : la voie tag est l'entrée par défaut (aucun accès nouveau). L'hébergement
+   sur sous-domaine reste à câbler pour les variantes que le tag ne peut pas porter.
+5. Le brain : `4_structure` (sur Shopify, le template JSON EST déjà le page.json), `context.json`,
    KB, premier `/diagnose`.
-5. **Arrêté** : rendre le clone « production-ready » (réinjection JS/pixels) — pas avant d'avoir
+6. **Arrêté** : rendre le clone « production-ready » (réinjection JS/pixels) — pas avant d'avoir
    choisi la livraison SaaS.
+
+## Leçon gravée le 2026-09-18
+**Un instrument de mesure qu'on ne vérifie pas ment avec autorité.** Sur les sept corrections
+qu'il a fallu pour amener le tag à 9/9, **quatre étaient dans le juge**, pas dans le tag : il
+lisait à 3 000 ms alors que le tag a jusqu'à 4 825 ms pour poser, il tronquait les textes à
+80 caractères, il jugeait sur un tir unique alors qu'un site vivant n'est pas déterministe, et
+il tirait un verdict de vitesse de deux mesures bruitées. Verdict annoncé valide, puis refusé,
+puis valide sur la même page. Vérifier le juge avant d'accuser le code.
 
 ## Blocages / parking
 - **Clone Asana (uses/project-management) interrompu** pendant la récupération des fichiers, sans
