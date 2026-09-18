@@ -16,7 +16,9 @@
     "deploy": "tsx engine/deploy/run.ts",
     "tag": "tsx engine/deploy/tag/build.ts",
     "tag:check": "tsx engine/deploy/tag/check.ts",
-    "lcp": "tsx engine/deploy/tag/lcp.ts"
+    "lcp": "tsx engine/deploy/tag/lcp.ts",
+    "ui": "tsx ui/build.ts",
+    "ui:deploy": "tsx ui/build.ts && cd ui/dist && vercel deploy --prod --yes"
   },
   "dependencies": {
     "pixelmatch": "^7",
