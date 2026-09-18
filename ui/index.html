@@ -1,4 +1,989 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
 <title>LPWS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+@property --a { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+:root{
+  --bg:#EDEEF0; --panel:#FFFFFF; --panel-2:#F4F5F7; --panel-3:#E9EBEE;
+  --ink:#0C0D0F; --ink-2:#4A4E56; --muted:#7B8089; --line:#E4E6EA; --line-2:#EEF0F3;
+  --pill:#121316; --pill-ink:#FFFFFF; --pill-muted:rgba(255,255,255,.55);
+  --ok:#1D9A58; --ok-bg:rgba(29,154,88,.12); --warn:#D48F0B; --warn-bg:rgba(212,143,11,.14); --bad:#D6433B; --bad-bg:rgba(214,67,59,.12);
+  --mint:#8EF0C8; --sky:#7DB8FF; --sun:#FFD68C;
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r-panel:28px; --r-card:20px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:8px}
+svg{flex:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.app{height:100%;display:grid;grid-template-columns:64px 284px minmax(0,1fr);gap:12px;padding:16px}
+
+/* ---------- rail ---------- */
+.rail{background:var(--panel);border-radius:999px;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;min-height:0}
+.rail .sp{flex:1}
+.rail .sep{width:18px;border:0;border-top:1px solid var(--line);margin:6px 0}
+.rb{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font-weight:600;font-size:12.5px;transition:background .12s}
+.rb:hover{background:var(--panel-2);color:var(--ink)}
+.rb.av{background:var(--panel-2);color:var(--ink);width:36px;height:36px;position:relative}
+.rb.av.on{background:var(--pill);color:var(--pill-ink)}
+.rb.av .live-dot{position:absolute;right:-1px;top:-1px;width:9px;height:9px;border-radius:999px;background:var(--ok);border:2px solid var(--panel)}
+.rb.mark{color:var(--ink)}
+.rb.plus{color:var(--muted)}
+
+/* ---------- panneau ---------- */
+.panel{background:var(--panel);border-radius:var(--r-panel);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.ph{padding:22px 22px 10px}
+.ph h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.ph .u{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all}
+.pn{padding:4px 12px 12px;overflow:auto;flex:1;min-height:0}
+.ni{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:14px;font-weight:500;transition:background .12s}
+.ni:hover{background:var(--panel-2)}
+.ni.on{background:var(--pill);color:var(--pill-ink)}
+.ni .n{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:500}
+.ni.on .n{color:var(--pill-muted)}
+.sub{padding:4px 0 4px 14px;display:flex;flex-direction:column;gap:2px}
+.si{display:flex;align-items:center;gap:9px;width:100%;padding:7px 10px;border-radius:11px;border:0;background:transparent;cursor:pointer;text-align:left;font-size:13px;color:var(--ink-2);line-height:1.3}
+.si:hover{background:var(--panel-2);color:var(--ink)}
+.si.on{background:var(--panel-2);color:var(--ink);font-weight:500}
+.si .dot{margin-left:auto}
+.si .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gl{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:18px 12px 6px;font-weight:600}
+.dot{width:7px;height:7px;border-radius:999px;background:var(--panel-3);flex:none}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)} .dot.off{background:var(--line)}
+.dot.pulse{box-shadow:0 0 0 0 rgba(29,154,88,.5);animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(29,154,88,.55)}100%{box-shadow:0 0 0 8px rgba(29,154,88,0)}}
+.mode{border-radius:16px;transition:background .12s}
+.mode.open{background:var(--panel-2)}
+.mode.na{opacity:.45}
+.mh{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;background:transparent;cursor:pointer;text-align:left;border-radius:14px}
+.mode:not(.open) .mh:hover{background:var(--panel-2)}
+.mh .t{font-size:14px;font-weight:500}
+.mh .s{font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
+.mh .cv{margin-left:auto;color:var(--muted);transition:transform .15s}
+.mode.open .mh .cv{transform:rotate(180deg)}
+.steps{display:none;padding:2px 12px 12px 14px}
+.mode.open .steps{display:block}
+.step{display:grid;grid-template-columns:18px 1fr;gap:9px;align-items:start;padding:5px 0;font-size:13px;color:var(--ink-2)}
+.step .k{width:18px;height:18px;border-radius:999px;border:1px solid var(--line);display:grid;place-items:center;font-size:10px;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--panel)}
+.step.done .k{background:var(--ok);border-color:var(--ok);color:#fff}
+.step.done{color:var(--muted)}
+.step.now{color:var(--ink);font-weight:500}
+.step.now .k{border-color:var(--ink);color:var(--ink)}
+.steps .more{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--ink);background:none;border:0;padding:6px 0;cursor:pointer}
+.steps .more:hover{text-decoration:underline}
+.pf{padding:12px;border-top:1px solid var(--line-2)}
+.site{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;text-decoration:none;font-size:13.5px;font-weight:500;color:var(--ink)}
+.site:hover{background:var(--panel-2)}
+.site svg{margin-left:auto;color:var(--muted)}
+
+/* ---------- principal ---------- */
+.main{background:var(--panel);border-radius:var(--r-panel);overflow:auto;padding:36px 40px 72px;min-height:0}
+.hd{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:26px}
+.hd h2{margin:0;font-size:28px;font-weight:600;letter-spacing:-.02em;text-wrap:balance;line-height:1.2}
+.hd .u{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:6px}
+.hd .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.hd .act{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hd .date{font-size:13px;color:var(--muted);margin-left:auto;padding-top:8px}
+.lede{font-size:17px;line-height:1.5;max-width:66ch;margin:10px 0 0;color:var(--ink-2)}
+.lede b{color:var(--ink);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .12s,box-shadow .25s,border-color .25s;white-space:nowrap;text-decoration:none}
+.btn:hover{background:var(--panel-2)}
+.btn.pri{background:var(--pill);color:var(--pill-ink);border-color:var(--pill)}
+.btn.pri:hover{opacity:.9}
+.btn.stop{color:var(--bad)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.lg{padding:12px 20px;font-size:14.5px}
+.btn:disabled{opacity:.5;cursor:default}
+/* le bouton qui donne envie : anneau lumineux qui tourne + reflet qui glisse */
+.go{position:relative;isolation:isolate;border:0;border-radius:999px;padding:13px 22px;font-size:15px;font-weight:600;color:#fff;background:transparent;cursor:pointer;display:inline-flex;align-items:center;gap:9px;white-space:nowrap}
+.go::before{content:"";position:absolute;inset:-2px;border-radius:inherit;z-index:-2;background:conic-gradient(from var(--a),transparent 0 38%,var(--mint) 52%,var(--sky) 68%,transparent 84%);animation:spin 3s linear infinite;opacity:.75;transition:opacity .25s}
+.go::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;background:var(--pill)}
+.go .halo{position:absolute;inset:-16px;border-radius:999px;z-index:-3;background:conic-gradient(from var(--a),transparent 0 38%,var(--mint) 52%,var(--sky) 68%,transparent 84%);filter:blur(16px);opacity:.25;animation:spin 3s linear infinite;transition:opacity .25s;pointer-events:none}
+.go .clip{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.go .sheen{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.16) 45%,rgba(255,255,255,.3) 50%,rgba(255,255,255,.16) 55%,transparent 70%);transform:translateX(-120%)}
+.go:hover::before{opacity:1}
+.go:hover .halo{opacity:.6}
+.go:hover .sheen{animation:sheen 1.3s ease-in-out infinite}
+.go.sm{padding:9px 16px;font-size:13.5px}
+.go.sm .halo{inset:-10px;filter:blur(12px)}
+@keyframes spin{to{--a:360deg}}
+@keyframes sheen{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
+/* contour lumineux doux (envoyer, copier, déployer) */
+.glow{transition:box-shadow .25s,border-color .25s}
+.glow:hover{border-color:transparent;box-shadow:0 0 0 1.5px var(--mint),0 0 22px rgba(142,240,200,.5),0 0 44px rgba(125,184,255,.3)}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:500;background:var(--panel-3);color:var(--ink-2);white-space:nowrap;line-height:1.5}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+.chip.ink{background:var(--pill);color:var(--pill-ink)}
+.chip .dot{width:6px;height:6px}
+.chip.ok .dot{background:var(--ok)} .chip.warn .dot{background:var(--warn)} .chip.bad .dot{background:var(--bad)}
+.mono{font-family:var(--mono);font-size:12px}
+.muted{color:var(--muted)}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.sec{margin-top:40px}
+.sec>h3,.card>h3{margin:0 0 14px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+.sec>h3 .n,.card>h3 .n{color:var(--muted);font-weight:500}
+.sec>h3 .r,.card>h3 .r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.sec>.sub-h{margin:-8px 0 16px;color:var(--muted);font-size:14px;max-width:70ch}
+.card{background:var(--panel-2);border-radius:var(--r-card);padding:24px 26px;min-width:0}
+.card.w{background:var(--panel);border:1px solid var(--line)}
+.card p{margin:0;max-width:62ch}
+.card p+p{margin-top:10px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 20px;font-size:14px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.stat{background:var(--panel-2);border-radius:var(--r-card);padding:18px 20px;min-width:0}
+.stat .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat .v{font-size:28px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px;line-height:1.15}
+.stat .v small{font-size:13px;color:var(--muted);font-weight:500;margin-left:5px;letter-spacing:0}
+.stat .s{font-size:13px;color:var(--muted);margin-top:4px}
+.stat .s.up{color:var(--ok);font-weight:500} .stat .s.down{color:var(--bad);font-weight:500}
+.tbl{display:grid;gap:2px;min-width:0}
+.tr{display:grid;grid-template-columns:var(--cols);gap:14px;align-items:center;padding:13px 16px;border-radius:14px;min-width:0}
+.tr>*{min-width:0}
+.tr.h{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding-top:4px;padding-bottom:6px}
+.tr.r{cursor:pointer;transition:background .12s;border:0;background:transparent;text-align:left;width:100%;font:inherit}
+.tr.r:hover{background:var(--panel-2)}
+.tr .t{font-weight:500}
+.tr .m{color:var(--muted);font-size:13px}
+.tr .num{font-variant-numeric:tabular-nums;text-align:right}
+.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list{display:flex;flex-direction:column;gap:2px}
+.li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:0;background:transparent;text-align:left;width:100%;cursor:pointer;font:inherit;transition:background .12s}
+.li:hover{background:var(--panel-2)}
+.card .li:hover{background:var(--panel)}
+.li .t{font-weight:500}
+.li .m{color:var(--muted);font-size:13px;margin-top:2px}
+.li .cv{margin-left:auto;color:var(--muted)}
+.ck{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px 12px;align-items:start;padding:9px 0;font-size:14px;border-top:1px solid var(--line)}
+.ck:first-of-type{border-top:0;padding-top:0}
+.ck .i{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--ok-bg);color:var(--ok)}
+.ck.warn .i{background:var(--warn-bg);color:var(--warn)}
+.ck.off .i{background:var(--panel-3);color:var(--muted)}
+.ck .d{color:var(--muted);font-size:13px;margin-top:2px}
+.ck b{font-weight:600}
+.code{font-family:var(--mono);font-size:12.5px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow-x:auto;white-space:pre;line-height:1.6;color:var(--ink)}
+.code .c{color:var(--muted)}
+.rec{display:grid;grid-template-columns:repeat(4,auto);gap:6px 24px;font-family:var(--mono);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow-x:auto}
+.rec .k{font-family:var(--sans);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.empty{padding:40px 24px;text-align:center;color:var(--muted);background:var(--panel-2);border-radius:var(--r-card);max-width:60ch;margin:0 auto}
+.empty b{color:var(--ink);font-weight:600;display:block;margin-bottom:4px;font-size:16px}
+.inp{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:9px 12px;width:100%;min-width:0}
+.inp.mono{font-family:var(--mono);font-size:12.5px}
+.fld{display:grid;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.fld .inp{text-transform:none;letter-spacing:0;font-weight:400}
+.big{font-size:30px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
+.big small{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0;margin-left:6px}
+.range{display:flex;align-items:center;gap:10px}
+.range input{width:150px;accent-color:var(--pill);margin:0}
+.range .v{font-variant-numeric:tabular-nums;font-weight:600;min-width:42px;text-align:right}
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--pill);color:var(--pill-ink);border-radius:999px;padding:10px 18px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .15s;z-index:9}
+.toast.on{opacity:1}
+.bar{height:8px;border-radius:999px;background:var(--panel-3);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--mint),var(--sky))}
+.bar i.ok{background:var(--ok)}
+
+/* ---------- la carte d’un test en ligne : aurore lente ---------- */
+.live{position:relative;overflow:hidden;border-radius:var(--r-card);background:var(--panel);padding:28px 30px;border:1px solid var(--line);min-width:0}
+.live::before{content:"";position:absolute;inset:-40%;z-index:0;pointer-events:none;background:
+  radial-gradient(40% 40% at 28% 30%,rgba(142,240,200,.5),transparent 60%),
+  radial-gradient(35% 35% at 72% 60%,rgba(125,184,255,.42),transparent 60%),
+  radial-gradient(30% 30% at 50% 85%,rgba(255,214,140,.32),transparent 60%);
+  filter:blur(34px);animation:drift 16s ease-in-out infinite alternate}
+.live.win::before{background:radial-gradient(45% 45% at 30% 35%,rgba(142,240,200,.65),transparent 60%),radial-gradient(35% 35% at 75% 60%,rgba(142,240,200,.35),transparent 60%)}
+.live.calm::before{opacity:.45}
+.live>*{position:relative;z-index:1}
+@keyframes drift{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(6%,-4%) rotate(8deg)}100%{transform:translate(-5%,5%) rotate(-6deg)}}
+.live h3{margin:12px 0 4px;font-size:20px;font-weight:600;letter-spacing:-.015em}
+.live .who{font-size:13px;color:var(--muted)}
+.live .row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;margin-top:18px}
+.live .n{font-size:44px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.live .n small{font-size:14px;color:var(--muted);font-weight:500;letter-spacing:0;margin-left:6px}
+.live .say{font-size:15px;color:var(--ink-2);margin-top:14px;max-width:60ch}
+.live .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+
+/* ---------- tableau de score, comme dans Google Ads ---------- */
+.score{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.score .stat{background:var(--panel)}
+.verdict{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:20px 24px;border-radius:var(--r-card);background:var(--panel);border:1px solid var(--line);margin-top:14px}
+.verdict .b{font-size:18px;font-weight:600;letter-spacing:-.01em}
+.verdict .s{color:var(--muted);font-size:14px;margin-top:2px}
+.verdict .bar{width:180px;margin:0;flex:none}
+.verdict .act{margin-left:auto;display:flex;gap:8px}
+
+/* ---------- avant / après ---------- */
+.cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.cmp figure,.fig{margin:0;min-width:0}
+.cmp figcaption,.fig figcaption{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin-bottom:10px;min-width:0}
+.cmp figcaption .mono,.fig figcaption .mono{font-weight:400;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cmp figcaption .chip{margin-left:auto}
+.view{height:760px;overflow-y:auto;overflow-x:hidden;border-radius:18px;border:1px solid var(--line);background:var(--panel-2)}
+.view img{display:block;width:100%;height:auto}
+
+/* ---------- ce qui change ---------- */
+.chg{display:flex;flex-direction:column}
+.ch{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px 14px;padding:18px 0;border-top:1px solid var(--line);align-items:start}
+.ch:first-child{border-top:0;padding-top:4px}
+.ch .i{width:24px;height:24px;border-radius:999px;background:var(--panel-2);display:grid;place-items:center;color:var(--ink);margin-top:1px}
+.ch .t{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.ch q{display:block;margin:8px 0 0;padding:4px 0 4px 16px;border-left:2px solid var(--ink);font-size:15px;line-height:1.45;max-width:70ch;quotes:"« " " »"}
+.ch .w{font-size:13.5px;color:var(--muted);margin-top:8px;max-width:70ch}
+
+/* ---------- garde-fous ---------- */
+.guards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.guard{display:flex;gap:12px;align-items:flex-start;background:var(--panel-2);border-radius:var(--r-card);padding:18px 20px}
+.guard .i{width:28px;height:28px;border-radius:999px;background:var(--ok-bg);color:var(--ok);display:grid;place-items:center;flex:none}
+.guard.warn .i{background:var(--warn-bg);color:var(--warn)}
+.guard b{display:block;font-weight:600;font-size:14.5px}
+.guard span{color:var(--muted);font-size:13px;display:block;margin-top:3px}
+
+/* ---------- tests (cartes) ---------- */
+.tests{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.tc{background:var(--panel-2);border-radius:var(--r-card);padding:22px 24px;text-align:left;border:0;cursor:pointer;font:inherit;display:flex;flex-direction:column;gap:10px;min-width:0;transition:transform .15s,box-shadow .2s,background .12s}
+.tc:hover{transform:translateY(-1px);box-shadow:0 10px 30px rgba(12,13,15,.08)}
+.tc .t{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.tc .d{color:var(--muted);font-size:13.5px;line-height:1.45}
+.tc .f{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:auto}
+.tc .f .r{margin-left:auto;color:var(--muted)}
+
+/* ---------- comparatif des voies ---------- */
+.voies{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;background:var(--panel)}
+.voies>div{padding:12px 16px;border-top:1px solid var(--line-2);font-size:14px;min-width:0}
+.voies>div:nth-child(-n+4){border-top:0;background:var(--panel-2);font-weight:600}
+.voies .y{color:var(--ok);font-weight:600} .voies .n{color:var(--muted)}
+.voies .lab{color:var(--muted)}
+.pv{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:20px;align-items:start}
+
+@media (max-width:1100px){.cmp{grid-template-columns:1fr}.pv{grid-template-columns:1fr}.view{height:560px}.voies{grid-template-columns:1fr 1fr 1fr 1fr;font-size:13px}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr;height:auto;min-height:100%}
+  html,body{height:auto;min-height:100%}
+  .rail{flex-direction:row;padding:8px 12px;justify-content:flex-start;overflow-x:auto}
+  .rail .sp{display:none}.rail .sep{width:0;height:18px;border-top:0;border-left:1px solid var(--line);margin:0 4px}
+  .panel{max-height:46vh}
+  .main{padding:24px 18px 48px}
+  .hd .act{margin-left:0}
+  .verdict .act{margin-left:0}
+  .voies{grid-template-columns:1fr}.voies>div:nth-child(-n+4){border-top:1px solid var(--line-2)}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <nav class="rail" id="rail" aria-label="Clients"></nav>
+  <aside class="panel" id="panel"></aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script>
 /*THUMBS*/
+
+/* ---------- icônes (dessinées ici, 20×20, trait 1.5) ---------- */
+const svg = (d, s = 18) => `<svg viewBox="0 0 20 20" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+  mark: s => svg('<rect x="3" y="4" width="6" height="12" rx="2"/><rect x="11" y="4" width="6" height="12" rx="2" fill="currentColor"/>', s),
+  home: s => svg('<path d="M4 9.5 10 4.5l6 5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/>', s),
+  page: s => svg('<rect x="5" y="3" width="10" height="14" rx="2"/><path d="M8 7.5h4M8 10.5h4"/>', s),
+  ab: s => svg('<rect x="3" y="5" width="14" height="10" rx="2.5"/><path d="M10 5v10"/>', s),
+  bars: s => svg('<path d="M5 16v-5M10 16V5M15 16V9"/>', s),
+  plug: s => svg('<path d="M7 3v4M13 3v4M10 13v4"/><rect x="5" y="7" width="10" height="6" rx="2"/>', s),
+  bag: s => svg('<path d="M5 7h10l-.8 9.2a1 1 0 0 1-1 .8H6.8a1 1 0 0 1-1-.8L5 7z"/><path d="M7.5 7a2.5 2.5 0 0 1 5 0"/>', s),
+  bolt: s => svg('<path d="M11 3 5 11h4.5L9 17l6-8h-4.5L11 3z"/>', s),
+  relay: s => svg('<path d="M3 10h4M13 10h4"/><circle cx="10" cy="10" r="3"/>', s),
+  chev: s => svg('<path d="m7 8 3 3 3-3"/>', s),
+  chevr: s => svg('<path d="m8 6 3 4-3 4"/>', s),
+  plus: s => svg('<path d="M10 5v10M5 10h10"/>', s),
+  check: s => svg('<path d="m5 10.5 3 3 7-7"/>', s),
+  copy: s => svg('<rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>', s),
+  ext: s => svg('<path d="M9 5H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3M12 4h4v4M16 4l-6 6"/>', s),
+  stop: s => svg('<rect x="5" y="5" width="10" height="10" rx="2"/>', s),
+  play: s => svg('<path d="M7 4.5v11l9-5.5-9-5.5z" fill="currentColor"/>', s),
+  eye: s => svg('<path d="M2.5 10s3-5 7.5-5 7.5 5 7.5 5-3 5-7.5 5-7.5-5-7.5-5z"/><circle cx="10" cy="10" r="2.2"/>', s),
+  sliders: s => svg('<path d="M4 6h12M4 10h12M4 14h12"/><circle cx="8" cy="6" r="1.7" fill="var(--panel)"/><circle cx="13" cy="10" r="1.7" fill="var(--panel)"/><circle cx="7" cy="14" r="1.7" fill="var(--panel)"/>', s),
+  warn: s => svg('<path d="M10 3.5 17 16H3l7-12.5z"/><path d="M10 8.5v3.5M10 14.2v.3"/>', s),
+  refresh: s => svg('<path d="M4.5 10a5.5 5.5 0 0 1 9.7-3.5M15.5 10a5.5 5.5 0 0 1-9.7 3.5"/><path d="M14.5 3.5v3h-3M5.5 16.5v-3h3"/>', s),
+  arrow: s => svg('<path d="M4 10h12M11 5l5 5-5 5"/>', s),
+  back: s => svg('<path d="M16 10H4M9 5l-5 5 5 5"/>', s),
+  link: s => svg('<path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M11.5 8.5a3 3 0 0 0-4.2 0L5 10.8a3 3 0 0 0 4.2 4.2l1-1"/>', s),
+  clock: s => svg('<circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 1.5"/>', s),
+  send: s => svg('<path d="M3.5 10 16.5 4l-3.2 12-3.8-4.4L3.5 10z"/><path d="M9.5 11.6 16.5 4"/>', s),
+  shield: s => svg('<path d="M10 3 4 5.5v4.5c0 3.5 2.5 6 6 7 3.5-1 6-3.5 6-7V5.5L10 3z"/><path d="m7.5 10 2 2 3.5-3.5"/>', s),
+  gauge: s => svg('<path d="M3.5 13.5a7 7 0 0 1 13 0"/><path d="m10 13 3-4"/><circle cx="10" cy="13" r="1" fill="currentColor"/>', s),
+  trophy: s => svg('<path d="M6 4h8v3.5a4 4 0 0 1-8 0V4z"/><path d="M6 6H4a2 2 0 0 0 2 3M14 6h2a2 2 0 0 1-2 3M10 11.5V14M7.5 16h5"/>', s),
+  dl: s => svg('<path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4 15.5h12"/>', s),
+  text: s => svg('<path d="M4 5h12M4 9h8M4 13h10"/>', s),
+  minus: s => svg('<circle cx="10" cy="10" r="7"/><path d="M7 10h6"/>', s),
+  up: s => svg('<path d="M10 16V4M5.5 8.5 10 4l4.5 4.5"/>', s),
+  dup: s => svg('<rect x="3" y="3" width="9" height="9" rx="2"/><rect x="8" y="8" width="9" height="9" rx="2" fill="var(--panel-2)"/>', s),
+  sparkle: s => svg('<path d="M10 3v4M10 13v4M3 10h4M13 10h4M5.5 5.5l2 2M12.5 12.5l2 2M14.5 5.5l-2 2M7.5 12.5l-2 2"/>', s),
+};
+
+/* ---------- les trois façons de connecter un client ---------- */
+const MODES = {
+  express:  { nom: 'Express',  sous: 'GTM', icon: 'bolt',  pret: 'prêt en 10 min',
+    ligne: 'Une balise dans le Google Tag Manager du client. Vous y avez déjà accès pour le suivi des conversions : rien à demander, rien à installer sur le site.',
+    peut: ['Textes et boutons', 'Ordre des blocs', 'Retirer menu et pied de page', 'Dupliquer un bloc'], pas: ['Ajouter une section nouvelle → Intégral'] },
+  integral: { nom: 'Intégral', sous: 'Adresse dédiée', icon: 'relay', pret: 'prêt en 1 jour',
+    ligne: 'Une adresse dédiée à vos tests (lp.client.com). Le client — ou son hébergeur — ajoute une ligne, une fois. Ensuite tout est possible : sections nouvelles, page vivante, zéro clignotement.',
+    peut: ['Tout Express', 'Ajouter des sections entières', 'Formulaires et animations vivants', 'Aucun clignotement'], pas: [] },
+  natif:    { nom: 'Natif',    sous: 'Shopify', icon: 'bag', pret: 'prêt en 1 h',
+    ligne: 'Le client vous ajoute comme collaborateur. Chaque test est une version native de la fiche produit : panier, paiement et apps restent ceux de la boutique.',
+    peut: ['Tout, nativement', 'Panier et paiement intacts', 'Sections du thème', 'Mesure Shopify inchangée'], pas: [] },
+};
+const STEPS = {
+  express: c => ['Copier la balise', 'La coller dans Google Tag Manager', 'Publier', 'LPWS vérifie : tracking et vitesse'],
+  integral: c => ['Choisir l’adresse' + (c ? ' · ' + c.connexion.integral.hote : ''), 'Transmettre la ligne DNS au client', 'Vérification automatique', 'En ligne, certificat inclus'],
+  natif: c => ['Envoyer la demande de collaborateur', 'Le client accepte (Paramètres → Utilisateurs)', 'LPWS lit le thème', 'Chaque test = une version de la fiche'],
+};
+
+/* ---------- les clients ---------- */
+const CLIENTS = [
+  {
+    id: 'atlassian', ini: 'A', nom: 'Atlassian', marque: 'Jira', url: 'www.atlassian.com/software/jira', site: 'atlassian.com', img: 'atlassian',
+    capture: { date: '17 sept. 2026', ok: true, conforme: '99,9 %', blocs: 9 },
+    connexion: {
+      express: { etat: 'ok', label: 'Installé', verifie: '18 sept.', vitesse: '+8 ms', stopGtm: true, steps: [1, 1, 1, 1] },
+      integral: { etat: 'off', label: 'Pas encore', hote: 'lp.atlassian.com', steps: [0, 0, 0, 0] },
+      natif: { etat: 'na', label: 'Pas une boutique Shopify' },
+    },
+    ads: { compte: '493-217-0068', campagne: 'Jira · Search · FR', conversion: 'Inscription', cpc: 2.4, clics: 900 },
+    tests: [
+      { id: 'message-match', titre: 'Le titre reprend la promesse de l’annonce', etat: 'live', part: 50, jours: 7, potentiel: 'Fort',
+        teste: 'Un titre qui dit exactement ce que l’annonce promet — « −60 % de temps de sprint planning » — à la place d’une formule générique.',
+        pourquoi: 'Le visiteur a cliqué pour une promesse précise. S’il ne la retrouve pas en cinq secondes, il repart, et le clic est payé.',
+        res: { o: { n: 1240, c: 38 }, v: { n: 1236, c: 51 } },
+        changes: [
+          { t: 'Titre', q: 'Cut sprint planning time by 60%', w: 'La promesse exacte de l’annonce, là où l’œil arrive en premier.' },
+          { t: 'Sous-titre', q: 'AI agents in Jira turn plans into agent-ready tasks — with the full context your team already has.', w: 'Garde le positionnement produit que le titre ne porte plus.' },
+        ] },
+      { id: 'offer-clarity', titre: 'Le bouton dit que c’est gratuit', etat: 'gagnant', part: 100, jours: 14, potentiel: 'Moyen', fin: '12 sept.',
+        teste: 'Le bouton du formulaire annonce l’offre — « gratuit jusqu’à 10 utilisateurs » — au lieu d’un simple « Sign up ».',
+        pourquoi: 'L’annonce promet la gratuité, le formulaire n’en parle pas : le doute sur le prix arrive pile au moment de remplir.',
+        res: { o: { n: 3810, c: 118 }, v: { n: 3795, c: 152 } },
+        note: 'Le volume d’inscriptions peut monter sans que l’activation suive : à surveiller côté client.',
+        changes: [ { t: 'Bouton du formulaire', q: 'Start free — up to 10 users', w: 'Un seul changement : si ça marche, on sait pourquoi.' } ] },
+      { id: 'proof-fit', titre: 'Une preuve qui parle aux petites équipes', etat: 'pret', part: 0, potentiel: 'Moyen',
+        teste: 'La preuve sous le titre s’adresse aux petites équipes visées par la campagne, pas seulement aux Fortune 500.',
+        pourquoi: 'Une preuve ne rassure que si le visiteur s’y reconnaît. Le chiffre est déjà revendiqué par Atlassian plus bas sur la page.',
+        changes: [ { t: 'Preuve sous le titre', q: '300,000+ teams build in Jira — from two-person startups to the Fortune 500', w: 'Même chiffre, cadré pour que la petite équipe s’y voie.' } ] },
+      { id: 'lp-payante', titre: 'La page devient une vraie landing page de campagne', etat: 'pret', part: 0, potentiel: 'Fort',
+        teste: 'Menu et pied de page retirés, preuve remontée sous le titre, sections hors sujet supprimées, second bouton à mi-page.',
+        pourquoi: 'Une page de marque servie à du trafic payant fuit de partout : chaque lien du menu est une sortie, et la preuve est à 4 100 px du haut.',
+        note: 'Beaucoup de choses changent en même temps : un gain ne dira pas lequel a joué. Idéal quand le trafic est trop faible pour des tests fins.',
+        changes: [
+          { t: 'Menu retiré', w: 'Chaque lien du menu est une sortie payée.' },
+          { t: 'Pied de page retiré', w: '560 px de liens sans rapport avec la campagne.' },
+          { t: 'Preuve chiffrée remontée juste sous le titre', w: 'Là où se joue l’attention.' },
+          { t: 'Témoignages placés juste après la preuve', w: 'Un seul bloc de réassurance au lieu de deux éparpillés.' },
+          { t: 'Bouton d’inscription dupliqué à mi-page', q: 'Free for your whole team — no credit card required.', w: 'Un second moment pour convertir, dans le design de la page.' },
+          { t: 'Ordre inversé : l’étendue du produit avant la preuve d’usage', w: 'Montrer d’abord ce que fait le produit, ensuite qui l’utilise.' },
+          { t: 'Actualités produit retirées', w: 'Hors sujet pour un visiteur qui arrive d’une annonce.' },
+          { t: 'Cross-sell Confluence · Loom · Rovo retiré', w: 'Dilue l’offre unique que la campagne promet.' },
+          { t: 'Tous les boutons disent la même chose', q: 'Start free', w: 'Une seule offre, du haut en bas.' },
+        ] },
+      { id: 'section-objections', titre: 'Une section qui répond aux objections', etat: 'pret', part: 0, potentiel: 'Moyen',
+        teste: 'Un bloc à trois cartes, juste avant le dernier bouton, répond aux trois questions qui freinent une équipe avant de migrer.',
+        pourquoi: 'Un doute non traité ne devient pas un refus, il devient un report. Le bloc reprend un gabarit déjà présent sur la page : même design, au pixel.',
+        note: 'Les réponses reprennent des affirmations déjà sur la page. À faire valider par le client avant de lancer.',
+        changes: [
+          { t: 'Nouveau bloc avant le dernier bouton', q: 'Questions teams ask before switching', w: 'Copié depuis un gabarit de la page, sans rien inventer.' },
+          { t: 'Carte 1', q: 'Will it work with our stack?' },
+          { t: 'Carte 2', q: 'What happens to our existing projects?' },
+          { t: 'Carte 3', q: 'How do we keep control of what agents do?' },
+        ] },
+      { id: 'sections-creees', titre: 'Objections et garantie avant le dernier bouton', etat: 'integral', part: 0, potentiel: 'Moyen',
+        teste: 'Deux sections nouvelles : les objections en trois colonnes, puis un bandeau sombre de garantie juste avant l’inscription.',
+        pourquoi: 'Lever le doute, puis lever le risque, au moment où le visiteur décide.',
+        changes: [
+          { t: 'Nouvelle section objections, trois colonnes', q: 'Questions teams ask before switching' },
+          { t: 'Nouveau bandeau de garantie', q: 'Start free. Keep your data either way.', w: 'Export à tout moment, pas de carte bancaire, pas d’appel commercial.' },
+        ] },
+    ],
+  },
+  {
+    id: 'hubspot', ini: 'H', nom: 'HubSpot', marque: 'Marketing Hub', url: 'www.hubspot.com/products/marketing', site: 'hubspot.com', img: 'hubspot',
+    capture: { date: '17 sept. 2026', ok: true, conforme: '99,9 %', blocs: 17 },
+    connexion: {
+      express: { etat: 'ok', label: 'Installé', verifie: '18 sept.', vitesse: 'aucun', stopGtm: false, steps: [1, 1, 1, 1] },
+      integral: { etat: 'off', label: 'Pas encore', hote: 'lp.hubspot.com', steps: [0, 0, 0, 0] },
+      natif: { etat: 'na', label: 'Pas une boutique Shopify' },
+    },
+    ads: { compte: '493-217-0068', campagne: 'Marketing Hub · Search · EU', conversion: 'Demande de démo', cpc: 3.1, clics: 1400 },
+    tests: [
+      { id: 'preuve-au-dessus-du-pli', titre: 'La preuve client remonte sous le titre', etat: 'live', part: 50, jours: 5, potentiel: 'Fort',
+        teste: 'Logos et études de cas passent de 4 700 px du haut à juste sous le titre. Menu et pied de page disparaissent, un bouton de démo suit la preuve.',
+        pourquoi: 'Un visiteur froid décide de rester ou de partir dans les premières secondes : c’est là qu’il lui faut la réassurance.',
+        res: { o: { n: 2118, c: 61 }, v: { n: 2095, c: 74 } },
+        changes: [
+          { t: 'Menu retiré', w: 'Autant de sorties en moins sur une page de campagne.' },
+          { t: 'Pied de page retiré', w: 'Hors sujet pour la campagne.' },
+          { t: 'Preuve client remontée sous le titre', w: 'Dans la zone où se joue la décision de rester.' },
+          { t: 'Bouton de démo dupliqué juste après la preuve', q: 'Ready to see it on your own pipeline?', w: 'Un moment pour convertir, juste après la réassurance.' },
+        ] },
+    ],
+  },
+  {
+    id: 'monday', ini: 'M', nom: 'Monday', marque: 'Work Management', url: 'monday.com/work-management', site: 'monday.com', img: 'monday',
+    capture: { date: '16 sept. 2026', ok: false, conforme: '76 %', cause: 'La page anime ses blocs au défilement : la copie n’est pas encore conforme. On la refait avec un réglage adapté — rien à faire de votre côté.' },
+    connexion: {
+      express: { etat: 'off', label: 'Après la copie', steps: [0, 0, 0, 0] },
+      integral: { etat: 'off', label: 'Pas encore', hote: 'lp.monday.com', steps: [0, 0, 0, 0] },
+      natif: { etat: 'na', label: 'Pas une boutique Shopify' },
+    },
+    ads: null, tests: [],
+  },
+  {
+    id: 'asana', ini: 'As', nom: 'Asana', marque: 'Project management', url: 'asana.com/uses/project-management', site: 'asana.com', img: null,
+    capture: { date: '17 sept. 2026', ok: null, cause: 'La copie s’est interrompue en cours de route. On la relance — rien à faire de votre côté.' },
+    connexion: {
+      express: { etat: 'off', label: 'Après la copie', steps: [0, 0, 0, 0] },
+      integral: { etat: 'off', label: 'Pas encore', hote: 'lp.asana.com', steps: [0, 0, 0, 0] },
+      natif: { etat: 'na', label: 'Pas une boutique Shopify' },
+    },
+    ads: null, tests: [],
+  },
+  {
+    id: 'dawn', ini: 'D', nom: 'Dawn', marque: 'Boutique de dev', url: 'lpws-dev.myshopify.com/products/sample', site: 'lpws-dev.myshopify.com', img: null, shopify: true,
+    capture: { date: '17 sept. 2026', ok: true, theme: 'Dawn', conforme: 'native' },
+    connexion: {
+      express: { etat: 'off', label: 'Possible', steps: [0, 0, 0, 0] },
+      integral: { etat: 'na', label: 'Inutile sur Shopify' },
+      natif: { etat: 'warn', label: 'Accès à demander', steps: [0, 0, 1, 1] },
+    },
+    ads: null,
+    tests: [
+      { id: 'pdp-reassurance', titre: 'Réassurance et FAQ sur la fiche produit', etat: 'attente', part: 0, potentiel: 'Moyen',
+        teste: 'Un bloc de réassurance sous le bouton d’achat, une FAQ native du thème, un titre de cross-sell qui vend.',
+        pourquoi: 'Le doute naît au moment du clic d’achat : c’est là qu’on y répond.',
+        changes: [
+          { t: 'Réassurance sous « Ajouter au panier »' },
+          { t: 'FAQ ajoutée sous la fiche', w: 'Section native du thème Dawn.' },
+          { t: 'Titre du cross-sell', q: 'Souvent achetés ensemble' },
+        ] },
+    ],
+  },
+];
+const byId = id => CLIENTS.find(c => c.id === id);
+
+/* ---------- état ---------- */
+const S = { ctx: 'home', view: 'dash', test: null, openMode: null, mode: null };
+try { Object.assign(S, JSON.parse(localStorage.getItem('lpws-ui-v2') || '{}')); } catch {}
+if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
+const save = () => { try { localStorage.setItem('lpws-ui-v2', JSON.stringify(S)); } catch {} };
+
+/* ---------- utilitaires ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fr = n => Math.round(n).toLocaleString('fr-FR');
+const eur = n => Math.round(n).toLocaleString('fr-FR') + ' €';
+const pct = (x, d = 1) => (x * 100).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' %';
+const signed = (x, d = 0) => (x >= 0 ? '+' : '−') + pct(Math.abs(x), d);
+const img = k => (typeof IMG !== 'undefined' && IMG[k]) || null;
+const toast = t => { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1800); };
+async function copier(t, msg = 'Copié') { try { await navigator.clipboard.writeText(t); toast(msg); } catch { toast('Impossible de copier ici'); } }
+const GO = (label, extra = '') => `<button class="go" ${extra}><span class="halo"></span><span class="clip"><span class="sheen"></span></span>${label}</button>`;
+
+/* statistiques, en langage humain */
+const Z = { a: 1.96, b: 0.8416 };
+const nParBranche = (p, mde) => 2 * Math.pow(Z.a + Z.b, 2) * p * (1 - p) / Math.pow(p * mde, 2);
+function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + .3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - .284496736) * t + .254829592) * t * Math.exp(-x * x); return s * y; }
+const normCdf = z => .5 * (1 + erf(z / Math.SQRT2));
+function stats(r) {
+  const p1 = r.o.c / r.o.n, p2 = r.v.c / r.v.n, p = (r.o.c + r.v.c) / (r.o.n + r.v.n);
+  const se = Math.sqrt(p * (1 - p) * (1 / r.o.n + 1 / r.v.n)); const z = (p2 - p1) / se;
+  return { p1, p2, lift: (p2 - p1) / p1, conf: 2 * normCdf(Math.abs(z)) - 1 };
+}
+/** le verdict, dans ses mots — calqué sur ce que Google Ads / VWO / AB Tasty disent */
+function verdict(c, t) {
+  const s = stats(t.res); const minConv = Math.min(t.res.o.c, t.res.v.c);
+  const need = nParBranche(s.p1, Math.max(Math.abs(s.lift), 0.05)); const reste = Math.max(0, need - Math.min(t.res.o.n, t.res.v.n));
+  const clicsJour = c.ads ? c.ads.clics : 800; const jours = Math.ceil(reste * 2 / clicsJour);
+  if (t.etat === 'gagnant') return { k: 'win', b: `Gagnant : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} · déployée sur 100 % du trafic le ${t.fin}`, s2: s };
+  if (minConv < 25) return { k: 'wait', b: 'Pas encore assez de données', s: `Continuez — il manque environ ${fr(25 - minConv)} conversions sur la version la moins vue`, s2: s };
+  if (s.conf >= .95 && s.lift > 0) return { k: 'win', b: `Gagnant probable : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} — vous pouvez déployer`, s2: s };
+  if (s.conf >= .95 && s.lift < 0) return { k: 'lose', b: `L’original fait mieux (${signed(s.lift)})`, s: `Certitude ${pct(s.conf, 0)} — remettez l’original et testez autre chose`, s2: s };
+  return { k: 'run', b: `Avantage variante ${signed(s.lift)}, certitude ${pct(s.conf, 0)}`, s: `Encore ~${jours} jours au rythme actuel pour être sûr à 95 %`, s2: s };
+}
+const ETATS = {
+  live: ['ok', 'En ligne · collecte', true], gagnant: ['ok', 'Gagnant · déployé', false], pret: ['', 'Prêt à lancer', false],
+  stop: ['', 'Arrêté', false], integral: ['warn', 'Demande Intégral', false], attente: ['warn', 'Boutique à connecter', false],
+};
+const chipEtat = t => { const [k, l, p] = ETATS[t.etat]; return `<span class="chip ${k}">${k ? `<span class="dot ${p ? 'pulse' : ''}"></span>` : ''}${l}${t.etat === 'live' ? ' · ' + t.part + ' %' : ''}</span>`; };
+const chipPot = t => `<span class="chip ${t.potentiel === 'Fort' ? 'ink' : ''}">${I.sparkle(12)}Potentiel ${t.potentiel.toLowerCase()}</span>`;
+const voieDe = c => c.shopify ? 'natif' : 'express';
+const chipConn = c => { const m = voieDe(c); const x = c.connexion[m]; const k = x.etat === 'ok' ? 'ok' : x.etat === 'warn' ? 'warn' : ''; return `<span class="chip ${k}">${I[MODES[m].icon](13)}${MODES[m].nom} · ${esc(x.label)}</span>`; };
+const statutClient = c => {
+  const live = c.tests.find(t => t.etat === 'live');
+  if (live) return '<span class="chip ok"><span class="dot pulse"></span>Test en ligne</span>';
+  if (c.capture.ok === false) return '<span class="chip">Copie en cours de mise au point</span>';
+  if (c.capture.ok === null) return '<span class="chip">Copie à relancer</span>';
+  if (c.shopify) return '<span class="chip warn"><span class="dot"></span>Accès à demander</span>';
+  if (c.tests.some(t => t.etat === 'pret')) return '<span class="chip">Prêt à tester</span>';
+  return '<span class="chip">Prêt</span>';
+};
+const previewUrl = (c, t) => `https://${c.url}${c.shopify ? '?view=lpws-pdp' : '?lpws=' + t.id}`;
+
+/* ---------- rail ---------- */
+function renderRail() {
+  document.getElementById('rail').innerHTML = `
+    <button class="rb mark" data-go="ctx:home" title="Vue d’ensemble" aria-label="Vue d’ensemble">${I.mark(20)}</button>
+    <hr class="sep">
+    ${CLIENTS.map(c => `<button class="rb av ${S.ctx === c.id ? 'on' : ''}" data-go="ctx:${c.id}" title="${esc(c.nom)}" aria-label="${esc(c.nom)}">${c.ini}${c.tests.some(t => t.etat === 'live') ? '<span class="live-dot"></span>' : ''}</button>`).join('')}
+    <button class="rb plus" title="Ajouter un client" aria-label="Ajouter un client" data-act="add">${I.plus()}</button>
+    <div class="sp"></div>
+    <button class="rb" title="Réglages" aria-label="Réglages">${I.sliders()}</button>
+    <button class="rb av" title="Yann" aria-label="Compte">Y</button>`;
+}
+
+/* ---------- panneau ---------- */
+function modeItem(c, m) {
+  const M = MODES[m]; const x = c ? c.connexion[m] : null;
+  const na = x && x.etat === 'na'; const open = S.openMode === m && !na;
+  const dot = !x ? '' : x.etat === 'ok' ? 'ok' : x.etat === 'warn' ? 'warn' : 'off';
+  const now = x && x.steps ? x.steps.findIndex(s => !s) : -1;
+  return `<div class="mode ${open ? 'open' : ''} ${na ? 'na' : ''}">
+    <button class="mh" data-go="mode:${m}" aria-expanded="${open}" ${na ? 'disabled' : ''}>
+      ${I[M.icon]()}<span class="t">${M.nom}<span class="s">${M.sous}</span></span>
+      ${x ? `<span class="dot ${dot}" style="margin-left:auto" title="${esc(x.label)}"></span>` : ''}
+      ${na ? '' : `<span class="cv" ${x ? 'style="margin-left:6px"' : ''}>${I.chev(16)}</span>`}
+    </button>
+    <div class="steps">
+      ${STEPS[m](c).map((s, i) => `<div class="step ${x && x.steps && x.steps[i] ? 'done' : ''} ${i === now ? 'now' : ''}"><span class="k">${x && x.steps && x.steps[i] ? I.check(11) : i + 1}</span><span>${esc(s)}</span></div>`).join('')}
+      <button class="more" data-go="guide:${m}">${c ? 'Voir la marche à suivre' : 'Comment ça marche'} ${I.arrow(14)}</button>
+    </div>
+  </div>`;
+}
+function renderPanel() {
+  const p = document.getElementById('panel');
+  if (S.ctx === 'home') {
+    p.innerHTML = `
+      <div class="ph"><h1>Vue d’ensemble</h1><div class="u">18 sept. 2026</div></div>
+      <div class="pn">
+        <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash">${I.home()}Aujourd’hui</button>
+        <div class="gl">Clients</div>
+        <div class="sub" style="padding-left:0">${CLIENTS.map(c => `<button class="si" data-go="ctx:${c.id}"><span class="t">${esc(c.nom)}</span><span class="dot ${c.tests.some(t => t.etat === 'live') ? 'ok pulse' : c.capture.ok === false || c.capture.ok === null ? 'off' : c.shopify ? 'warn' : 'off'}"></span></button>`).join('')}</div>
+        <div class="gl">Connexion</div>
+        ${['express', 'integral', 'natif'].map(m => modeItem(null, m)).join('')}
+      </div>`;
+    return;
+  }
+  const c = byId(S.ctx);
+  const nLive = c.tests.filter(t => t.etat === 'live').length;
+  p.innerHTML = `
+    <div class="ph"><h1>${esc(c.nom)}</h1><div class="u">${esc(c.url)}</div></div>
+    <div class="pn">
+      <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash">${I.home()}Tableau de bord</button>
+      <button class="ni ${S.view === 'tests' ? 'on' : ''}" data-go="view:tests">${I.ab()}Tests<span class="n">${c.tests.length}${nLive ? ' · ' + nLive + ' en ligne' : ''}</span></button>
+      ${c.tests.length ? `<div class="sub">${c.tests.map(t => `<button class="si ${S.view === 'test' && S.test === t.id ? 'on' : ''}" data-go="test:${t.id}"><span class="t">${esc(t.titre)}</span><span class="dot ${t.etat === 'live' ? 'ok pulse' : t.etat === 'gagnant' ? 'ok' : t.etat === 'integral' || t.etat === 'attente' ? 'warn' : 'off'}"></span></button>`).join('')}</div>` : ''}
+      <button class="ni ${S.view === 'page' ? 'on' : ''}" data-go="view:page">${I.page()}Landing page</button>
+      <button class="ni ${S.view === 'resultats' ? 'on' : ''}" data-go="view:resultats">${I.bars()}Résultats</button>
+      <div class="gl">Connexion</div>
+      ${(c.shopify ? ['natif', 'express', 'integral'] : ['express', 'integral', 'natif']).map(m => modeItem(c, m)).join('')}
+    </div>
+    <div class="pf"><a class="site" href="https://${esc(c.url)}" target="_blank" rel="noopener">Voir la page en ligne ${I.ext(16)}</a></div>`;
+}
+
+/* ---------- morceaux réutilisés ---------- */
+function liveCard(c, t, { compact = false } = {}) {
+  const v = verdict(c, t); const s = v.s2;
+  return `<div class="live ${v.k === 'win' ? 'win' : ''} ${v.k === 'wait' ? 'calm' : ''}">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${chipEtat(t)}<span class="chip">${I.clock(12)}${t.jours} jours</span>${compact ? `<span class="chip">${esc(c.nom)}</span>` : ''}</div>
+    <h3>${esc(t.titre)}</h3>
+    <div class="who">${esc(c.marque)} · ${esc(c.url)}</div>
+    <div class="row">
+      <div><div class="n">${signed(s.lift)}<small>de conversions</small></div></div>
+      <div><div class="n">${pct(s.conf, 0)}<small>de certitude</small></div><div class="bar" style="width:180px"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div></div>
+    </div>
+    <div class="say"><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
+    <div class="act">
+      <button class="btn" data-go="ctx:${c.id};test:${t.id}">Voir le test ${I.arrow(15)}</button>
+      ${v.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}
+      ${t.etat === 'live' ? `<button class="btn stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(15)}Arrêter — l’original reprend 100 %</button>` : ''}
+    </div>
+  </div>`;
+}
+function guards(c, t) {
+  const ex = c.connexion.express;
+  const stopTxt = c.shopify ? 'La version d’origine reste publiée : un clic et elle reprend tout.' : ex.stopGtm ? 'Un clic dans LPWS. Sur ce site, la commande passe par GTM : elle prend 30 secondes.' : 'Un clic, sans rouvrir GTM : l’original reprend 100 % du trafic.';
+  const vit = c.shopify ? 'Page native de la boutique, rien d’ajouté.' : ex.etat === 'ok' ? (ex.vitesse === 'aucun' ? 'Aucun ralentissement mesuré, pas de clignotement.' : `${ex.vitesse} mesurés, invisible pour le visiteur. Pas de clignotement.`) : 'Mesuré à l’installation, avant le premier test.';
+  return `<div class="guards">
+    <div class="guard"><span class="i">${I.shield(15)}</span><div><b>Tracking intact</b><span>${c.shopify ? 'Panier, paiement et pixels restent ceux de la boutique.' : 'Le gclid arrive sur la page : vos conversions Google Ads ne changent pas.'}</span></div></div>
+    <div class="guard"><span class="i">${I.gauge(15)}</span><div><b>Page pas ralentie</b><span>${vit}</span></div></div>
+    <div class="guard"><span class="i">${I.eye(15)}</span><div><b>L’original reste intact</b><span>Les visiteurs hors test voient la page telle quelle, à la même adresse.</span></div></div>
+    <div class="guard"><span class="i">${I.stop(15)}</span><div><b>Arrêt à tout moment</b><span>${stopTxt}</span></div></div>
+  </div>`;
+}
+function testCard(c, t, { withClient = false } = {}) {
+  const r = t.res ? stats(t.res) : null;
+  return `<button class="tc" data-go="ctx:${c.id};test:${t.id}">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${chipEtat(t)}${withClient ? `<span class="chip">${esc(c.nom)}</span>` : ''}</div>
+    <div class="t">${esc(t.titre)}</div>
+    <div class="d">${esc(t.teste)}</div>
+    <div class="f">${r ? `<span class="chip ${r.lift > 0 ? 'ok' : ''}">${signed(r.lift)} · ${pct(r.conf, 0)}</span>` : chipPot(t)}<span class="r">${I.chevr(16)}</span></div>
+  </button>`;
+}
+
+/* ---------- vues ---------- */
+function vHome() {
+  const lives = CLIENTS.flatMap(c => c.tests.filter(t => t.etat === 'live').map(t => [c, t]));
+  const prets = CLIENTS.flatMap(c => c.tests.filter(t => t.etat === 'pret').map(t => [c, t]));
+  const todo = [
+    { id: 'dawn', t: 'Dawn · demander l’accès collaborateur', m: 'Le test est prêt. Un code à envoyer au client, il accepte en un clic.' },
+    { id: 'monday', t: 'Monday · copie en cours de mise au point', m: 'La page anime ses blocs au défilement. On la refait — rien à faire de votre côté.' },
+    { id: 'asana', t: 'Asana · copie à relancer', m: 'Interrompue en cours de route. On la relance.' },
+  ];
+  return `
+    <div class="hd"><div><h2>Aujourd’hui</h2><p class="lede">${lives.length} tests en ligne, ${prets.length} prêts à lancer. Tracking et vitesse vérifiés sur tous les sites connectés.</p></div><span class="date">18 sept. 2026</span></div>
+    <div class="grid g2">${lives.map(([c, t]) => liveCard(c, t, { compact: true })).join('')}</div>
+    <div class="sec"><h3>Prêts à lancer <span class="n">${prets.length}</span></h3>
+      <div class="tests">${prets.map(([c, t]) => testCard(c, t, { withClient: true })).join('')}</div></div>
+    <div class="grid g2 sec">
+      <div class="card"><h3>À faire <span class="n">${todo.length}</span></h3>
+        <div class="list">${todo.map(a => `<button class="li" data-go="ctx:${a.id}" style="padding-left:10px"><span><div class="t">${esc(a.t)}</div><div class="m">${esc(a.m)}</div></span><span class="cv">${I.chevr(16)}</span></button>`).join('')}</div>
+      </div>
+      <div class="card"><h3>Clients <span class="n">${CLIENTS.length}</span></h3>
+        <div class="list">${CLIENTS.map(c => `<button class="li" data-go="ctx:${c.id}" style="padding-left:10px"><span class="rb av" style="width:32px;height:32px;font-size:12px;flex:none">${c.ini}</span><span style="min-width:0"><div class="t">${esc(c.nom)} <span class="m" style="display:inline">· ${esc(c.marque)}</span></div><div class="m">${c.tests.length ? c.tests.length + ' test' + (c.tests.length > 1 ? 's' : '') : 'aucun test'} · ${esc(c.url)}</div></span><span style="margin-left:auto">${statutClient(c)}</span></button>`).join('')}</div>
+      </div>
+    </div>`;
+}
+
+function vDash(c) {
+  const live = c.tests.find(t => t.etat === 'live');
+  const gagnant = c.tests.find(t => t.etat === 'gagnant');
+  const prets = c.tests.filter(t => t.etat === 'pret');
+  const first = prets[0];
+  const ex = c.connexion.express, na = c.connexion.natif;
+  const hero = live ? liveCard(c, live)
+    : first ? `<div class="live calm"><div style="display:flex;gap:6px">${chipEtat(first)}${chipPot(first)}</div><h3>${esc(first.titre)}</h3><div class="say">${esc(first.teste)}</div><div class="act">${GO(I.play(16) + 'Lancer ce test', `data-act="launch" data-test="${first.id}" data-client="${c.id}"`)}<button class="btn" data-go="test:${first.id}">Voir d’abord ${I.arrow(15)}</button></div></div>`
+    : c.shopify ? `<div class="live calm"><span class="chip warn"><span class="dot"></span>Accès à demander</span><h3>Un test attend la boutique</h3><div class="say">Le client vous ajoute comme collaborateur en un clic, et le test part sur sa fiche produit — panier et paiement intacts.</div><div class="act">${GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')}<button class="btn" data-go="guide:natif">Comment ça marche ${I.arrow(15)}</button></div></div>`
+    : `<div class="live calm"><span class="chip">${c.capture.ok === false ? 'Copie en cours de mise au point' : 'Copie à relancer'}</span><h3>${esc(c.nom)} arrive</h3><div class="say">${esc(c.capture.cause)}</div><div class="act"><button class="btn" data-go="view:page">Voir la page ${I.arrow(15)}</button></div></div>`;
+  return `
+    <div class="hd"><div><h2>${esc(c.nom)} <span class="muted" style="font-weight:500">· ${esc(c.marque)}</span></h2><div class="u">${esc(c.url)}</div><div class="chips">${statutClient(c)}${chipConn(c)}</div></div>
+      <div class="act">${c.tests.length ? `<button class="btn" data-go="view:tests">${I.ab(16)}Tests</button>` : ''}<button class="btn" data-go="view:resultats">${I.bars(16)}Résultats</button></div></div>
+    ${hero}
+    ${(ex.etat === 'ok' || c.shopify) ? `<div class="sec"><h3>Ce qui est garanti</h3>${guards(c)}</div>` : ''}
+    ${gagnant ? `<div class="sec"><h3>Dernier gagnant</h3>${liveCard(c, gagnant)}</div>` : ''}
+    ${c.tests.filter(t => t !== live && t !== gagnant).length ? `<div class="sec"><h3>Tests <span class="n">${c.tests.length}</span></h3><div class="tests">${c.tests.filter(t => t !== live && t !== gagnant).map(t => testCard(c, t)).join('')}</div></div>` : ''}
+    <div class="grid g2 sec">
+      <div class="card"><h3>Connexion <span class="r">${chipConn(c)}</span></h3>
+        ${c.shopify ? `<p>Un accès collaborateur suffit : le client l’accorde en un clic depuis sa boutique. Ensuite chaque test est une version native de la fiche produit.</p><div style="margin-top:16px"><button class="btn glow" data-act="shopify">${I.send(15)}Envoyer la demande d’accès</button></div>`
+        : ex.etat === 'ok' ? `<p>Express est installé et vérifié le ${ex.verifie} : tracking intact, ${ex.vitesse === 'aucun' ? 'aucun ralentissement' : ex.vitesse + ' de chargement'}. Textes, boutons, ordre des blocs, menu : tout se teste sans rien redemander au client.</p><p>Pour tester des sections entières, passez en Intégral : une ligne DNS à transmettre au client, une fois.</p><div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-go="guide:express">${I.bolt(14)}Express</button><button class="btn sm glow" data-go="guide:integral">${I.relay(14)}Passer en Intégral</button></div>`
+        : `<p>La connexion se fait une fois la copie de la page conforme. Express ne demande rien au client : une balise dans son Google Tag Manager.</p><div style="margin-top:16px"><button class="btn sm" data-go="guide:express">${I.bolt(14)}Comment ça marche</button></div>`}
+      </div>
+      <div class="card"><h3>Landing page <span class="r">${c.capture.ok === true ? `<span class="chip ok"><span class="dot"></span>Copie conforme${c.shopify ? '' : ' · ' + c.capture.conforme}</span>` : c.capture.ok === false ? '<span class="chip">Mise au point</span>' : '<span class="chip">À relancer</span>'}</span></h3>
+        ${c.shopify ? `<p>Fiche produit lue directement dans le thème ${esc(c.capture.theme)}. Les tests s’écrivent dans le langage de Shopify, sans copie intermédiaire.</p>` : c.capture.ok ? `<p>Copiée le ${c.capture.date}, conforme à ${c.capture.conforme} sur ordinateur et mobile. C’est sur cette copie que les variantes sont préparées et montrées avant mise en ligne.</p>` : `<p>${esc(c.capture.cause)}</p>`}
+        <div style="margin-top:16px"><button class="btn sm" data-go="view:page">${I.page(14)}Voir la page</button></div>
+      </div>
+    </div>`;
+}
+
+function vTests(c) {
+  if (!c.tests.length) return `<div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div></div></div><div class="empty"><b>Pas encore de test</b>${c.capture.ok === false ? 'La copie de la page est en cours de mise au point. Les tests se préparent dessus.' : 'La copie de la page doit d’abord aboutir.'}</div>`;
+  const grp = (k) => c.tests.filter(t => t.etat === k);
+  const sec = (titre, arr) => arr.length ? `<div class="sec"><h3>${titre} <span class="n">${arr.length}</span></h3><div class="tests">${arr.map(t => testCard(c, t)).join('')}</div></div>` : '';
+  return `
+    <div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div><p class="lede">Chaque test oppose une variante à l’original, sur la même adresse, avec le trafic que vous choisissez.</p></div></div>
+    ${sec('En ligne', grp('live'))}${sec('Prêts à lancer', grp('pret'))}${sec('Gagnants déployés', grp('gagnant'))}${sec('Demandent Intégral', grp('integral'))}${sec('En attente de la boutique', grp('attente'))}${sec('Arrêtés', grp('stop'))}`;
+}
+
+function vTest(c) {
+  const t = c.tests.find(x => x.id === S.test) || c.tests[0];
+  if (!t) return vTests(c);
+  S.test = t.id;
+  const live = t.etat === 'live';
+  const url = previewUrl(c, t);
+  const o = img(c.img), v = img('v:' + t.id);
+  const ex = c.connexion.express;
+  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="0" max="100" step="5" value="${t.part}" aria-label="Part du trafic"><span class="v" id="partv">${t.part} %</span></label>` : '';
+  const principal = live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(16)}Arrêter — l’original reprend 100 %</button>`
+    : (t.etat === 'pret' || t.etat === 'stop') ? GO(I.play(16) + 'Lancer le test', `data-act="launch" data-test="${t.id}" data-client="${c.id}"`)
+    : t.etat === 'integral' ? GO(I.relay(16) + 'Passer en Intégral', 'data-go="guide:integral"')
+    : t.etat === 'attente' ? GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')
+    : `<button class="btn lg" data-act="restore" data-test="${t.id}" data-client="${c.id}">${I.back(16)}Remettre l’original</button>`;
+  let results = '';
+  if (t.res) {
+    const vd = verdict(c, t); const s = vd.s2;
+    const cpc = c.ads ? c.ads.cpc : null;
+    const cpaO = cpc ? cpc * t.res.o.n / t.res.o.c : null, cpaV = cpc ? cpc * t.res.v.n / t.res.v.c : null;
+    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r"><span class="chip">exemple</span></span></h3>
+      <div class="score">
+        <div class="stat"><div class="l">Visiteurs</div><div class="v">${fr(t.res.v.n)}</div><div class="s">original ${fr(t.res.o.n)}</div></div>
+        <div class="stat"><div class="l">Conversions</div><div class="v">${t.res.v.c}</div><div class="s">original ${t.res.o.c}</div></div>
+        <div class="stat"><div class="l">Taux de conversion</div><div class="v">${pct(s.p2, 2)}</div><div class="s ${s.lift >= 0 ? 'up' : 'down'}">${signed(s.lift)} vs original (${pct(s.p1, 2)})</div></div>
+        ${cpc ? `<div class="stat"><div class="l">Coût par conversion</div><div class="v">${eur(cpaV)}</div><div class="s ${cpaV <= cpaO ? 'up' : 'down'}">original ${eur(cpaO)} · CPC ${cpc.toLocaleString('fr-FR')} €</div></div>` : ''}
+      </div>
+      <div class="verdict"><div><div class="b">${esc(vd.b)}</div><div class="s">${esc(vd.s)}</div></div><div class="bar"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div>
+        <div class="act">${vd.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}<button class="btn glow" data-act="report">${I.dl(15)}Rapport pour le client</button></div></div>
+    </div>`;
+  }
+  const ic = ch => ch.q && !/retir|inversé|dupliqu|nouve|ajout/i.test(ch.t) ? I.text(13) : /retir/i.test(ch.t) ? I.minus(13) : /remont|inversé|placé/i.test(ch.t) ? I.up(13) : /dupliqu/i.test(ch.t) ? I.dup(13) : /nouve|ajout|bloc|FAQ|réassurance/i.test(ch.t) ? I.plus(13) : I.text(13);
+  return `
+    <div class="hd" style="margin-bottom:8px"><div style="min-width:0;flex:1 1 520px">
+      <div class="chips" style="margin:0 0 12px">${chipEtat(t)}${chipPot(t)}${t.etat === 'integral' ? `<span class="chip warn">${I.relay(12)}Ajoute des sections — demande Intégral</span>` : ''}</div>
+      <h2>${esc(t.titre)}</h2>
+      <p class="lede"><b>Ce qu’on teste.</b> ${esc(t.teste)}</p>
+      <p class="lede" style="margin-top:8px"><b>Pourquoi.</b> ${esc(t.pourquoi)}</p>
+    </div></div>
+    <div class="hd" style="margin-bottom:0"><div class="act" style="margin-left:0;margin-top:14px;gap:10px">
+      <button class="btn lg glow" data-copy="${esc(url)}" data-msg="Lien d’aperçu copié — à envoyer au client" title="${esc(url)}">${I.eye(16)}Lien d’aperçu pour le client</button>
+      ${slider}${principal}
+    </div></div>
+    ${results}
+    ${o ? `<div class="sec"><h3>Ce que voit le visiteur</h3>
+      <div class="cmp">
+        <figure><figcaption>Original <span class="mono">${esc(c.url)}</span>${live ? `<span class="chip">${100 - t.part} % du trafic</span>` : ''}</figcaption><div class="view" data-sync="a"><img src="${o}" alt="Page d’origine"></div></figure>
+        <figure><figcaption>Variante <span class="mono">${esc(url.replace('https://', ''))}</span>${live ? `<span class="chip ok">${t.part} % du trafic</span>` : ''}</figcaption><div class="view" data-sync="b">${v ? `<img src="${v}" alt="Variante">` : `<div class="empty" style="margin:40px auto"><b>Aperçu en préparation</b></div>`}</div></figure>
+      </div></div>` : ''}
+    <div class="sec"><h3>Ce qui change <span class="n">${t.changes.length}</span></h3>
+      <div class="chg">${t.changes.map(ch => `<div class="ch"><span class="i">${ic(ch)}</span><div><div class="t">${esc(ch.t)}</div>${ch.q ? `<q>${esc(ch.q)}</q>` : ''}${ch.w ? `<div class="w">${esc(ch.w)}</div>` : ''}</div></div>`).join('')}</div>
+      ${t.note ? `<div class="card" style="margin-top:14px"><p><b>À savoir.</b> ${esc(t.note)}</p></div>` : ''}
+    </div>
+    <div class="sec"><h3>${live || t.etat === 'gagnant' ? 'Ce qui est garanti' : 'Avant de lancer'}</h3>
+      ${t.etat === 'integral' ? `<div class="card"><p><b>Ce test ajoute des sections entières</b> — ce qu’une balise ne peut pas faire. Il passe par la connexion Intégral : une ligne DNS à transmettre au client, une fois, et il est prêt.</p><div style="margin-top:16px"><button class="btn glow" data-go="guide:integral">${I.relay(15)}Voir la marche à suivre</button></div></div>`
+      : t.etat === 'attente' ? `<div class="card"><p><b>Ce test attend l’accès à la boutique.</b> Le client vous ajoute comme collaborateur en un clic ; le test devient une version de sa fiche produit, l’original reste publié.</p><div style="margin-top:16px"><button class="btn glow" data-act="shopify">${I.send(15)}Envoyer la demande d’accès</button></div></div>`
+      : guards(c, t)}
+    </div>`;
+}
+
+function vPage(c) {
+  const k = c.capture; const o = img(c.img);
+  const facts = k.ok === true && !c.shopify ? `
+      <div class="stats">
+        <div class="stat"><div class="l">Copie conforme</div><div class="v">${k.conforme}</div><div class="s">ordinateur et mobile</div></div>
+        <div class="stat"><div class="l">Copiée le</div><div class="v" style="font-size:22px">${k.date}</div><div class="s">à recopier si la page change</div></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Ce qu’on peut tester sur cette page</h3>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Textes et boutons</b><div class="d">titres, accroches, libellés, offres</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Ordre des blocs</b><div class="d">remonter la preuve, déplacer un bouton</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Retirer menu et pied de page</b><div class="d">la page devient une vraie LP de campagne</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Dupliquer un bloc existant</b><div class="d">un second bouton, une section réutilisée — même design</div></div></div>
+        <div class="ck ${c.connexion.integral.etat === 'ok' ? '' : 'off'}"><span class="i">${c.connexion.integral.etat === 'ok' ? I.check(12) : I.plus(12)}</span><div><b>Ajouter une section nouvelle</b><div class="d">objections, garantie, FAQ… avec Intégral</div></div></div>
+      </div>`
+    : c.shopify ? `<div class="card"><h3>Fiche produit · thème ${esc(k.theme)}</h3><p>Sur Shopify, pas de copie : LPWS lit la fiche produit directement dans le thème. Chaque test est une version de la fiche que la boutique sait afficher, l’original reste publié.</p><p>Panier, paiement, apps d’avis : rien ne change.</p></div>`
+    : `<div class="card"><h3>${k.ok === false ? 'Copie en cours de mise au point' : 'Copie à relancer'}</h3><p>${esc(k.cause)}</p>${k.ok === false ? `<p>Aujourd’hui la copie est conforme à ${k.conforme} ; les tests se préparent dès qu’elle dépasse 99 %.</p>` : ''}</div>`;
+  return `
+    <div class="hd"><div><h2>Landing page</h2><div class="u">${esc(c.url)}</div></div>
+      <div class="act">${!c.shopify ? `<button class="btn" data-act="recapture">${I.refresh(16)}Recopier la page</button>` : ''}<a class="btn" href="https://${esc(c.url)}" target="_blank" rel="noopener">${I.ext(16)}Voir en ligne</a></div></div>
+    <div class="pv" ${o ? '' : 'style="grid-template-columns:minmax(0,720px)"'}>
+      ${o ? `<figure class="fig"><figcaption>La copie <span class="mono">${esc(k.date)} · ordinateur</span></figcaption><div class="view"><img src="${o}" alt="Copie de la page ${esc(c.nom)}"></div></figure>` : ''}
+      <div>${facts}</div>
+    </div>`;
+}
+
+function vResultats(c) {
+  if (!c.ads) return `<div class="hd"><div><h2>Résultats</h2><div class="u">${esc(c.url)}</div></div></div>${c.shopify ? `<div class="grid g2"><div class="card"><h3>Mesure native</h3><p>Chaque test est une version de la fiche produit : les commandes et les conversions se lisent dans Shopify et Google Ads comme aujourd’hui.</p></div><div class="card"><h3>Google Ads <span class="r"><span class="chip">À connecter</span></span></h3><p>Connectez le compte pour voir le coût par conversion de chaque version, ici.</p><div style="margin-top:16px"><button class="btn glow" data-act="gads">${I.link(15)}Connecter Google Ads</button></div></div></div>` : `<div class="empty"><b>Rien à mesurer encore</b>Les résultats arrivent avec le premier test.</div>`}`;
+  const tests = c.tests.filter(t => t.res);
+  const a = c.ads; const ex = c.connexion.express;
+  return `
+    <div class="hd"><div><h2>Résultats</h2><div class="u">${esc(c.url)}</div><div class="chips"><span class="chip ok"><span class="dot"></span>Google Ads connecté</span><span class="chip">exemple</span></div></div>
+      <div class="act"><button class="btn lg glow" data-act="report">${I.dl(16)}Rapport pour le client</button></div></div>
+    <div class="grid g2">
+      <div class="card"><h3>Google Ads</h3>
+        <dl class="kv"><dt>Compte</dt><dd class="mono">${a.compte}</dd><dt>Campagne</dt><dd>${esc(a.campagne)}</dd><dt>Conversion</dt><dd>${esc(a.conversion)}</dd><dt>Final URL</dt><dd class="mono">https://${esc(c.url)}</dd><dt>Clics</dt><dd>~${fr(a.clics)} par jour · CPC ${a.cpc.toLocaleString('fr-FR')} €</dd></dl>
+        <div style="margin-top:16px"><button class="btn sm" data-act="gads">Changer</button></div>
+      </div>
+      <div class="card"><h3>Tracking <span class="r"><span class="chip ok"><span class="dot"></span>Vérifié le ${ex.verifie}</span></span></h3>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Le gclid arrive sur la page</b><div class="d">une seule Final URL, aucune redirection : vos conversions restent attribuées</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Un visiteur voit toujours la même version</b><div class="d">même s’il revient — la comparaison reste propre</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Consentement respecté</b><div class="d">rien ne se charge avant l’accord donné sur la bannière du client</div></div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div><b>Page pas ralentie</b><div class="d">${ex.vitesse === 'aucun' ? 'aucun ralentissement mesuré' : ex.vitesse + ' mesurés'}, pas de clignotement</div></div></div>
+      </div>
+    </div>
+    <div class="sec"><h3>Par test</h3>
+      <div class="tbl" style="--cols:minmax(220px,2fr) minmax(130px,1fr) 90px 90px 90px 110px 18px">
+        <div class="tr h"><span>Test</span><span>Statut</span><span class="num">Visiteurs</span><span class="num">Conv.</span><span class="num">Taux</span><span class="num">vs original</span><span></span></div>
+        ${tests.map(t => { const s = stats(t.res); return `<button class="tr r" data-go="test:${t.id}"><span class="t ell">${esc(t.titre)}</span><span>${chipEtat(t)}</span><span class="num">${fr(t.res.v.n)}</span><span class="num">${t.res.v.c}</span><span class="num">${pct(s.p2, 1)}</span><span class="num" style="color:${s.lift >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${signed(s.lift)} · ${pct(s.conf, 0)}</span><span class="muted">${I.chevr(16)}</span></button>`; }).join('')}
+      </div>
+    </div>
+    <div class="grid g2 sec">
+      <div class="card"><h3>Combien de temps pour conclure ?</h3>
+        <div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          <label class="fld">Taux de conv. actuel (%)<input class="inp" id="ss-p" type="text" inputmode="decimal" value="${(stats(tests[0].res).p1 * 100).toFixed(1).replace('.', ',')}"></label>
+          <label class="fld">Hausse visée (%)<input class="inp" id="ss-mde" type="text" inputmode="decimal" value="20"></label>
+          <label class="fld">Clics par jour<input class="inp" id="ss-clics" type="text" inputmode="numeric" value="${a.clics}"></label>
+        </div>
+        <p id="ss-out" style="margin-top:16px;font-size:15px"></p>
+      </div>
+      <div class="card"><h3>Le rapport pour le client</h3>
+        <p>Une page : ce qu’on a testé et pourquoi, les deux versions côte à côte, le taux de conversion et le coût par conversion avant / après, et la recommandation.</p>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn glow" data-act="report">${I.dl(15)}Télécharger</button><button class="btn glow" data-act="send-report">${I.send(15)}Envoyer au client</button></div>
+      </div>
+    </div>`;
+}
+
+function vGuide(c, m) {
+  const M = MODES[m]; const x = c ? c.connexion[m] : null;
+  const head = `<div class="hd"><div><h2>${M.nom} <span class="muted" style="font-weight:500">· ${M.sous}</span></h2>${c ? `<div class="u">${esc(c.url)}</div>` : ''}<div class="chips">${x ? `<span class="chip ${x.etat === 'ok' ? 'ok' : x.etat === 'warn' ? 'warn' : ''}">${x.etat === 'ok' || x.etat === 'warn' ? '<span class="dot"></span>' : ''}${esc(x.label)}</span>` : ''}<span class="chip">${M.pret}</span></div><p class="lede">${M.ligne}</p></div>
+    ${c ? `<div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div>` : ''}</div>`;
+  if (x && x.etat === 'na') return head + `<div class="empty"><b>${m === 'natif' ? esc(c.site) + ' n’est pas une boutique Shopify' : 'Pas nécessaire ici'}</b>${m === 'natif' ? 'Express et Intégral s’appliquent à ce site.' : 'Sur Shopify, Natif fait déjà tout ce qu’Intégral apporte.'}</div>`;
+  const peut = `<div class="card"><h3>Ce que vous pouvez tester</h3>${M.peut.map(p => `<div class="ck"><span class="i">${I.check(12)}</span><div>${esc(p)}</div></div>`).join('')}${M.pas.map(p => `<div class="ck off"><span class="i">${I.plus(12)}</span><div>${esc(p)}</div></div>`).join('')}</div>`;
+  const tableau = `<div class="sec"><h3>Laquelle choisir</h3>
+    <div class="voies">
+      <div></div><div>${I.bolt(14)} Express</div><div>${I.relay(14)} Intégral</div><div>${I.bag(14)} Natif</div>
+      <div class="lab">Textes, boutons, ordre des blocs</div><div class="y">✓</div><div class="y">✓</div><div class="y">✓</div>
+      <div class="lab">Retirer menu et pied de page</div><div class="y">✓</div><div class="y">✓</div><div class="n">layout du thème</div>
+      <div class="lab">Ajouter une section nouvelle</div><div class="n">—</div><div class="y">✓</div><div class="y">✓</div>
+      <div class="lab">Clignotement</div><div>invisible, mesuré</div><div class="y">aucun</div><div class="y">aucun</div>
+      <div class="lab">Ce qu’on demande au client</div><div class="y">rien</div><div>une ligne DNS, une fois</div><div>un accès collaborateur</div>
+      <div class="lab">Pour quels sites</div><div>tous</div><div>tous, sauf Shopify</div><div>Shopify</div>
+      <div class="lab">Prêt en</div><div>10 min</div><div>1 jour</div><div>1 h</div>
+    </div></div>`;
+  if (m === 'express') {
+    const script = `<script src="https://cdn.lpws.io/t/${c ? c.id : 'client'}.js" async><\/script>`;
+    const acces = `Bonjour,\n\nPour lancer les tests de landing page, j’ai besoin d’un accès à votre Google Tag Manager :\ntagmanager.google.com → Admin → Gestion des utilisateurs → Ajouter → mon adresse e-mail → autorisation « Publier ».\n\nUne seule balise sera ajoutée, sans modification de votre site, retirable à tout moment.\n\nMerci !`;
+    return head + `
+      <div class="grid g2">
+        <div class="card"><h3>1 · La balise</h3>
+          <div class="code">${esc(script)}</div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn glow" data-copy="${esc(script)}" data-msg="Balise copiée">${I.copy(15)}Copier la balise</button></div>
+          <p style="margin-top:14px;color:var(--muted);font-size:13.5px">Collée une fois. Ensuite, lancer, régler ou arrêter un test ne rouvre jamais GTM.</p>
+        </div>
+        <div class="card"><h3>2 · Dans Google Tag Manager</h3>
+          <div class="ck"><span class="i off" style="background:var(--panel-3);color:var(--ink)">1</span><div>Balises → Nouvelle → <b>HTML personnalisé</b></div></div>
+          <div class="ck"><span class="i off" style="background:var(--panel-3);color:var(--ink)">2</span><div>Coller la balise</div></div>
+          <div class="ck"><span class="i off" style="background:var(--panel-3);color:var(--ink)">3</span><div>Déclencheur : <b>All Pages</b></div></div>
+          <div class="ck"><span class="i off" style="background:var(--panel-3);color:var(--ink)">4</span><div>Envoyer → <b>Publier</b></div></div>
+          <p style="margin-top:14px;color:var(--muted);font-size:13.5px">Pas encore l’accès ? <button class="btn sm glow" data-copy="${esc(acces)}" data-msg="Demande d’accès copiée">${I.send(13)}Copier la demande d’accès à envoyer au client</button></p>
+        </div>
+        <div class="card"><h3>3 · LPWS vérifie <span class="r">${x && x.etat === 'ok' ? `<span class="chip ok"><span class="dot"></span>Vérifié le ${x.verifie}</span>` : ''}</span></h3>
+          ${x && x.etat === 'ok' ? `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Tracking intact</b><div class="d">le gclid arrive sur la page, les conversions restent attribuées</div></div></div>
+            <div class="ck"><span class="i">${I.check(12)}</span><div><b>Page pas ralentie</b><div class="d">${x.vitesse === 'aucun' ? 'aucun ralentissement mesuré' : x.vitesse + ' mesurés'}, pas de clignotement</div></div></div>
+            <div class="ck"><span class="i">${I.check(12)}</span><div><b>Original intact</b><div class="d">les visiteurs hors test voient la page telle quelle</div></div></div>
+            ${x.stopGtm ? `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Arrêt possible à tout moment</b><div class="d">sur ce site, la commande passe par GTM : retirer la balise, 30 secondes</div></div></div>` : `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Arrêt en un clic</b><div class="d">sans rouvrir GTM</div></div></div>`}`
+          : `<p>LPWS ouvre la page trois fois comme Google Ads le ferait et confirme : tracking intact, page pas ralentie, original intact.</p><div style="margin-top:16px">${GO(I.check(16) + 'Vérifier l’installation', 'data-act="verify"')}</div>`}
+        </div>
+        ${peut}
+      </div>${tableau}`;
+  }
+  if (m === 'integral') {
+    const hote = c ? x.hote : 'lp.client.com';
+    const fiche = `À transmettre à votre hébergeur ou développeur :\n\nAjouter un enregistrement DNS sur le domaine ${hote.split('.').slice(1).join('.')} :\n  Type   CNAME\n  Nom    ${hote.split('.')[0]}\n  Valeur edge.lpws.io\n  TTL    automatique\n\nRien d’autre ne change : le site principal n’est pas touché, seule cette adresse est concernée.\nRetour arrière à tout moment : supprimer la ligne.`;
+    return head + `
+      <div class="grid g2">
+        <div class="card"><h3>1 · L’adresse des tests</h3>
+          <label class="fld">Sous-domaine<input class="inp mono" id="host" value="${esc(hote)}"></label>
+          <p style="margin-top:14px;color:var(--muted);font-size:13.5px">C’est l’adresse que vous collez dans l’annonce. Le domaine reste celui du client.</p>
+        </div>
+        <div class="card"><h3>2 · À transmettre au client</h3>
+          <div class="rec"><span class="k">Type</span><span class="k">Nom</span><span class="k">Valeur</span><span class="k">TTL</span><span>CNAME</span><span>${esc(hote.split('.')[0])}</span><span>edge.lpws.io</span><span>auto</span></div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">${GO(I.send(16) + 'Copier la fiche à transmettre', `data-copy="${esc(fiche)}" data-msg="Fiche copiée — à transmettre à l’hébergeur ou au développeur"`)}</div>
+          <p style="margin-top:14px;color:var(--muted);font-size:13.5px">OVH, Cloudflare, GoDaddy, Gandi… c’est le même écran et la même ligne. Le site principal n’est pas touché. Retour arrière : supprimer la ligne.</p>
+        </div>
+        <div class="card"><h3>3 · Vérification <span class="r"><span class="chip">${x && x.steps && x.steps[1] ? 'En cours' : 'En attente de la ligne DNS'}</span></span></h3>
+          <p>Dès que la ligne répond, le certificat est émis et la page du client passe par LPWS, à l’identique. Vous êtes prévenu.</p>
+          <div style="margin-top:16px"><button class="btn" data-act="dns">${I.refresh(15)}Vérifier maintenant</button></div>
+        </div>
+        ${peut}
+      </div>${tableau}`;
+  }
+  const demande = `Bonjour,\n\nPour préparer les tests sur votre fiche produit, LPWS demande un accès collaborateur à votre boutique (thèmes uniquement).\nVous recevrez la demande dans Shopify → Paramètres → Utilisateurs → « Accepter ».\n\nChaque test est une version de la fiche : l’original reste publié, panier et paiement ne changent pas.\n\nMerci !`;
+  return head + `
+    <div class="grid g2">
+      <div class="card"><h3>1 · La demande d’accès <span class="r">${x && x.steps && x.steps[0] ? '<span class="chip ok"><span class="dot"></span>Accordé</span>' : ''}</span></h3>
+        <p>Un accès collaborateur, limité aux thèmes. Le client l’accepte en un clic dans Paramètres → Utilisateurs.</p>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">${GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')}<button class="btn glow" data-copy="${esc(demande)}" data-msg="Message copié">${I.copy(15)}Copier le message</button></div>
+      </div>
+      <div class="card"><h3>2 · LPWS lit le thème <span class="r">${x && x.steps && x.steps[2] ? '<span class="chip ok"><span class="dot"></span>Fait</span>' : ''}</span></h3>
+        <dl class="kv"><dt>Thème</dt><dd>${c ? esc(c.capture.theme) : '—'}</dd><dt>Fiche produit</dt><dd>lue directement, sans copie</dd><dt>Sections</dt><dd>celles du thème, dans son design</dd></dl>
+      </div>
+      <div class="card"><h3>3 · Chaque test, une version de la fiche <span class="r">${x && x.steps && x.steps[3] ? '<span class="chip ok"><span class="dot"></span>Prête</span>' : ''}</span></h3>
+        <p>La variante est une version native de la fiche produit, que la boutique sait afficher. L’original reste publié ; panier, paiement, apps d’avis ne bougent pas.</p>
+      </div>
+      ${peut}
+    </div>${tableau}`;
+}
+
+function renderMain() {
+  const m = document.getElementById('main');
+  const c = S.ctx === 'home' ? null : byId(S.ctx);
+  let html;
+  if (S.view === 'guide') html = vGuide(c, S.mode);
+  else if (!c) html = vHome();
+  else if (S.view === 'tests') html = vTests(c);
+  else if (S.view === 'test') html = vTest(c);
+  else if (S.view === 'page') html = vPage(c);
+  else if (S.view === 'resultats') html = vResultats(c);
+  else html = vDash(c);
+  m.innerHTML = html; m.scrollTop = 0;
+  if (S.view === 'resultats') calcSS();
+}
+function calcSS() {
+  const num = id => parseFloat(String(document.getElementById(id)?.value ?? '').replace(/\s/g, '').replace(',', '.'));
+  const p = num('ss-p') / 100, mde = num('ss-mde') / 100, clics = num('ss-clics'); const out = document.getElementById('ss-out');
+  if (!out) return;
+  if (!(p > 0 && mde > 0 && clics > 0)) { out.textContent = ''; return; }
+  const n = nParBranche(p, mde); const j = Math.ceil(2 * n / clics);
+  out.innerHTML = `Avec <b>${fr(clics)} clics par jour</b> et <b>${pct(p, 1)}</b> de conversion aujourd’hui, un test détecte une hausse de <b>${pct(mde, 0)}</b> en <b>~${fr(j)} jours</b> à 50 / 50 — soit environ ${fr(n)} visiteurs par version.`;
+}
+function render() { renderRail(); renderPanel(); renderMain(); save(); }
+
+/* ---------- interactions ---------- */
+function go(spec) {
+  for (const part of spec.split(';')) {
+    const [k, v] = part.split(':');
+    if (k === 'ctx') { S.ctx = v; S.view = 'dash'; S.test = null; S.openMode = null; }
+    else if (k === 'view') { S.view = v; }
+    else if (k === 'test') { S.view = 'test'; S.test = v; }
+    else if (k === 'guide') { S.view = 'guide'; S.mode = v; S.openMode = v; }
+  }
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]');
+  if (g) {
+    if (g.dataset.go.startsWith('mode:')) { const m = g.dataset.go.slice(5); S.openMode = S.openMode === m ? null : m; renderPanel(); save(); return; }
+    go(g.dataset.go); render(); return;
+  }
+  const cp = e.target.closest('[data-copy]');
+  if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
+  const act = e.target.closest('[data-act]');
+  if (!act) return;
+  const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
+  const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
+  switch (act.dataset.act) {
+    case 'launch': if (t) { t.etat = 'live'; t.jours = 0; if (!t.part) t.part = 50; c.tests.forEach(o => { if (o !== t && o.etat === 'live') o.etat = 'stop'; }); toast(`Test en ligne — ${t.part} % des visiteurs voient la variante`); S.ctx = c.id; S.view = 'test'; S.test = t.id; render(); } break;
+    case 'stop': if (t) { t.etat = 'stop'; toast('Arrêté — l’original reprend 100 % du trafic'); render(); } break;
+    case 'deploy': if (t) { t.etat = 'gagnant'; t.part = 100; t.fin = '18 sept.'; toast('Gagnant déployé sur 100 % du trafic'); render(); } break;
+    case 'restore': if (t) { t.etat = 'stop'; t.part = 0; toast('Original remis en place'); render(); } break;
+    case 'verify': toast('Vérification lancée — résultat dans une minute'); break;
+    case 'dns': toast('La ligne DNS ne répond pas encore — on réessaie toutes les heures'); break;
+    case 'shopify': toast('Demande d’accès envoyée au client'); break;
+    case 'gads': toast('Connexion Google Ads'); break;
+    case 'recapture': toast('Copie relancée — quelques minutes'); break;
+    case 'report': toast('Rapport en préparation'); break;
+    case 'send-report': toast('Rapport envoyé au client'); break;
+    case 'add': toast('Nouveau client : collez l’adresse de sa landing page'); break;
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'part') { const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test); if (t) t.part = +e.target.value; document.getElementById('partv').textContent = e.target.value + ' %'; return; }
+  if (e.target.id?.startsWith('ss-')) calcSS();
+  if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
+});
+/* les deux captures défilent ensemble */
+let syncLock = false;
+document.addEventListener('scroll', e => {
+  const el = e.target;
+  if (!(el instanceof Element) || !el.dataset || !el.dataset.sync || syncLock) return;
+  const other = document.querySelector(`.view[data-sync]:not([data-sync="${el.dataset.sync}"])`);
+  if (!other) return;
+  syncLock = true; other.scrollTop = el.scrollTop; requestAnimationFrame(() => { syncLock = false; });
+}, true);
+render();
 </script>
+</body>
+</html>

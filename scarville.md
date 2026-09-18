@@ -53,6 +53,18 @@ passe en détail repliable ou disparaît.
 **Hébergement** : `ui/` dans le repo (source + `build.ts`), sortie `ui/dist/` déployée sur
 Vercel. Les captures d'écran sont injectées au build depuis `clients/` — jamais commitées.
 
+**Fait (18 sept., soir) — en ligne : https://lpws.vercel.app** (`npm run ui:deploy`).
+Ce que la recherche a dicté et qui est à l'écran : ses dix questions dans l'ordre (tracking,
+vitesse, ce qu'il demande au client, aperçu à montrer, split, arrêt, qui gagne et avec quelle
+certitude, combien de temps, coût par conversion, quoi tester ensuite) ; le vocabulaire
+d'Unbounce / Google Ads / VWO (original vs variante, « pas encore assez de données », « encore
+~N jours pour être sûr à 95 % », « déployer le gagnant », « l'original reprend 100 % ») ; les
+garanties toujours en clair (tracking intact, page pas ralentie, original intact, arrêt à tout
+moment) ; les messages prêts à transmettre au client (accès GTM, ligne DNS, accès Shopify).
+Disparu : ancres, règles, signaux, masque, fiabilité en fraction, verbes techniques.
+Simulé et marqué « exemple » : comptes et chiffres Google Ads, le gagnant « déployé », les
+états en ligne, les boutons de connexion.
+
 ## Fait · La première maquette (pour mémoire)
 
 Maquette HTML (artefact) de ce que voit le buyer : rail des clients · panneau (vue d'ensemble,
