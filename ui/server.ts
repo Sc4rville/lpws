@@ -1,8 +1,8 @@
 /**
- * server.ts — la v1 : l'interface du media buyer branchée sur la machine.
+ * server.ts : la v1 : l'interface du media buyer branchée sur la machine.
  *
  * Un serveur local (node:http, zéro dépendance) qui sert ui/index.html et pilote les familles
- * existantes en SOUS-PROCESSUS — clone, apply, tag — parce qu'elles sortent du processus
+ * existantes en SOUS-PROCESSUS : clone, apply, tag : parce qu'elles sortent du processus
  * en cas d'échec (`fail`), et qu'un échec de capture ne doit pas tuer l'interface.
  *
  *   GET  /                                  l'interface (source, sans captures embarquées :
@@ -41,7 +41,7 @@ const ROOT = resolve(import.meta.dirname, "..")
 const DIST = join(ROOT, "ui", "dist")
 const UI = join(ROOT, "ui", "index.html")
 const TSX = join(ROOT, "node_modules", ".bin", "tsx")
-/** l'adresse publique des fichiers du tag — celle que le buyer colle dans GTM */
+/** l'adresse publique des fichiers du tag : celle que le buyer colle dans GTM */
 const BASE_TAGS = process.env.LPWS_BASE ?? "https://lpws.vercel.app"
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".png": "image/png", ".json": "application/json; charset=utf-8",
@@ -127,9 +127,9 @@ async function etat() {
             blocs: meta.marked?.sections ?? 0,
             // pas de promesse que la machine ne tient pas : rien ne « refait » la copie tout seul.
             // Et la vérité utile : un test Express s'applique sur la VRAIE page, la copie ne sert
-            // qu'à préparer et montrer — une copie approximative n'empêche pas de tester.
+            // qu'à préparer et montrer : une copie approximative n'empêche pas de tester.
             cause: meta.fidele ? undefined : `La copie est conforme à ${meta.diff ? `${(100 - meta.diff.desktop * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %` : "moins de 97 %"} : cette page anime ses blocs au défilement, ce que la copie ne rejoue pas. Les tests Express restent possibles (ils s’appliquent sur la vraie page) ; seul l’aperçu sera approximatif.` }
-        : captureEnCours ? { date: dateFr(encours!.debut), ok: null, enCours: true, cause: "Copie en cours — quelques minutes." }
+        : captureEnCours ? { date: dateFr(encours!.debut), ok: null, enCours: true, cause: "Copie en cours : quelques minutes." }
         : { date: dateFr(encours?.debut), ok: null, cause: "La copie s’est interrompue avant la fin. Relancez-la depuis cette page : rien à faire côté client." }
       clients.push({
         id: `${c}/${camp}`, client: c, campagne: camp, clientSlug, ini: cap(c.slice(0, 1)), nom: cap(c), marque: camp.replace(/-/g, " "),
@@ -152,7 +152,7 @@ async function etat() {
         tests: tests.map((t) => ({
           id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe), potentiel: "Moyen",
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
-          changes: t.edits.map((e) => ({ t: `Texte modifié — avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
+          changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(d, "variants", t.id, "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
           res: null,
         })),
@@ -177,7 +177,7 @@ async function capturer(url: string): Promise<{ job: Job; client: string; campag
   await ecrireJson(join(d, "capture.json"), { url, job: job.id, debut: job.debut })
   ;(async () => {
     const code = await lancer(job, TSX, [join(ROOT, "engine/clone/run.ts"), url, "--client", client, "--campaign", campagne])
-    // exit 1 = capture faite mais pas fidèle : la page existe, le juge a dit non — c'est un résultat
+    // exit 1 = capture faite mais pas fidèle : la page existe, le juge a dit non : c'est un résultat
     const meta = existsSync(join(d, "baseline", "meta.json"))
     finir(job, code === 0 || meta, { client, campagne, fidele: code === 0 })
     if (meta) { try { await rm(join(d, "capture.json")) } catch {} }
@@ -197,7 +197,7 @@ async function textes(c: string, camp: string): Promise<Texte[]> {
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await page.goto("file://" + join(base, "capture.html"), { waitUntil: "domcontentloaded", timeout: 60_000 })
-    // ce que le buyer veut changer d'abord : le titre, l'accroche, le bouton — pas le menu
+    // ce que le buyer veut changer d'abord : le titre, l'accroche, le bouton : pas le menu
     const out: Texte[] = await page.evaluate(() => {
       const res: Array<Texte & { prio: number }> = []
       const bruit = /^(skip to content|log ?in|sign in|sign up|high contrast|select a language|_+$|menu|close|search|cookie|accept|privacy)/i
@@ -239,7 +239,7 @@ async function creerTest(c: string, camp: string, entree: { titre: string; pourq
     hypothese: `Si ${teste}, alors les conversions augmentent, parce que ${entree.pourquoi}`.slice(0, 600).padEnd(20, "."),
     metrique: "conversions Google Ads sur le trafic payant",
     risque: "test défini à la main par le media buyer : à relire avant lancement",
-    diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${entree.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer — pas de règle KB" },
+    diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${entree.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer : pas de règle KB" },
     edits: edits.map((e) => {
       const emp = empreintes.find((x) => x.a === e.anchor)
       return { anchor: e.anchor, op: "set", text: e.text, pourquoi: entree.pourquoi, ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
@@ -305,7 +305,7 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
   /* UN CLIENT, PLUSIEURS PAGES, UNE SEULE CONFIG.
    * La balise est par client (t/<client>.js) et sa config aussi (v/<client>.json), mais chaque
    * page construit la sienne dans son dossier : publier la config d'une page écrasait les
-   * variantes de l'autre — le test de la page A disparaissait dès qu'on touchait à la page B.
+   * variantes de l'autre : le test de la page A disparaissait dès qu'on touchait à la page B.
    * On fusionne donc ici toutes les pages du client ; le loader sait déjà filtrer par URL. */
   const cdir = join(CLIENTS_ROOT, c)
   const fusion: any = { actif: true, delaiMasque: 0, delaiMax: 0, variantes: [] as any[] }
@@ -314,7 +314,7 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
     const cfg = await lireJson<any>(f, null)
     if (!cfg) continue
     // seule tests.json fait foi : une config construite par un outil (tag:check, un essai à la
-    // main) sans test derrière est un reste, pas une variante à servir — constaté : une variante
+    // main) sans test derrière est un reste, pas une variante à servir : constaté : une variante
     // de Jira partait à 100 % du trafic sans qu'aucun test n'existe
     const testsCamp = await lireJson<Test[]>(join(cdir, camp, "tests.json"), [])
     fusion.delaiMasque = Math.max(fusion.delaiMasque, Math.round(cfg.delaiMasque ?? 0))
@@ -331,7 +331,7 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
   await ecrireJson(join(DIST, "v", `${slug}.json`), fusion)
 
   // le même dossier sert AUSSI la démo statique (ui:deploy) : déployer l'un sans l'autre
-  // efface l'autre en production — c'est ainsi que t/<client>.js est passé en 404 sur Vercel.
+  // efface l'autre en production : c'est ainsi que t/<client>.js est passé en 404 sur Vercel.
   // On garantit donc que la page d'accueil est là avant de pousser quoi que ce soit.
   if (!existsSync(join(DIST, "index.html"))) {
     dire(job, "la démo statique n’est pas dans ui/dist : on la reconstruit pour ne pas l’effacer en ligne")
@@ -450,6 +450,11 @@ createServer(async (req, res) => {
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
+    }
+    if (p.startsWith("/assets/")) {
+      const rel = normalize(decodeURIComponent(p.slice(8)))
+      if (rel.startsWith("..")) { res.writeHead(403); res.end(); return }
+      return fichier(res, join(ROOT, "ui", "assets", rel))
     }
     if (p.startsWith("/files/")) {
       const rel = normalize(decodeURIComponent(p.slice(7)))

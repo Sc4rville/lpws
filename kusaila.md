@@ -192,6 +192,37 @@ que `lpws.vercel.app/t/<client>.js` réponde ; puis le vrai test qui manque à t
 
 ---
 
+## 2026-09-18 (nuit) · La refonte visuelle de l'interface, façon a1mobile
+
+**La demande.** kabylesystem veut pour les media buyers le même monde que son application
+a1mobile : clair, cocooning, net. La direction est figée dans [`design.md`](design.md).
+
+**Ce qui a changé, sans toucher à la logique de Yann** (les gabarits et l'API sont intacts,
+seule la couche visuelle et quelques textes bougent) :
+- **Typographie** : Archivo (titres serrés et lourds, corps) + Red Hat Mono (navigation,
+  adresses, chiffres). Fini les petites capitales grises espacées, partout.
+- **Lumière** : un fond photographique flouté (`ui/assets/backdrop-soft.webp`, 4 Ko), un
+  grain d'impression très léger, des panneaux en verre blanc à 80 %.
+- **L'illustration tramée** (`ui/assets/hero-halftone.webp`, GPT-Image, recolorée en
+  bichromie bleu/blanc cassé : le papier crème d'origine est banni chez kabylesystem) : deux
+  chemins qui se séparent, un drapeau. Sur l'accueil et sur « Nouvelle page », dans un cadre
+  arrondi pleine largeur, texte blanc par-dessus.
+- **Pilules** blanches à ombre douce ou noires ; le bouton principal ne tourne plus en
+  permanence, il a un reflet au survol. Tout ce qui se clique réagit au survol.
+- **Copie** : plus un seul tiret cadratin (41 dans l'interface, 12 dans le serveur, tous
+  remplacés), deux paragraphes raccourcis.
+
+**Vérifié** : six écrans, en 1440 px et en 390 px, zéro erreur de console, zéro débordement
+horizontal. Les captures ont servi à corriger trois choses avant de livrer : le texte du hero
+tombait sur le ciel clair (dégradé ajouté à gauche), les lignes clients se cassaient sur
+mobile, le curseur de trafic débordait.
+
+**À trancher avec Yann, pas décidé ici** : la langue de l'interface. Tout est en français
+(le vocabulaire du buyer, écrit par Yann) alors que la cible du 2 novembre est YC et que la
+règle de kabylesystem est « interface en anglais ». C'est un choix produit, pas un détail.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

@@ -14,7 +14,7 @@
  *         npm run ui:deploy     → build puis `vercel deploy --prod` depuis ui/dist
  */
 import { chromium } from "playwright"
-import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises"
+import { readFile, writeFile, mkdir, readdir, stat, cp } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, basename, dirname } from "node:path"
 
@@ -67,4 +67,6 @@ await browser.close()
 
 await mkdir(dirname(OUT), { recursive: true })
 await writeFile(OUT, html.replace("/*THUMBS*/", `const IMG = ${JSON.stringify(img)};`))
+// les visuels de l'interface (fond flouté, illustration tramée) partent avec la page
+await cp(join(ROOT, "ui", "assets"), join(dirname(OUT), "assets"), { recursive: true })
 console.log(`ui/dist/index.html — ${files.length} captures, ${Math.round(total / 1024)} Ko d'images`)
