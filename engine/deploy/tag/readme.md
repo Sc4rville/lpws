@@ -70,6 +70,13 @@ C'est le seul test de la machine qui se fait contre **le site live**, pas contre
 | masque médian | 30 à 109 ms | 1 091 à 2 246 ms |
 | **écart de LCP avec / sans le tag** | **−8 ms** | **+8 ms** |
 
+**Troisième site, monday.com** (`/work-management`, page lourde, animations au défilement) :
+**3/3**, aperçu `?lpws=` fonctionnel, masque médian 251 ms pour une cible naturelle à 108 ms.
+Ce site a appris deux choses à la machine : l'adresse tapée répond 301 vers `monday.com/`, donc
+**l'adresse qui compte est celle où le visiteur atterrit** (capture, balise et juge l'enregistrent
+désormais) ; et cette redirection **perd les paramètres d'URL**, ce qui tue le lien d'aperçu
+et, bien plus grave pour le client, son `gclid`. La construction le détecte et le dit.
+
 **Le LCP est le seul verdict de vitesse qui compte** (`npm run lcp`, tirs alternés avec et sans
 le tag). Les deux écarts sont à ±8 ms, alors que le bruit propre de Jira va de 4 676 à 11 908 ms :
 autrement dit, **le tag ne produit aucun effet mesurable au-dessus du bruit de la page**.

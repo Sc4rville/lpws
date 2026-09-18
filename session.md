@@ -68,6 +68,18 @@ playground, mesure), sur les données réelles du corpus.
 
 ## Fait le 2026-09-18 (kabylesystem) — journal détaillé dans [kusaila.md](kusaila.md)
 
+### Le parcours du buyer, rejoué pour de vrai et corrigé (nuit du 18)
+Serveur `ui:serve` piloté par l'API et l'interface parcourue en Chromium headless. **Sept
+défauts corrigés** (`dcb535a`, `0b8f5b3`), détail dans [kusaila.md](kusaila.md) : la page
+d'un client plantait avec un test en ligne · on pouvait lancer un test **sans balise** (le
+serveur sonde la page et refuse) · les configs de deux pages d'un même client s'écrasaient
+(fusion, `tests.json` fait foi) · `ui/dist` sert démo ET balise, l'un efface l'autre en ligne
+(**`lpws.vercel.app/t/corpus.js` répond 404 aujourd'hui** — à redéployer complet) · faux
+« Copie à relancer » · deux promesses non tenues (relance auto, ligne DNS `edge.lpws.io`) ·
+**l'adresse qui compte est celle où la page atterrit** (monday.com/work-management → 301).
+Troisième site Express validé : **monday.com 3/3**. Sonde ajoutée : une redirection qui perd
+ses paramètres perd le `gclid` du client — dit au buyer à la construction.
+
 ### La voie TAG existe et marche : livrer SANS DNS ni hébergement
 Le buyer colle **un seul script, une fois**, dans le GTM du client (accès qu'il a déjà). La
 variante s'applique sur **la vraie page, à la vraie URL** : domaine, suivi et Quality Score du

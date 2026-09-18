@@ -165,7 +165,14 @@ console une fois corrigée. Le guide Express est clair.
 l'adresse où le visiteur atterrit, concluait « pas cette page » et servait l'original à tout
 le monde : 0 chargement sur 3, cible pourtant résolue à 100 %. **L'adresse qui compte est
 celle où la page atterrit** : la capture et la balise enregistrent désormais celle-là, et
-l'adresse demandée est gardée à part.
+l'adresse demandée est gardée à part. Résultat sur monday.com : **3/3, aperçu compris**
+(`0b8f5b3`). Trois sites de référence pour Express : HubSpot 9/9, Jira 9/9, monday 3/3.
+
+**Et la sonde qui vaut plus que le correctif** : cette redirection **perd les paramètres
+d'URL**. Pour le client, un clic Google Ads vers l'adresse tapée perd son `gclid` en route,
+donc son attribution, avant même le test. La construction le détecte et le dit au buyer :
+« mettez l'adresse d'arrivée en URL finale de vos annonces ». Un diagnostic gratuit qui
+rend service dès le premier jour.
 
 **Ce que le serveur fait maintenant qu'il ne faisait pas** : il sonde la vraie page au moment
 de lancer et refuse (409) si la balise ne répond pas · il fusionne les configs de toutes les
