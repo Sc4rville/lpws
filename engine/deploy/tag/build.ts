@@ -70,7 +70,7 @@ export async function buildLoader(client: string, base: string, cfg: ConfigServi
  */
 async function resoudreSurLeLive(
   url: string, capturees: Empreinte[], ancres: string[], budgetMasque: number,
-): Promise<{ cibles: Record<string, Cible>; manquees: string[]; tardives: string[]; apparitionMax: number; stats: string }> {
+): Promise<{ cibles: Record<string, Cible>; manquees: string[]; tardives: string[]; apparitionMax: number; urlFinale: string; perdParametres: boolean; stats: string }> {
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage({
@@ -81,6 +81,11 @@ async function resoudreSurLeLive(
     await page.addInitScript({ content: "window.__name = (f) => f" })
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {})
+    // L'ADRESSE QUI COMPTE EST CELLE OÙ LE VISITEUR ATTERRIT, pas celle qu'on a tapée.
+    // monday.com/work-management répond 301 vers monday.com/ : la config disait « page :
+    // /work-management », le loader comparait à « / », concluait « pas cette page » et
+    // servait l'original à tout le monde — 0 chargement sur 3, cible pourtant résolue.
+    const urlFinale = page.url().split("#")[0]
     await page.evaluate(autoScroll)
     await page.waitForFunction(
       () => [...document.images].every((im) => !im.src || im.complete),
@@ -152,9 +157,20 @@ async function resoudreSurLeLive(
     }
     const apparitionMax = Math.max(0, ...Object.values(apparitions))
 
+    /* LA REDIRECTION GARDE-T-ELLE LES PARAMÈTRES ?
+     * monday.com/work-management?lpws=x répond 301 vers monday.com/ — sans le paramètre. Pour
+     * nous, le lien d'aperçu meurt. Pour le client, c'est bien pire et il ne le sait pas : le
+     * gclid de Google Ads est perdu de la même façon, donc son attribution aussi. C'est un
+     * diagnostic qui vaut de l'or pour le buyer, on le sort ici. */
+    let perdParametres = false
+    if (urlFinale.replace(/\/$/, "") !== url.replace(/\/$/, "")) {
+      await tot.goto(url + (url.includes("?") ? "&" : "?") + "lpws=__sonde", { waitUntil: "domcontentloaded", timeout: 60_000 })
+      perdParametres = !(await tot.evaluate(() => location.search.includes("lpws=__sonde")))
+    }
+
     const s = rapport.stats
     return {
-      cibles, manquees, tardives, apparitionMax,
+      cibles, manquees, tardives, apparitionMax, urlFinale, perdParametres,
       stats: `${s.retrouves}/${s.avant} ancres re-liées sur le live · ${s.ambigus} ambiguës · ${s.perdus} perdues`
         + ` · cible la plus tardive à ${apparitionMax} ms`,
     }
@@ -217,10 +233,18 @@ export async function buildTag(
     if (!parAncre.has(a)) fail(SCOPE, `ancre ${a} absente d'anchors.json — la spec et la capture ne vont pas ensemble`)
 
   const budgetMasque = opts.delaiMasque ?? 1500
-  const { cibles, manquees, tardives, apparitionMax, stats } = await timed(SCOPE,
+  const { cibles, manquees, tardives, apparitionMax, urlFinale, perdParametres, stats } = await timed(SCOPE,
     `résolution sur la page vivante (${url})`,
     () => resoudreSurLeLive(url, capturees, [...besoins], budgetMasque))
   step(SCOPE, stats)
+  const memeAdresse = (a: string, b: string) =>
+    a.replace(/^(https?:\/\/)www\./, "$1").replace(/\/$/, "") === b.replace(/^(https?:\/\/)www\./, "$1").replace(/\/$/, "")
+  if (!memeAdresse(url, urlFinale))
+    step(SCOPE, `la page redirige : ${url} → ${urlFinale}. C'est cette adresse-là que la balise surveillera.`)
+  if (perdParametres)
+    step(SCOPE, `ATTENTION — la redirection PERD les paramètres d'URL. Le lien d'aperçu doit viser ${urlFinale}, `
+      + `et surtout : un clic Google Ads vers ${url} perd son gclid en route — l'attribution du client est cassée `
+      + `avant même le test. À lui dire : mettre ${urlFinale} en URL finale de ses annonces.`)
   /* LE BUDGET DOIT ABSORBER LA VARIANCE DU SITE, PAS SEULEMENT SA MESURE DU JOUR.
    *
    * La même page a été chronométrée à 971 ms et à 2 062 ms selon le moment de la construction.
@@ -253,7 +277,7 @@ export async function buildTag(
       `    ambiguë (plusieurs éléments identiques) : viser un élément reconnaissable.`)
 
   const variantes: VarianteServie[] = []
-  for (const p of specPaths) variantes.push(await traduire(p, part, url, cibles))
+  for (const p of specPaths) variantes.push(await traduire(p, part, urlFinale, cibles))
 
   const cfg: ConfigServie = {
     actif: true,
@@ -281,7 +305,7 @@ export async function buildTag(
   step(SCOPE, `loader → ${fLoader} (${(loader.length / 1024).toFixed(1)} Ko, collé une seule fois)`)
   step(SCOPE, `config → ${fConfig} (${(octetsCfg / 1024).toFixed(1)} Ko) · ${variantes.map((v) => `${v.nom} ${v.part}%`).join(" · ")}`)
   for (const [a, c] of Object.entries(cibles)) step(SCOPE, `  ${a} → ${c.sel}`)
-  return { fLoader, fConfig, cfg, client, loader, cibles, apparitionMax }
+  return { fLoader, fConfig, cfg, client, loader, cibles, apparitionMax, urlFinale, perdParametres }
 }
 
 /* CLI */

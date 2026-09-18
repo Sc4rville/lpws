@@ -59,7 +59,10 @@ export type Resource = {
 }
 
 export type AcquireResult = {
+  /** l'adresse où la page ATTERRIT — c'est elle que tout l'aval (juge, tag, interface) doit viser */
   source: string
+  /** l'adresse demandée, quand le site a redirigé ailleurs (monday.com/work-management → monday.com/) */
+  demande?: string
   capturedAt: string
   marked: { elements: number; sections: number }
   htmlBytes: { desktop: number; mobile: number }
@@ -327,6 +330,11 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
       await page.waitForTimeout(1500) // laisse le preloader/intro démarrer
       return resp?.status() ?? 0
     })
+    // l'adresse qui compte est celle où le visiteur atterrit : une 301 vers une autre page
+    // ferait viser à la balise une adresse que personne ne visite (vu sur monday.com)
+    const landed = page.url().split("#")[0]
+    if (landed.replace(/\/$/, "") !== url.replace(/\/$/, ""))
+      step(SCOPE, `la page redirige : ${url} → ${landed} — c'est cette adresse qui est capturée`)
 
     // Le juge compare le clone au live : il ne peut PAS savoir que le live n'est pas la page
     // demandée. Sans ce garde-fou, une 404 clonée fidèlement sort « fidèle à 0,00 % » — c'est
@@ -434,7 +442,8 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
     for (const r of resources) byType[r.type] = (byType[r.type] ?? 0) + 1
 
     return {
-      source: url,
+      source: landed,
+      ...(landed.replace(/\/$/, "") !== url.replace(/\/$/, "") ? { demande: url } : {}),
       capturedAt: new Date().toISOString(),
       marked,
       htmlBytes: { desktop: html.length, mobile: htmlMobile.length },

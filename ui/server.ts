@@ -134,6 +134,8 @@ async function etat() {
       clients.push({
         id: `${c}/${camp}`, client: c, campagne: camp, clientSlug, ini: cap(c.slice(0, 1)), nom: cap(c), marque: camp.replace(/-/g, " "),
         url, site, live: true,
+        // le site a redirigé l'adresse collée : on le dit, sinon le buyer cherche « sa » page
+        redirigeDe: meta?.demande ? String(meta.demande).replace(/^https?:\/\//, "") : undefined,
         imgUrl: existsSync(join(base, "clone.png")) ? `/files/${c}/${camp}/baseline/clone.png` : null,
         capture,
         job: captureEnCours ? encours!.job : undefined,

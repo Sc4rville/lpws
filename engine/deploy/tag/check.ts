@@ -91,7 +91,10 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
 
   // 100 % pour que le scénario « variante » tombe toujours du bon côté ; l'aperçu et le stop
   // sont testés séparément, eux, avec 0 %
-  const { cfg, client, loader, apparitionMax } = await buildTag(baseline, specPaths, { part: 100, base: BASE })
+  const { cfg, client, loader, apparitionMax, urlFinale } = await buildTag(baseline, specPaths, { part: 100, base: BASE, url })
+  // on juge à l'adresse où le visiteur atterrit : une redirection qui perd les paramètres tuait
+  // l'aperçu ?lpws=<nom> et le gclid de contrôle (monday.com/work-management → monday.com/)
+  const urlJuge = urlFinale || url
   const spec = VariantSpec.parse(JSON.parse(await readFile(specPaths[0], "utf8")))
   const attendus = spec.edits.map((e) => e.text).filter((t): t is string => !!t)
 
@@ -105,14 +108,14 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
    * Un tir unique m'a fait annoncer « valide » puis « refusé » sur la même page à quelques
    * minutes d'écart. Ce qu'un media buyer achète, c'est la fiabilité : on la mesure. */
   const tirs: Vu[] = []
-  for (let i = 0; i < 3; i++) tirs.push(await ouvrir(url, loader, cfg, client, `gclid=JUGE-1-${i}`, attente))
+  for (let i = 0; i < 3; i++) tirs.push(await ouvrir(urlJuge, loader, cfg, client, `gclid=JUGE-1-${i}`, attente))
   const reussis = tirs.filter((t) => t.applique > 0)
   const variante = reussis[0] ?? tirs[0]
   const median = (xs: number[]) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)]
-  const temoin = await ouvrir(url, null, null, client, "gclid=JUGE-2", attente)
+  const temoin = await ouvrir(urlJuge, null, null, client, "gclid=JUGE-2", attente)
   const cfg0 = { ...cfg, variantes: cfg.variantes.map((v) => ({ ...v, part: 0 })) }
-  const apercu = await ouvrir(url, loader, cfg0, client, `lpws=${spec.nom}`, attente)
-  const stop = await ouvrir(url, loader, { ...cfg, actif: false }, client, "gclid=JUGE-4", attente)
+  const apercu = await ouvrir(urlJuge, loader, cfg0, client, `lpws=${spec.nom}`, attente)
+  const stop = await ouvrir(urlJuge, loader, { ...cfg, actif: false }, client, "gclid=JUGE-4", attente)
 
   const vus = variante.textes.join(" | ")
   const poses = attendus.filter((t) => vus.includes(t))

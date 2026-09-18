@@ -137,6 +137,54 @@ figé) mais le pilotage à distance et le bouton stop demandent de recoller le l
 
 ---
 
+## 2026-09-18 (nuit) · Le parcours du buyer, rejoué pour de vrai
+
+**La méthode.** Le serveur de Yann (`npm run ui:serve`) piloté par l'API avec `curl`, et
+l'interface parcourue dans un Chromium sans fenêtre (Playwright) : coller l'URL, créer un test,
+lancer, arrêter, vérifier, écran par écran, avec capture et lecture des erreurs de console.
+Aucun défaut ci-dessous n'était visible sans faire le parcours pour de vrai.
+
+**Ce qui marche** : la création d'un test sur HubSpot de bout en bout en 44 s (variante,
+cible retrouvée sur la vraie page, balise et config produites), l'arrêt, la vérification de
+la balise sur la vraie page, et une interface propre à 1440 px comme à 390 px, sans erreur de
+console une fois corrigée. Le guide Express est clair.
+
+**Six défauts corrigés** (`dcb535a`) :
+
+| # | Défaut | Pourquoi ça compte pour le buyer |
+|---|---|---|
+| 1 | La page d'un client **plantait** dès qu'un test était en ligne (`verdict()` lisait des résultats Google Ads qu'un test réel n'a pas) | il ne pouvait plus ouvrir son client |
+| 2 | On pouvait **lancer un test sans balise** sur la page : « En ligne · 50 % », personne ne voyait la variante | il croyait tester |
+| 3 | Un client, plusieurs pages : publier la config d'une page **écrasait** les variantes de l'autre ; et une config construite par un outil sans test derrière était servie (une variante Jira partait à 100 %) | test perdu en silence |
+| 4 | `ui/dist` sert la démo ET la balise : déployer l'un **efface** l'autre en ligne. `lpws.vercel.app/t/corpus.js` répond **404** aujourd'hui | il collerait une balise morte, sans message |
+| 5 | Le tableau de bord disait « Copie à relancer » sur une copie à 99,9 % dès qu'aucun test n'était prêt | il relance une copie pour rien |
+| 6 | Deux promesses que la machine ne tient pas : « on la refait avec un réglage adapté », et une ligne DNS Intégral vers `edge.lpws.io` qui ne répond pas | il transmet au client une instruction morte |
+
+**Et un septième, trouvé en élargissant le corpus** : `monday.com/work-management` répond
+**301 vers `monday.com/`**. La capture enregistrait l'adresse tapée, le loader comparait
+l'adresse où le visiteur atterrit, concluait « pas cette page » et servait l'original à tout
+le monde : 0 chargement sur 3, cible pourtant résolue à 100 %. **L'adresse qui compte est
+celle où la page atterrit** : la capture et la balise enregistrent désormais celle-là, et
+l'adresse demandée est gardée à part.
+
+**Ce que le serveur fait maintenant qu'il ne faisait pas** : il sonde la vraie page au moment
+de lancer et refuse (409) si la balise ne répond pas · il fusionne les configs de toutes les
+pages d'un client, `tests.json` faisant seul foi · il vérifie une fois par minute que la
+balise publiée répond, sinon l'interface dit « Balise pas encore publiée » · il reconstruit
+la démo avant de pousser si elle manque dans `ui/dist`.
+
+**Vérifier soi-même.**
+```bash
+LPWS_SANS_VERCEL=1 npm run ui:serve      # sur un poste sans le projet Vercel lié
+curl -X POST localhost:4700/api/clients/corpus/hubspot/tests/<id> -d '{"etat":"live"}'   # → 409 sans balise
+```
+
+**Pour Yann, à faire de son poste** : redéployer `ui/dist` complet (démo + `t/` + `v/`) pour
+que `lpws.vercel.app/t/<client>.js` réponde ; puis le vrai test qui manque à tout le monde,
+**coller la balise dans un conteneur GTM réel** et vérifier depuis l'interface.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client
