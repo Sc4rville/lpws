@@ -137,7 +137,8 @@ async function etat() {
       // le brain : ce que le buyer a dit de la campagne, ce que la machine en a conclu, ce qu'elle propose
       const contexte = await lireJson<any>(join(d, "context.json"), null)
       const diag = await lireJson<any>(join(d, "diagnostic.json"), null)
-      const dejaTests = new Set(tests.map((t) => t.id))
+      // un test en échec libère sa proposition : le buyer peut la retenter après correction
+      const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
       const propositions = (await lireJson<any[]>(join(d, "propositions.json"), [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
@@ -341,8 +342,9 @@ async function creerTestDepuisProposition(c: string, camp: string, nom: string) 
   const specPath = join(d, "specs", `${nom}.json`)
   if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
   const spec = await lireJson<any>(specPath, {})
-  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
-  if (tests.some((t) => t.id === nom)) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
+  let tests = await lireJson<Test[]>(join(d, "tests.json"), [])
+  if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
+  tests = tests.filter((t) => t.id !== nom)
   const txt = await textes(c, camp)
   const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
   const job = nouveauJob("test")
@@ -517,8 +519,22 @@ async function fichier(res: ServerResponse, f: string, cors = false) {
   res.end(await readFile(f))
 }
 
+/** Hébergée en ligne, l'interface est derrière un mot de passe (LPWS_MOT_DE_PASSE) : un seul,
+ *  partagé entre Yann et kabylesystem, le navigateur le retient. Sans la variable : rien ne change en local. */
+const MOT_DE_PASSE = process.env.LPWS_MOT_DE_PASSE ?? ""
+function autorise(req: IncomingMessage, res: ServerResponse): boolean {
+  if (!MOT_DE_PASSE) return true
+  const [, b64 = ""] = (req.headers.authorization ?? "").split(" ")
+  const donne = Buffer.from(b64, "base64").toString("utf8").split(":").slice(1).join(":")
+  if (donne === MOT_DE_PASSE) return true
+  res.writeHead(401, { "WWW-Authenticate": 'Basic realm="LPWS", charset="UTF-8"', "Content-Type": "text/plain; charset=utf-8" })
+  res.end("LPWS : mot de passe requis")
+  return false
+}
+
 createServer(async (req, res) => {
   try {
+    if (!autorise(req, res)) return
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
     const seg = p.split("/").filter(Boolean)
@@ -572,4 +588,4 @@ createServer(async (req, res) => {
     if ((seg[0] === "t" || seg[0] === "v") && seg[1]) return fichier(res, join(DIST, seg[0], normalize(seg[1])), true)
     res.writeHead(404); res.end()
   } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e) }) }
-}).listen(PORT, "127.0.0.1", () => step(SCOPE, `interface → http://localhost:${PORT} · tag publié sur ${BASE_TAGS}`))
+}).listen(PORT, process.env.LPWS_HOTE ?? "127.0.0.1", () => step(SCOPE, `interface → http://${process.env.LPWS_HOTE ?? "localhost"}:${PORT} · tag publié sur ${BASE_TAGS}`))

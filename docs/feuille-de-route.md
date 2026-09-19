@@ -212,11 +212,11 @@ reste un outil de développement, pas un produit.
 
 ## 3.1 · Mettre en ligne
 - ✅ Dossier publiable produit et **jugé avant publication** ([`engine/deploy`](../engine/deploy/readme.md))
-- ⬜ Héberger une variante : sous-domaine, certificat, diffusion
-- ⬜ Une URL stable par variante *(c'est elle que le buyer colle dans son annonce)*
+- ✅ Livrer une variante **sans héberger** : la voie Express (tag GTM) l'applique sur la vraie page · ⬜ héberger (Intégral) reste à construire
+- ✅ Une seule URL, celle du client : la répartition est collante par `gclid` · `?lpws=<nom>` pour l'aperçu
 - ⬜ Sur Shopify : publier le template et ouvrir par `?view=`
-- ⬜ Dépublier et revenir en arrière en un clic
-- ⬜ `noindex` et canonique pour ne pas polluer le référencement du client
+- ✅ Arrêter en un clic (`actif:false`, l'original reprend 100 %) ; l'état affiché est l'état en ligne
+- ✅ `noindex` + canonique dans `deploy` (sans objet en Express : la page reste celle du client)
 
 ## 3.2 · Brancher la mesure
 - ✅ Remettre les pixels du client sur la variante (gtag / Meta, depuis la config)
@@ -224,7 +224,7 @@ reste un outil de développement, pas un produit.
 - ✅ Consentement conforme en Europe : Consent Mode v2 en refus par défaut, avant les pixels
 - ✅ Paramètres de campagne relayés vers le tunnel du client (gclid, gbraid, wbraid, msclkid, fbclid, utm_*)
 - ✅ `noindex` + `canonical` : pas de concurrence de référencement avec la page du client
-- ⬜ Preuve de bout en bout : un clic de test qui remonte dans le compte du client
+- 🟡 Preuve de bout en bout : le visiteur voit la variante sur une page publique (démo Relay) ; la remontée dans une vraie GA4 attend une propriété
 
 ## 3.3 · Brancher les plateformes publicitaires
 - ⬜ Google Ads : lire les annonces, mots-clés, termes de recherche, conversions
@@ -234,16 +234,16 @@ reste un outil de développement, pas un produit.
 - ⬜ **Alerter quand la créa change et que la page ne suit plus** *(c'est ça, l'alignement continu qu'on vend)*
 
 ## 3.4 · L'interface
-- 🟡 Cockpit local : comparer, voir les variantes, lire le journal
-- 🔴 Rien pour un utilisateur externe : ni compte, ni multi-client, ni droits
-- ⬜ Ajouter un client, ajouter une campagne
-- ⬜ Formulaire d'entrée du contexte
-- ⬜ **Afficher le diagnostic hiérarchisé** *(c'est le livrable qui se vend, pas la variante)*
-- ⬜ Valider ou refuser une variante
-- ⬜ Suivre les tests en cours
+- ✅ Interface web hébergée (box, mot de passe) : copie, campagne, propositions, tests, résultats
+- 🟡 Un mot de passe partagé ; ni comptes ni droits
+- ✅ Ajouter une page : client et campagne déduits de l'adresse
+- ✅ « Votre campagne » : deux champs obligatoires, le reste optionnel
+- ✅ **Le diagnostic hiérarchisé** : « LPWS propose 3 tests » avec la raison et la source, « À transmettre au client »
+- ✅ « Créer ce test » / « Pas celui-là » (le refus est gardé)
+- ✅ Suivre les tests : part de trafic, jours, verdict dès que GA4 remonte
 - ⬜ Multi-compte : un buyer gère plusieurs clients
 - ⬜ Comptes, authentification, droits
-- ⬜ Décider : local, web, ou les deux — et qui héberge
+- ✅ Les deux : web sur la box de kabylesystem (seule instance qui publie), local avec `LPWS_SANS_VERCEL=1`
 
 ## 3.5 · Le modèle commercial
 - ⬜ Trancher l'unité de facturation *(par compte et par mois — facturer à la variante invite l'objection « ce n'est qu'un titre »)*

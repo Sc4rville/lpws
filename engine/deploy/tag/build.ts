@@ -79,13 +79,18 @@ async function resoudreSurLeLive(
     })
     // cf. note __name dans 1_acquire/render.ts : esbuild nomme les fonctions injectées
     await page.addInitScript({ content: "window.__name = (f) => f" })
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
+    // ON LIT LA PAGE TELLE QUE LE CLIENT L'A FAITE, PAS TELLE QUE NOTRE TAG LA MONTRE.
+    // Un test déjà en ligne change le titre : sans `lpws=off`, la cible du titre ne se retrouve
+    // plus (« e11 non résolue » sur la démo Relay, avec la variante 1 servie à 100 %).
+    const urlNeutre = url + (url.includes("?") ? "&" : "?") + "lpws=off"
+    await page.goto(urlNeutre, { waitUntil: "domcontentloaded", timeout: 60_000 })
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {})
     // L'ADRESSE QUI COMPTE EST CELLE OÙ LE VISITEUR ATTERRIT, pas celle qu'on a tapée.
     // monday.com/work-management répond 301 vers monday.com/ : la config disait « page :
     // /work-management », le loader comparait à « / », concluait « pas cette page » et
     // servait l'original à tout le monde — 0 chargement sur 3, cible pourtant résolue.
-    const urlFinale = page.url().split("#")[0]
+    const atterrie = new URL(page.url()); atterrie.searchParams.delete("lpws"); atterrie.hash = ""
+    const urlFinale = atterrie.toString()
     await page.evaluate(autoScroll)
     await page.waitForFunction(
       () => [...document.images].every((im) => !im.src || im.complete),
@@ -121,7 +126,7 @@ async function resoudreSurLeLive(
 
     const tot = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await tot.addInitScript({ content: "window.__name = (f) => f" })
-    await tot.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
+    await tot.goto(urlNeutre, { waitUntil: "domcontentloaded", timeout: 60_000 })
 
     /* ON MESURE QUAND LA CIBLE ARRIVE, ON NE LE DEVINE PAS.
      *

@@ -271,6 +271,57 @@ données pur.
 
 ---
 
+## 2026-09-19 · Distribuer, de fond en comble (sauf Shopify)
+
+Demande de kabylesystem : « le MVP qui fonctionne aujourd'hui ». Le parcours du buyer est rejoué
+**en public**, pas sur localhost, et l'interface est hébergée.
+
+**La page de démo Relay** (`ui/demo/index.html`, publiée avec l'interface sur
+https://lpws-app.vercel.app/demo/) : une landing page SaaS fictive (support client pour
+petites équipes), assez réaliste pour que le brain ait à dire (bouton « Get a demo » sur une
+offre en libre-service, téléphone obligatoire, titre qui nomme la catégorie). Le pied de page
+dit qu'elle est fictive. `ui/build.ts` la copie dans `ui/dist/demo`.
+
+**Le parcours, mesuré** (script `mvp-relay.sh`, tout par l'API du serveur) :
+
+| Étape | Résultat |
+|---|---|
+| copie de la page | fidèle 100 %, 5 s |
+| la balise collée dans la page, republiée | trouvée par `/verifier` |
+| contexte + brain | 3 propositions (titre, bouton, structure), 42 s d'écriture |
+| créer le test | variante appliquée, cible `e11 → section.hero div:nth-of-type(1) > h1`, publiée |
+| lancer à 100 % | `v/vercel.json` servi par Vercel : `actif: true`, 100 % |
+| un visiteur (`?gclid=VISITEUR-1`) | h1 = « Answer every customer message from one shared inbox », masque 64 ms |
+| `?lpws=off` | h1 = l'original |
+
+**Corrigé en chemin** :
+- `spawn vercel ENOENT` : le serveur cherchait un CLI global ; il passe par `npx --yes vercel@latest` quand il manque.
+- **L'état affiché est l'état en ligne** : une publication ratée laissait le test « live » à
+  l'écran alors que rien n'avait changé sur Vercel. Maintenant : retour à l'état d'avant + la
+  cause ; une publication réussie efface l'erreur précédente.
+- L'interface repartait à l'accueil à chaque rechargement (elle vérifiait le client avant d'avoir chargé la liste).
+- Le nom du client vient du site (`og:site_name`, sinon le segment du `<title>` qui ressemble au domaine), pas de l'hébergeur : « Relay », « Atlassian », « monday.com ».
+- « Pas celui-là » sur une proposition (`POST …/propositions/<nom>/refuser`) : elle disparaît de
+  l'écran mais reste dans `propositions.json` avec sa raison ; c'est une donnée pour Nourrir.
+- « Rapport pour le client » copie et télécharge un texte ; « Envoyer au client » dit honnêtement qu'il attend un canal.
+- **Trouvé depuis la box** : le tag se construit en lisant la page vivante ; avec un test déjà en
+  ligne à 100 %, le titre n'y a plus son texte d'origine et la cible `e11` ne se retrouvait plus
+  (2ᵉ test refusé). Le build lit maintenant la page avec `?lpws=off` (notre propre interrupteur),
+  et retire ce paramètre de l'adresse d'atterrissage enregistrée. Un test en échec libère sa
+  proposition : « Créer ce test » le retente. Vérifié : visiteur → variante 1, `?lpws=<2ᵉ test>` →
+  bouton « Start free » sur le titre d'origine, `?lpws=off` → tout d'origine.
+
+**Hébergement** : https://lpws.46.225.146.226.sslip.io, mot de passe partagé (HTTP Basic,
+variable `LPWS_MOT_DE_PASSE` ; sans elle, rien ne change en local). Sur la box : service systemd
+`lpws-ui` (`/root/lpws`, `.env.box`), Chromium Playwright, `claude` CLI sur les crédits du plan
+(testé avec les vrais drapeaux), login Vercel copié, route Traefik par fichier vers `10.0.1.1:4702`.
+**Une seule instance publie** sur `lpws-app.vercel.app` : la box. En local : `LPWS_SANS_VERCEL=1`.
+
+**Non fait, dit** : Shopify (exclu par kabylesystem), un vrai GTM et une vraie GA4 (comptes de Yann),
+des comptes utilisateurs (un mot de passe pour deux), Intégral.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

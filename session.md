@@ -66,57 +66,26 @@ Trois voies de livraison, trois noms : **Express** (tag GTM, porte d'entrée, re
 En cours : maquette de l'interface du media buyer (rail clients, connexion dépliable,
 playground, mesure), sur les données réelles du corpus.
 
-## Fait le 2026-09-18 (kabylesystem) — journal détaillé dans [kusaila.md](kusaila.md)
+## Fait le 2026-09-18 → 19 (kabylesystem) — journal détaillé dans [kusaila.md](kusaila.md)
 
-### Le parcours du buyer, rejoué pour de vrai et corrigé (nuit du 18)
-Serveur `ui:serve` piloté par l'API et l'interface parcourue en Chromium headless. **Sept
-défauts corrigés** (`dcb535a`, `0b8f5b3`), détail dans [kusaila.md](kusaila.md) : la page
-d'un client plantait avec un test en ligne · on pouvait lancer un test **sans balise** (le
-serveur sonde la page et refuse) · les configs de deux pages d'un même client s'écrasaient
-(fusion, `tests.json` fait foi) · `ui/dist` sert démo ET balise, l'un efface l'autre en ligne
-(**`lpws.vercel.app/t/corpus.js` répond 404 aujourd'hui** — à redéployer complet) · faux
-« Copie à relancer » · deux promesses non tenues (relance auto, ligne DNS `edge.lpws.io`) ·
-**l'adresse qui compte est celle où la page atterrit** (monday.com/work-management → 301).
-Troisième site Express validé : **monday.com 3/3**. Sonde ajoutée : une redirection qui perd
-ses paramètres perd le `gclid` du client — dit au buyer à la construction.
-
-### La voie TAG existe et marche : livrer SANS DNS ni hébergement
-Le buyer colle **un seul script, une fois**, dans le GTM du client (accès qu'il a déjà). La
-variante s'applique sur **la vraie page, à la vraie URL** : domaine, suivi et Quality Score du
-client intacts. Ensuite, lancer/changer/arrêter une variante ne rouvre plus jamais GTM.
-**Mesuré, 18 chargements par site : HubSpot 9/9, atlassian.com 9/9** · écart de LCP avec et
-sans le tag : −8 ms et +8 ms, pour un bruit propre de Jira allant de 4 676 à 11 908 ms.
-- Le rapprochement se fait **à la construction**, pas chez le visiteur : config servie 0,4 à
-  0,7 Ko (contre 97 à 188 Ko), et le runtime redevient un `querySelector` + un témoin.
-- Le budget de masque est **chronométré sur la page**, avec une marge proportionnelle : sur un
-  site rendu en JS la cible n'existe pas encore à l'arrivée, masquer en l'attendant ne retarde
-  rien. C'est cette marge qui fait passer de 8/9 à 9/9.
-- Verbes : `set`, `remove`, `move`, `swap`, `duplicate`. `compose` reste hébergé.
-- Répartition **collante par gclid** → une seule Final URL, plus de biais de diffusion Google.
-- `?lpws=<nom>` = lien d'aperçu pour son client · `actif:false` = bouton stop.
-- **Limite dite à l'installation** : sous CSP stricte (cas d'Atlassian) la config distante
-  n'arrive pas — le tag marche en mode figé, mais stop et pilotage demandent de recoller.
-
-### La famille `deploy` : une variante livrable sans coûter sa mesure au buyer
-gclid/gbraid/wbraid/msclkid/fbclid/utm_* relayés vers les domaines du client, pixels remis,
-Consent Mode v2 en refus par défaut, `noindex` + `canonical`. **Un juge tourne avant la mise en
-ligne** et refuse une livraison où un CTA perd l'identifiant de clic.
-
-### L'identité des ancres (1.1.3) : comblée et prouvée
-`e231` voulait dire « 231ᵉ élément », pas « titre du héros » : une bannière ajoutée en tête de
-page et **293 ancres sur 471 désignaient un autre contenu**, sans qu'`apply` s'en aperçoive.
-  - `1_acquire/fingerprint.ts` : empreinte par élément (rôle, texte, classes hors hachages de
-    build, chemin des parents, section, rang) → `anchors.json`, écrit à la capture.
-  - `1_acquire/relink.ts` : re-liage de deux captures. Ossature des correspondances franches
-    (seuil 70, sans concurrent), plus longue sous-suite croissante pour jeter les croisements,
-    puis **l'ordre du document contraint le voisinage** — c'est ce qui débloque les pages à
-    composants répétés (51,6 % → 87,3 % de re-liage).
-  - `apply/spec.ts` : champ `attendu` (rôle + texte témoin) ; `apply` **refuse en échec franc**
-    si l'ancre ne désigne plus la même chose, et renvoie vers `npm run relink`.
-  - `npm run relink:check -- <baseline>` : la preuve rejouable, sur une mutation connue.
-- **Mesuré sur Jira** : 411/471 retrouvées (87,3 %), dont 402 déplacées, **0 lien faux** contre
-  la vérité terrain, 60 ambiguës, 0 perdue. Les ambiguës sont refusées à l'édition, pas devinées.
-- Non-régression : Jira fidèle (0,08 % / 0,44 %), HubSpot fidèle (0,05 % desktop).
+- **1.1.3 comblé** : empreinte par élément, re-liage de deux captures, `apply` refuse une ancre qui a
+  changé de sens. Jira : 411/471 retrouvées, **0 lien faux**.
+- **Express (tag GTM) prouvé** : un script collé une fois dans GTM, la variante sur la vraie URL du
+  client. HubSpot 9/9, Atlassian 9/9, monday 3/3 ; LCP ±8 ms. Sélecteurs résolus à la construction,
+  budget de masque chronométré, répartition collante par gclid, `?lpws=<nom>`, `actif:false`.
+- **`deploy`** : dossier publiable jugé avant publication (gclid relayé, Consent Mode v2, noindex).
+- **`measure`** : GA4 Data API → `resultats.json` → verdict à l'écran, prouvé sur une réponse enregistrée.
+- **Le brain** (`engine/variant`) : signaux mécaniques + 8 jugements typés (`claude -p`, crédits du
+  plan) + 34 règles exécutables → diagnostic classé → une variante par cible, validée par le schéma
+  d'`apply`. HubSpot : 6 tests, 1 conseil, 3 variantes en 76 s.
+- **L'interface** (refonte façon a1mobile, `ui/`) : copie → « Votre campagne » → « LPWS propose 3
+  tests » → « Créer ce test » → 0-100 % → arrêt. Refuser une proposition, rapport à copier/télécharger.
+- **Le parcours entier prouvé en public** sur notre page de démo **Relay**
+  (`ui/demo/`, https://lpws-app.vercel.app/demo/) : balise posée, diagnostic, test créé, 100 % du
+  trafic → le visiteur voit la variante, `?lpws=off` voit l'original.
+- **Hébergée sur la box** : https://lpws.46.225.146.226.sslip.io (mot de passe partagé, service
+  `lpws-ui`, Chromium + `claude` + Vercel installés). C'est **la seule instance qui publie** sur
+  `lpws-app.vercel.app` ; en local, lancer avec `LPWS_SANS_VERCEL=1`.
 
 ## La feuille de route
 [docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
@@ -124,53 +93,25 @@ page et **293 ancres sur 471 désignaient un autre contenu**, sans qu'`apply` s'
 référence ; la liste courte ci-dessous n'en garde que le haut.
 
 ## À faire (dans l'ordre)
-0. **Le brain** est maintenant le seul vrai trou : la machine sait exécuter une variante, pas
-   décider laquelle. Les specs sont écrites à la main.
-1. Remplir `attendu` automatiquement à l'écriture d'une spec · versionner les captures ·
-   éprouver le re-liage sur deux captures réelles à deux dates.
-2. **Yann : compte Shopify Partner + boutique de dev** — seul moyen de valider le rendu, `?view=`,
-   et le mode d'accès (collaborateur ou app custom). Rien d'autre ne peut trancher ça.
-3. Sur la boutique : pousser la variante Dawn, la rendre, vérifier que Shopify accepte/rejette ce
-   que notre validateur accepte/rejette. Si OK → backend Shopify dans `engine/apply`.
-4. Livraison SaaS : **Express** (tag) est l'entrée par défaut ; **Intégral** (relais DNS) reste
-   à construire pour tout ce que le tag ne peut pas porter — d'abord un spike sur une vraie
-   page WordPress/Webflow. Express lui-même n'a jamais tourné via un vrai GTM : à mesurer.
-5. Le brain : `4_structure` (sur Shopify, le template JSON EST déjà le page.json), `context.json`,
-   KB, premier `/diagnose`.
-6. **Arrêté** : rendre le clone « production-ready » (réinjection JS/pixels) — pas avant d'avoir
-   choisi la livraison SaaS.
+1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
+   une vraie propriété GA4 pour confirmer `customUser:lpws_variante` et `keyEvents`, et trancher la
+   langue de l'interface (FR aujourd'hui).
+2. **Nourrir** (bloc 4) : enregistrer chaque test, savoir quand on a le droit de conclure (4.2, à
+   remonter), apprendre des refus de propositions (déjà stockés).
+3. Brain : mesurer le jugement contre des pages annotées (2.7), les règles en fichier de données.
+4. **Intégral** (relais DNS) : spike sur une vraie page WordPress/Webflow, seulement si un client le demande.
+5. **Shopify** : compte Partner + boutique de dev (Yann), puis backend `?view=`.
+6. Comptes et droits sur l'interface (un mot de passe partagé aujourd'hui).
 
 ## Leçon gravée le 2026-09-18
 **Un instrument de mesure qu'on ne vérifie pas ment avec autorité.** Sur les sept corrections
-qu'il a fallu pour amener le tag à 9/9, **quatre étaient dans le juge**, pas dans le tag : il
-lisait à 3 000 ms alors que le tag a jusqu'à 4 825 ms pour poser, il tronquait les textes à
-80 caractères, il jugeait sur un tir unique alors qu'un site vivant n'est pas déterministe, et
-il tirait un verdict de vitesse de deux mesures bruitées. Verdict annoncé valide, puis refusé,
-puis valide sur la même page. Vérifier le juge avant d'accuser le code.
+qu'il a fallu pour amener le tag à 9/9, **quatre étaient dans le juge**, pas dans le tag. Vérifier
+le juge avant d'accuser le code.
 
 ## Blocages / parking
-- **Clone Asana (uses/project-management) interrompu** pendant la récupération des fichiers, sans
-  message d'erreur, cause inconnue. Non-régression Jira non revérifiée après les correctifs d'hier.
-- Header/footer Shopify = groupes de sections rendus par le layout : les retirer demande un layout
-  alternatif (clé `layout` du template). Et sur une PDP, retirer le header retire l'icône panier —
-  la règle « retirer la nav » (pensée B2B) ne s'applique pas telle quelle à l'e-com.
-- Sur Shopify, les avis viennent d'apps (blocs `@app`) : on ne peut pas en créer, seulement placer.
-- Écriture de thème par une app publique = exemption Shopify requise (depuis l'API 2023-04).
-- Recherche v2 à lancer : `docs/recherche-v2-brief.md` (livrable clé : KB e-com + créa→hero).
-- Corpus sans aucune page e-commerce : ajouter une PDP Shopify réelle.
-- Gel trop brutal (animation figée en plein vol) · Salesforce anti-bot · Monday scroll-jack.
-- Jev (TypeSafe) : non adopté ; garder l'extraction de signaux en questions typées indépendantes.
-- **00:01** — ancres c quoi ? + je viens darriver sur le projet vienso n fait un point, message court par message court
-- **00:09** — une grande bande? en gros il label les diffrents componets de la page? ca sappelle c omme ca? pas comrpis l'histoire de aucun LLM ne touche au HTML
-- **00:14** — mais donc c bien ou pas de fonctionner comme ca?
-- **00:26** — mais t'es sur que genre meme GPT 6 aurait pas su copier une page HTML ? il est multimodal et hyper smart, surtout avec un bon screen etc. non ? parce que n'oubl
-- **01:00** — ya pas la partie implementation aussi ou jsp quoi?
-- **01:04** — reprenons depuis le debut et essayson de tout comprendre / tout fixer pour que le projet soit parfait donc renforcons chaque maillon parfaitement step by step j
-- **01:19** — tu peux documenter ce que tu viens de faire et globalement tout ce que tu feras qui vient de moi dans un kusaila.md comme ca je sais ce que j;ai ajoute, mais al
-  - fichiers : kusaila.md
-- **01:21** — entry le SaaS renseigne toi! tu sais meme pas de quoi je parle
-- **01:29** — clignotement? reponse courte, OVH aussi pour domain connect? on pourrait le rajouter s'il y est pas? toi tu ferais quoi concernant tout ca du coup? et le but po
-- **02:29** — je comprends rien je debute dans tout ca c quoi omme domaine de linfo tout ca
-- **02:54** — mais du coup la le soucis si tu devais lexpliquer a un enfant de 5 ans c quoi? pourquoi ca marchait pas? je veux comprendre tehcniquement mais comprendre du cou
-- **03:47** — bah non attend cmoment on fait pour les sites comme Jira du coup/
-- **16:49** — mais alors ca va lag je comprends pas ce quil se passe?
+- Le clone Asana (uses/project-management) s'interrompt pendant la récupération des fichiers, cause inconnue.
+- `lpws.vercel.app` (le projet de Yann) sert une démo sans `t/` ni `v/` : à redéployer complet depuis `ui/dist`,
+  ou basculer sur `lpws-app.vercel.app` (le projet qui publie aujourd'hui).
+- Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
+- Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
+- Gel trop brutal (animation figée) · Salesforce anti-bot · Monday scroll-jack.
