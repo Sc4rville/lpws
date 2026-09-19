@@ -371,6 +371,27 @@ Ce qui reste hors capteur : `me-qualite`, `me-couleur-bouton` (méthode) et
 
 ---
 
+## 2026-09-19 (nuit) · « On pourrait pas faire plus rapide ? » : mesuré, puis raccourci
+
+| Étape | Avant | Après | Ce qui a changé |
+|---|---|---|---|
+| copier une page (Relay) | 21 s | **17 s** | le juge rend desktop et mobile en même temps |
+| signaux du brain | 13 s | **3,9 s** | lectures locales et les 3 chargements LCP en parallèle, attente LCP 2 s |
+| jugement (sonnet) | 30 s | 30 s | latence du modèle |
+| écriture des variantes (sonnet) | 50-55 s | 50-55 s | latence du modèle ; 3 appels parallèles d'une variante = 65 s, plus lent |
+| brain complet | 100 s | **87 s** | |
+| créer un test | apply 10 s + balise 5 s + Vercel ~15 s | idem | |
+
+Essayé et rejeté : `haiku` pour le brain (`LPWS_MODELE=haiku`) : 110 s au total (jugement 67 s
+sur ce tir) et des propositions moins bonnes (« Remove site navigation to focus on offer », en
+anglais sur une page dont la langue est détectée). Le modèle reste `sonnet`, la variable existe.
+
+Le plancher du brain est donc ~80 s : deux appels au modèle qu'on ne peut pas raccourcir sans
+changer de modèle. La marge restante est côté ressenti : montrer le diagnostic dès la fin du
+jugement (35 s) pendant que les variantes s'écrivent.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

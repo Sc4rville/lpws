@@ -141,14 +141,13 @@ export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise
   const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
     const out: Partial<Verdict> = { seuil }
-    for (const [label, viewport, ref] of [
+    // desktop et mobile ne s'attendent pas : deux pages, un navigateur, la moitié du temps
+    await Promise.all(([
       ["desktop", DESKTOP, "original.png"],
       ["mobile", MOBILE, "original.mobile.png"],
-    ] as const) {
+    ] as const).map(async ([label, viewport, ref]) => {
       const page = await browser.newPage({ viewport })
       const shot = join(dir, label === "desktop" ? "clone.png" : "clone.mobile.png")
-      // l'état mobile a sa propre sérialisation (cf. 1_acquire) ; repli sur capture.html
-      // pour les baselines d'avant
       const file = label === "mobile" && existsSync(join(dir, "capture.mobile.html"))
         ? "capture.mobile.html" : "capture.html"
       const { screenshot, ...sante } = await timed(SCOPE, `rendu du clone (${label})`, () =>
@@ -158,7 +157,7 @@ export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise
       step(SCOPE, `${label} : diff ${(diff.ratio * 100).toFixed(2)}% · Δhauteur ${diff.heightDelta}px`)
       out[label] = { diff, sante: { ...sante, consoleErrors: sante.consoleErrors }, screenshot }
       await page.close()
-    }
+    }))
     const verdict: Verdict = {
       ...(out as Verdict),
       fidele: out.desktop!.diff.ratio <= seuil && out.mobile!.diff.ratio <= seuil,

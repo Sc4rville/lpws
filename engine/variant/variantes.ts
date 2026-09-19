@@ -49,7 +49,7 @@ const Propositions = z.array(Proposition).min(1).max(4)
 
 function claude(prompt: string): Promise<string> {
   return new Promise((ok, ko) => {
-    const p = spawn("claude", ["-p", "--output-format", "json", "--model", "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
+    const p = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.LPWS_MODELE ?? "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
     let out = "", err = ""
     p.stdout.on("data", (d) => out += d); p.stderr.on("data", (d) => err += d)
     p.on("close", (code) => {
@@ -119,6 +119,9 @@ export async function ecrireVariantes(
   if (!choisis.length) { step(SCOPE, "aucun constat testable : rien à écrire"); return [] }
   step(SCOPE, `cibles retenues : ${choisis.map((k) => `${famille(k)} (${k.id})`).join(" · ")}`)
 
+  // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
+  // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
+  // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
   let props: z.infer<typeof Propositions> | null = null
   for (let essai = 1; essai <= 2 && !props; essai++) {
     try {

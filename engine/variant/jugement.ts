@@ -76,7 +76,7 @@ ${corps.slice(0, 2500)}`
 
 function claude(prompt: string): Promise<string> {
   return new Promise((ok, ko) => {
-    const p = spawn("claude", ["-p", "--output-format", "json", "--model", "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
+    const p = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.LPWS_MODELE ?? "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
     let out = "", err = ""
     p.stdout.on("data", (d) => out += d)
     p.stderr.on("data", (d) => err += d)

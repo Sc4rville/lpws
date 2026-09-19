@@ -164,25 +164,26 @@ async function servir(page: Page, baseline: string) {
 export async function extraireSignaux(baseline: string): Promise<SignauxMecaniques> {
   const browser = await lancerNavigateur()
   try {
-    const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-    await servir(desktop, baseline)
-    await desktop.goto(`${ORIGIN}/capture.html`, { waitUntil: "load" })
-    await desktop.waitForTimeout(500)
-    const d = await desktop.evaluate(lirePage, 900)
-
-    const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } })
-    await servir(mobile, baseline)
-    await mobile.goto(`${ORIGIN}/capture.mobile.html`, { waitUntil: "load" })
-    await mobile.waitForTimeout(500)
-    const m = await mobile.evaluate(lirePage, 844)
-
     const meta = JSON.parse(await readFile(join(baseline, "meta.json"), "utf8").catch(() => "{}"))
+    // les deux lectures locales et les trois chargements de la vraie page n'ont rien à s'attendre
+    const lire = async (fichier: string, viewport: { width: number; height: number }) => {
+      const page = await browser.newPage({ viewport })
+      await servir(page, baseline)
+      await page.goto(`${ORIGIN}/${fichier}`, { waitUntil: "load" })
+      await page.waitForTimeout(500)
+      return page.evaluate(lirePage, viewport.height)
+    }
+    const [d, m, mesure, vitesse] = await Promise.all([
+      lire("capture.html", { width: 1440, height: 900 }),
+      lire("capture.mobile.html", { width: 390, height: 844 }),
+      lireMesure(baseline),
+      meta.source ? mesurerVitesse(meta.source) : Promise.resolve({ lcpMs: null, tirs: 0 }),
+    ])
     return SignauxMecaniques.parse({
       ...d,
       ctaAuDessusDuPliDesktop: d.ctas.some((c) => c.auDessusDuPli),
       ctaAuDessusDuPliMobile: m.ctas.some((c) => c.auDessusDuPli),
-      mesure: await lireMesure(baseline),
-      vitesse: meta.source ? await mesurerVitesse(meta.source) : { lcpMs: null, tirs: 0 },
+      mesure, vitesse,
     })
   } finally { await browser.close() }
 }
@@ -199,23 +200,25 @@ async function lireMesure(baseline: string): Promise<SignauxMecaniques["mesure"]
 
 /** LCP médian sur la vraie page, trois chargements : c'est la vitesse que le visiteur subit, pas celle du clone. */
 async function mesurerVitesse(url: string, tirs = 3): Promise<SignauxMecaniques["vitesse"]> {
-  const valeurs: number[] = []
   const browser = await lancerNavigateur()
-  for (let i = 0; i < tirs; i++) {
+  // trois contextes en même temps : trois visiteurs indépendants, un seul temps d'attente
+  const tirsFaits = await Promise.all(Array.from({ length: tirs }, async () => {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: UA })
     const page = await ctx.newPage()
+    let lcp = 0
     try {
       await page.goto(url, { waitUntil: "load", timeout: 45_000 })
-      const lcp: number = await page.evaluate(() => new Promise<number>((res) => {
+      lcp = await page.evaluate(() => new Promise<number>((res) => {
         let v = 0
         const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) v = e.startTime })
         po.observe({ type: "largest-contentful-paint", buffered: true })
-        setTimeout(() => { po.disconnect(); res(Math.round(v)) }, 3000)
+        setTimeout(() => { po.disconnect(); res(Math.round(v)) }, 2000)
       }))
-      if (lcp > 0) valeurs.push(lcp)
     } catch { /* page injoignable ce coup-ci : le tir ne compte pas */ }
     await ctx.close()
-  }
+    return lcp
+  }))
+  const valeurs = tirsFaits.filter((v) => v > 0)
   await browser.close()
   valeurs.sort((x, y) => x - y)
   return { lcpMs: valeurs.length ? valeurs[Math.floor(valeurs.length / 2)] : null, tirs: valeurs.length }
