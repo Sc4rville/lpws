@@ -257,8 +257,13 @@ function choisir(cfg: ConfigServie): VarianteServie | null {
 let mode: "pilote" | "figé" | "cache" = "figé"
 
 function annonce(version: string, applique: number, abandons: string[]): void {
-  const w = window as unknown as { dataLayer?: unknown[]; __lpws?: unknown }
+  const w = window as unknown as { dataLayer?: unknown[]; __lpws?: unknown; gtag?: (...a: unknown[]) => void }
   w.dataLayer = w.dataLayer || []
+  // en PROPRIÉTÉ UTILISATEUR, pas seulement en paramètre d'événement : l'achat arrive plus tard,
+  // dans un autre événement, et c'est lui qu'on veut compter par version (cf. engine/measure)
+  if (typeof w.gtag === "function") {
+    try { w.gtag("set", "user_properties", { lpws_variante: version }) } catch { /* gtag absent ou cassé */ }
+  }
   w.dataLayer.push({
     event: "lpws_variante", lpws_variante: version,
     lpws_editions: applique, lpws_abandons: abandons.length, lpws_mode: mode,

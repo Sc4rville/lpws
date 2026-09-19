@@ -113,6 +113,13 @@ async function etat() {
       const meta = await lireJson<any>(join(base, "meta.json"), null)
       const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
       const express = await lireJson<Express>(join(d, "express.json"), { installe: false })
+      // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
+      // données » au lieu d'inventer
+      const resultats = await lireJson<{ luLe: string; source?: string; versions: Record<string, { n: number; c: number }> } | null>(join(d, "resultats.json"), null)
+      const resDe = (id: string) => {
+        const o = resultats?.versions?.controle, v = resultats?.versions?.[id]
+        return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
+      }
       const url = (meta?.source ?? encours?.url ?? "").replace(/^https?:\/\//, "")
       const site = url.split("/")[0].replace(/^www\./, "")
       const clientSlug = slugify(meta?.client ?? c)
@@ -154,7 +161,7 @@ async function etat() {
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(d, "variants", t.id, "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
-          res: null,
+          res: resDe(t.id),
         })),
       })
     }

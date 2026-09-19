@@ -782,7 +782,7 @@ function vTest(c) {
     const vd = verdict(c, t); const s = vd.s2;
     const cpc = c.ads ? c.ads.cpc : null;
     const cpaO = cpc ? cpc * t.res.o.n / t.res.o.c : null, cpaV = cpc ? cpc * t.res.v.n / t.res.v.c : null;
-    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r"><span class="chip">exemple</span></span></h3>
+    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r">${t.res.source === 'exemple' ? '<span class="chip">exemple</span>' : `<span class="chip ok"><span class="dot"></span>GA4 · lu le ${esc(new Date(t.res.luLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span>`}</span></h3>
       <div class="score">
         <div class="stat"><div class="l">Visiteurs</div><div class="v">${fr(t.res.v.n)}</div><div class="s">original ${fr(t.res.o.n)}</div></div>
         <div class="stat"><div class="l">Conversions</div><div class="v">${t.res.v.c}</div><div class="s">original ${t.res.o.c}</div></div>
