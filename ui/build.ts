@@ -69,4 +69,6 @@ await mkdir(dirname(OUT), { recursive: true })
 await writeFile(OUT, html.replace("/*THUMBS*/", `const IMG = ${JSON.stringify(img)};`))
 // les visuels de l'interface (fond flouté, illustration tramée) partent avec la page
 await cp(join(ROOT, "ui", "assets"), join(dirname(OUT), "assets"), { recursive: true })
+// la landing page de démonstration (Relay) : la page à nous sur laquelle tout le parcours se rejoue
+await cp(join(ROOT, "ui", "demo"), join(dirname(OUT), "demo"), { recursive: true })
 console.log(`ui/dist/index.html — ${files.length} captures, ${Math.round(total / 1024)} Ko d'images`)

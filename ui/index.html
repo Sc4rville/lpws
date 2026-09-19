@@ -515,7 +515,6 @@ const byId = id => CLIENTS.find(c => c.id === id);
 /* ---------- état ---------- */
 const S = { ctx: 'home', view: 'dash', test: null, openMode: null, mode: null };
 try { Object.assign(S, JSON.parse(localStorage.getItem('lpws-ui-v2') || '{}')); } catch {}
-if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
 const save = () => { try { localStorage.setItem('lpws-ui-v2', JSON.stringify(S)); } catch {} };
 
 /* ---------- utilitaires ---------- */
@@ -648,7 +647,7 @@ function liveCard(c, t, { compact = false } = {}) {
       <div><div class="n">${pct(s.conf, 0)}<small>de certitude</small></div><div class="bar" style="width:180px"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div></div>
     </div>` : `<div class="row">
       <div><div class="n">${t.part} %<small>des visiteurs voient la variante</small></div></div>
-      <div><div class="n">:<small>pas encore de conversions remontées</small></div></div>
+      <div><div class="n"><small>conversions : en attente de GA4</small></div></div>
     </div>`}
     <div class="say"><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
     ${t.etat === 'live' && c.live && c.connexion.express.etat !== 'ok' ? `<div class="say" style="color:var(--bad)"><b>Personne ne voit encore la variante.</b> La balise Express n’a pas été trouvée sur la page : installez-la, publiez dans GTM, puis vérifiez.</div>` : ''}
@@ -979,7 +978,7 @@ async function chargerEtat() {
     const r = await fetch('/api/etat', { cache: 'no-store' }); if (!r.ok) throw 0;
     const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE;
     if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
-  } catch { CLIENTS = DEMO; LIVE = false; }
+  } catch { CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; } }
 }
 async function api(path, data) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data || {}) });
@@ -1086,7 +1085,7 @@ function brainBloc(c) {
   const props = c.propositions || [], conseils = (c.diagnostic && c.diagnostic.conseils) || [];
   let h = '';
   if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
-    <div class="tests">${props.map(p => `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div><div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${esc(p.nom)}" data-client="${c.id}"`)}</div></div>`).join('')}</div></div>`;
+    <div class="tests">${props.map(p => `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div><div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${esc(p.nom)}" data-client="${c.id}"`)}<button class="btn sm" data-act="refuser" data-nom="${esc(p.nom)}" data-client="${c.id}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div></div>`).join('')}</div></div>`;
   else if (c.diagnostic) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées, ou aucun constat ne se traduit en test. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
   if (conseils.length) h += `<div class="sec"><h3>À transmettre au client <span class="n">${conseils.length}</span><span class="r"><button class="btn sm" data-act="rapport" data-client="${c.id}">${I.copy ? I.copy(14) : ''}Copier le rapport</button></span></h3>
     <div class="card"><div class="chg">${conseils.map((k, i) => `<div class="ch"><span class="i">${i + 1}</span><div><div class="t">${esc(k.action)}</div><div class="w">${esc(k.pourquoi)} <span class="mono">${esc(k.sources.join(', '))}</span></div></div></div>`).join('')}</div></div></div>`;
@@ -1094,6 +1093,12 @@ function brainBloc(c) {
 }
 const FAMILLES_BRAIN = { mm: 'Promesse tenue', vp: 'Ce que la page promet', pr: 'Preuve', fr: 'Friction', of: 'Offre et prix', st: 'Ordre et attention', pe: 'Personnalisation', te: 'Technique', me: 'Méthode', sea: 'Recherche payante' };
 const nomRegle = id => FAMILLES_BRAIN[String(id).split('-')[0]] || id;
+function rapportTest(c, t) {
+  const l = [`Test « ${t.titre} » · ${c.marque} (${c.url})`, '', `Ce qu’on teste : ${t.teste}`, `Pourquoi : ${t.pourquoi}`, `État : ${(ETATS[t.etat] || [])[1] || t.etat}${t.etat === 'live' ? ` · ${t.part} % du trafic` : ''}`];
+  if (t.res) { const s = stats(t.res); const v = verdict(c, t); l.push('', `Visiteurs : ${fr(t.res.v.n)} (original ${fr(t.res.o.n)})`, `Conversions : ${t.res.v.c} (original ${t.res.o.c})`, `Taux : ${pct(s.p2, 2)} contre ${pct(s.p1, 2)} (${signed(s.lift)})`, `Certitude : ${pct(s.conf, 0)}`, '', `${v.b}. ${v.s}.`); }
+  else l.push('', 'Résultats : pas encore de données (GA4, dimension lpws_variante).');
+  return l.join('\n');
+}
 function rapportTexte(c) {
   const k = (c.diagnostic && c.diagnostic.conseils) || [];
   return `Conseils pour ${c.marque} (${c.url})\n\n` + k.map((x, i) => `${i + 1}. ${x.action}\n   Pourquoi : ${x.pourquoi}\n   Source : ${x.sources.join(', ')}`).join('\n\n');
@@ -1215,6 +1220,19 @@ document.addEventListener('click', e => {
       break;
     }
     case 'rapport': if (c) copier(rapportTexte(c), 'Rapport copié'); break;
+    case 'refuser': {
+      if (!c) break;
+      api(`/api/clients/${c.id}/propositions/${act.dataset.nom}/refuser`, {}).then(async () => { toast('Proposition retirée'); await chargerEtat(); render(); }).catch(e => toast(e.message));
+      break;
+    }
+    case 'report': {
+      const tt = t || (c && c.tests.find(x => x.id === S.test));
+      if (!c || !tt) { toast('Ouvrez un test pour en faire le rapport'); break; }
+      const txt = rapportTest(c, tt); copier(txt, 'Rapport copié');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' })); a.download = `lpws-${tt.id}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      break;
+    }
+    case 'send-report': toast('L’envoi au client arrive : copiez le rapport en attendant'); break;
     case 'capturer': case 'recapturer': {
       const u = act.dataset.url || document.getElementById('url')?.value || ''; S.urlSaisie = u;
       api('/api/clients', { url: u }).then(async r => { S.urlSaisie = ''; await chargerEtat(); S.ctx = r.id; S.view = 'dash'; render(); })

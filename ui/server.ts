@@ -73,6 +73,26 @@ function lancer(job: Job, cmd: string, args: string[], cwd = ROOT): Promise<numb
 }
 
 /* ---------- l'état, lu depuis clients/ ---------- */
+/** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
+ *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
+const nomsDeSites = new Map<string, string>()
+async function nomDuSite(d: string, c: string): Promise<string> {
+  if (nomsDeSites.has(d)) return nomsDeSites.get(d)!
+  let nom = cap(c)
+  try {
+    const html = (await readFile(join(d, "baseline", "capture.html"), "utf8")).slice(0, 80_000)
+    const og = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']{1,60})["']/i)?.[1]
+      ?? html.match(/<meta[^>]+content=["']([^"']{1,60})["'][^>]+property=["']og:site_name["']/i)?.[1]
+    const segments = (html.match(/<title[^>]*>([^<]{1,200})<\/title>/i)?.[1] ?? "").split(/\s+[|·•:–-]\s+/).map((x) => x.trim())
+    const lettres = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "")
+    const duDomaine = segments.find((x) => x && lettres(x) && (lettres(x) === lettres(c) || lettres(x).startsWith(lettres(c)) || lettres(c).startsWith(lettres(x))))
+    const brut = (og ?? duDomaine ?? "").replace(/&amp;/g, "&").trim()
+    if (brut && brut.length <= 40) nom = brut
+  } catch {}
+  nomsDeSites.set(d, nom)
+  return nom
+}
+
 type Test = {
   id: string; titre: string; teste: string; pourquoi: string; etat: "prep" | "pret" | "live" | "stop" | "echec"
   part: number; creeLe: string; lanceLe?: string; edits: Array<{ anchor: string; text: string; avant: string }>; erreur?: string; job?: string
@@ -118,7 +138,7 @@ async function etat() {
       const contexte = await lireJson<any>(join(d, "context.json"), null)
       const diag = await lireJson<any>(join(d, "diagnostic.json"), null)
       const dejaTests = new Set(tests.map((t) => t.id))
-      const propositions = (await lireJson<any[]>(join(d, "propositions.json"), [])).filter((p) => !dejaTests.has(p.nom))
+      const propositions = (await lireJson<any[]>(join(d, "propositions.json"), [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
@@ -147,7 +167,7 @@ async function etat() {
         : captureEnCours ? { date: dateFr(encours!.debut), ok: null, enCours: true, cause: "Copie en cours : quelques minutes." }
         : { date: dateFr(encours?.debut), ok: null, cause: "La copie s’est interrompue avant la fin. Relancez-la depuis cette page : rien à faire côté client." }
       clients.push({
-        id: `${c}/${camp}`, client: c, campagne: camp, clientSlug, ini: cap(c.slice(0, 1)), nom: cap(c), marque: camp.replace(/-/g, " "),
+        id: `${c}/${camp}`, client: c, campagne: camp, clientSlug, ini: cap(c.slice(0, 1)), nom: await nomDuSite(d, c), marque: camp.replace(/-/g, " "),
         url, site, live: true,
         // le site a redirigé l'adresse collée : on le dit, sinon le buyer cherche « sa » page
         redirigeDe: meta?.demande ? String(meta.demande).replace(/^https?:\/\//, "") : undefined,
@@ -257,7 +277,7 @@ async function pipelineTest(job: Job, c: string, camp: string, id: string, base:
     dire(job, "3 · en ligne : on publie la balise et la config sur " + BASE_TAGS)
     code = await publierTag(job, c, camp)
     if (code !== 0) { await maj({ etat: "echec", erreur: "La publication sur Vercel a échoué : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
-    await maj({ etat: "pret" })
+    await maj({ etat: "pret", erreur: undefined })
     finir(job, true, { id })
 }
 
@@ -407,7 +427,13 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
     ],
   })
   if (process.env.LPWS_SANS_VERCEL) { dire(job, "(publication Vercel sautée : LPWS_SANS_VERCEL)"); return 0 }
-  return lancer(job, "vercel", ["deploy", "--prod", "--yes"], DIST)
+  return lancer(job, ...VERCEL(["deploy", "--prod", "--yes"]), DIST)
+}
+
+/** le CLI Vercel n’est pas forcément installé en global : npx le télécharge une fois et le garde en cache */
+function VERCEL(args: string[]): [string, string[]] {
+  const global = (process.env.PATH ?? "").split(":").some((d) => existsSync(join(d, "vercel")))
+  return global ? ["vercel", args] : ["npx", ["--yes", "vercel@latest", ...args]]
 }
 
 async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number) {
@@ -426,6 +452,7 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
     if (!sonde.installe)
       throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
   }
+  const avant = tests.map((o) => [o.id, o.etat, o.part] as const)
   if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
   else { t.etat = "stop" }
   await ecrireJson(join(d, "tests.json"), tests)
@@ -434,6 +461,15 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
   ;(async () => {
     dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : "arrêt : l’original reprend 100 % du trafic")
     const code = await publierTag(job, c, camp)
+    // l'état affiché doit être l'état EN LIGNE : si la publication rate, on revient en arrière et on dit pourquoi
+    const all = await lireJson<Test[]>(join(d, "tests.json"), [])
+    const cible = all.find((x) => x.id === id)
+    if (code !== 0) {
+      for (const [oid, oetat, opart] of avant) { const o = all.find((x) => x.id === oid); if (o) { o.etat = oetat; o.part = opart } }
+      if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
+    } else if (cible) delete cible.erreur
+    await ecrireJson(join(d, "tests.json"), all)
+    if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()
   return job
@@ -513,6 +549,14 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
       if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
+      if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST") {
+        const f = join(dossier(c, camp), "propositions.json")
+        const props = await lireJson<any[]>(f, [])
+        const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
+        // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
+        p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = String((await body(req)).raison ?? "")
+        await ecrireJson(f, props); return json(res, 200, { ok: true })
+      }
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
     if (p.startsWith("/assets/")) {
