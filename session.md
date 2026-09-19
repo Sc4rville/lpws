@@ -89,7 +89,7 @@ playground, mesure), sur les données réelles du corpus.
 
 ## Fait le 2026-09-19 (soir) — Contrôler, les cinq points (détail dans [kusaila.md](kusaila.md))
 - **Corpus, un seul navigateur partout** (Chromium complet ; le headless shell est reconnu par
-  Akamai ET rend le texte autrement que le juge) : HubSpot 0,05 % / 0,16 % · Jira 0,8 % / 0,4 % ·
+  Akamai ET rend le texte autrement que le juge) : HubSpot 0,05 % / 0,16 % · Jira 0,07 % / 0,17 % ·
   Salesforce 1,2 % / 0,04 % (clonable, 403 avant) · Asana 2,1 % / 0,2 % (bloquait 18 min avant) ·
   monday 4,7 % / 0,9 % (était 24 % / 30 % ; ce n'était pas un scroll-jack).
 - Capture : SRI retiré des feuilles localisées · imbrications non re-parsables neutralisées ·

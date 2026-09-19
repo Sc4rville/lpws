@@ -365,7 +365,7 @@ Trouvé en chemin : la **seconde ouverture** du constructeur de balise n'avait p
 constructeur dit désormais **à quelle étape** une cible tombe (re-liage, dérivation, ouverture).
 
 **Corpus final, même navigateur pour la référence et le juge** : HubSpot 0,05 % / 0,16 % ·
-Jira 0,8 % / 0,4 % · Salesforce **0,03 % / 0,04 %** · Asana 2,1 % / 0,2 % · monday 0,20 % / 0,91 %.
+Jira **0,07 % / 0,17 %** · Salesforce **0,03 % / 0,04 %** · Asana 2,1 % / 0,2 % · monday 0,20 % / 0,91 %.
 Ce qui reste hors capteur : `me-qualite`, `me-couleur-bouton` (méthode) et
 `fr-compte-obligatoire` (le tunnel de commande, pas la page).
 
