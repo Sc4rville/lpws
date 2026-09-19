@@ -10,7 +10,8 @@ engine/
   viewer/     le cockpit local — comparer live/clone, suivre les captures, voir les variantes
   clone/      FAMILLE 1 — url du client → baseline fidèle, marquée, jugée   ← en cours
   apply/      FAMILLE 2 — hypothèse + éditions ancrées → variante prouvée   ← en cours
-  variant/    FAMILLE 3 — diagnostic → hypothèse + éditions (le brain)      ← à venir
+  variant/    FAMILLE 3 — le brain : page + annonce → diagnostic → 3 variantes ← en cours
+  measure/    FAMILLE 5 — GA4 → conversions par version → le verdict        ← en cours
   deploy/     FAMILLE 4 — variante validée → page publiable et jugée        ← en cours
   intent/     BRIQUE À PART — termes de recherche Google Ads → intentions   ← fondations
               (alimente le brain et, plus tard, la répartition du tag)

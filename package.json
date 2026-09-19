@@ -21,7 +21,8 @@
     "ui": "tsx ui/build.ts",
     "ui:serve": "tsx ui/server.ts",
     "ui:deploy": "tsx ui/build.ts && cd ui/dist && vercel deploy --prod --yes",
-    "measure": "tsx engine/measure/run.ts"
+    "measure": "tsx engine/measure/run.ts",
+    "brain": "tsx engine/variant/run.ts"
   },
   "dependencies": {
     "pixelmatch": "^7",
