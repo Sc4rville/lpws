@@ -733,6 +733,7 @@ function vDash(c) {
     <div class="hd"><div><h2>${esc(c.nom)} <span class="muted" style="font-weight:500">· ${esc(c.marque)}</span></h2><div class="u">${esc(c.url)}</div>${c.redirigeDe ? `<div class="u muted">L’adresse collée (${esc(c.redirigeDe)}) redirige ici : c’est cette page que vos visiteurs voient, et donc celle qu’on teste.</div>` : ''}<div class="chips">${statutClient(c)}${chipConn(c)}</div></div>
       <div class="act">${c.live && c.capture.ok !== null && !c.capture.enCours ? `<button class="btn pri" data-go="view:nouveau">${I.sparkle(16)}Nouveau test</button>` : ''}${c.tests.length ? `<button class="btn" data-go="view:tests">${I.ab(16)}Tests</button>` : ''}<button class="btn" data-go="view:resultats">${I.bars(16)}Résultats</button></div></div>
     ${hero}
+    ${brainBloc(c)}
     ${(ex.etat === 'ok' || c.shopify) ? `<div class="sec"><h3>Ce qui est garanti</h3>${guards(c)}</div>` : ''}
     ${gagnant ? `<div class="sec"><h3>Dernier gagnant</h3>${liveCard(c, gagnant)}</div>` : ''}
     ${c.tests.filter(t => t !== live && t !== gagnant).length ? `<div class="sec"><h3>Tests <span class="n">${c.tests.length}</span></h3><div class="tests">${c.tests.filter(t => t !== live && t !== gagnant).map(t => testCard(c, t)).join('')}</div></div>` : ''}
@@ -1049,6 +1050,55 @@ function vNouveau(c) {
       </div>
     </div>`;
 }
+
+/* ---------- le brain : la campagne, les propositions, les conseils ---------- */
+const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
+function vCampagne(c) {
+  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '' });
+  const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
+  return `
+    <div class="hd"><div><h2>Votre campagne</h2><p class="lede">Deux réponses suffisent pour que LPWS lise la page comme votre visiteur : ce que promet l’annonce, et comment se conclut la vente. Le reste affine.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="duo">
+      <div class="card w" style="display:grid;gap:18px">
+        ${champ('titre', 'Le titre de l’annonce', 'Tel qu’il s’affiche sur Google. C’est la comparaison la plus utile qu’on sache faire.', 'placeholder="Marketing Hub | Grow Traffic & Convert More Leads" required')}
+        ${champ('description', 'Sa description', '', 'placeholder="AI-powered marketing software. Start your free trial."')}
+        ${champ('motsCles', 'Les mots-clés achetés', 'Séparés par des virgules. Ils décident si le titre parle la langue du visiteur.', 'placeholder="marketing automation, marketing hub"')}
+        <div class="fld">Comment se conclut la vente
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${VENTES.map(([v, l, d]) => `<button class="btn ${f.vente === v ? 'pri' : ''}" data-pick="vente" data-v="${v}" title="${d}">${l}</button>`).join('')}</div>
+          <span class="muted" style="font-weight:400">C’est ce qui décide du bon bouton.</span>
+        </div>
+      </div>
+      <div style="display:grid;gap:14px;align-content:start">
+        <div class="card" style="display:grid;gap:16px">
+          <h3 style="margin:0">Pour affiner <span class="n">optionnel</span></h3>
+          ${champ('cible', 'À qui s’adresse la campagne', '', 'placeholder="équipes marketing de PME"')}
+          ${champ('offre', 'Ce que vous vendez, en un mot', '', '')}
+          ${champ('visiteursMois', 'Visiteurs par mois sur cette page', 'En dessous d’un certain volume, un petit test ne peut pas conclure : LPWS proposera des changements plus francs.', 'inputmode="numeric" placeholder="60000"')}
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.sparkle(16) + 'Lancer l’analyse', 'data-act="contexte"')}<span class="muted" id="ctx-err"></span></div>
+      </div>
+    </div>`;
+}
+function brainBloc(c) {
+  if (!c.live || c.capture.ok === null || c.capture.enCours) return '';
+  if (c.brainEnCours) return `<div class="sec"><div class="live calm"><span class="chip"><span class="dot pulse"></span>Analyse en cours</span><h3>LPWS lit la page et écrit trois variantes</h3><div class="say">Une à deux minutes. La page reste utilisable.</div><div id="job-zone" style="margin-top:14px">${jobBox(c.brainJob)}</div></div></div>`;
+  if (!c.contexte) return `<div class="sec"><div class="live calm"><span class="chip">Diagnostic</span><h3>Dites-nous ce que promet l’annonce</h3><div class="say">LPWS compare la page à l’annonce, relève ce qui freine, et propose trois tests avec leur raison. Deux réponses, trente secondes.</div><div class="act">${GO(I.sparkle(16) + 'Décrire la campagne', 'data-go="view:campagne"')}</div></div></div>`;
+  const props = c.propositions || [], conseils = (c.diagnostic && c.diagnostic.conseils) || [];
+  let h = '';
+  if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
+    <div class="tests">${props.map(p => `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div><div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${esc(p.nom)}" data-client="${c.id}"`)}</div></div>`).join('')}</div></div>`;
+  else if (c.diagnostic) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées, ou aucun constat ne se traduit en test. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
+  if (conseils.length) h += `<div class="sec"><h3>À transmettre au client <span class="n">${conseils.length}</span><span class="r"><button class="btn sm" data-act="rapport" data-client="${c.id}">${I.copy ? I.copy(14) : ''}Copier le rapport</button></span></h3>
+    <div class="card"><div class="chg">${conseils.map((k, i) => `<div class="ch"><span class="i">${i + 1}</span><div><div class="t">${esc(k.action)}</div><div class="w">${esc(k.pourquoi)} <span class="mono">${esc(k.sources.join(', '))}</span></div></div></div>`).join('')}</div></div></div>`;
+  return h;
+}
+const FAMILLES_BRAIN = { mm: 'Promesse tenue', vp: 'Ce que la page promet', pr: 'Preuve', fr: 'Friction', of: 'Offre et prix', st: 'Ordre et attention', pe: 'Personnalisation', te: 'Technique', me: 'Méthode', sea: 'Recherche payante' };
+const nomRegle = id => FAMILLES_BRAIN[String(id).split('-')[0]] || id;
+function rapportTexte(c) {
+  const k = (c.diagnostic && c.diagnostic.conseils) || [];
+  return `Conseils pour ${c.marque} (${c.url})\n\n` + k.map((x, i) => `${i + 1}. ${x.action}\n   Pourquoi : ${x.pourquoi}\n   Source : ${x.sources.join(', ')}`).join('\n\n');
+}
+
 function heroCapture(c) {
   return `<div class="live calm"><span class="chip warn"><span class="dot pulse" style="background:var(--warn)"></span>Copie en cours</span><h3>On copie ${esc(c.url)}</h3><div class="say">La page s’ouvre comme pour un visiteur, ses styles et ses images sont récupérés, puis la copie est vérifiée contre l’original. Quelques minutes.</div>${jobBox(c.job)}</div>`;
 }
@@ -1091,6 +1141,7 @@ function renderMain() {
   let html;
   if (S.view === 'ajout') html = vAjout();
   else if (S.view === 'nouveau' && c) html = vNouveau(c);
+  else if (S.view === 'campagne' && c) html = vCampagne(c);
   else if (S.view === 'guide') html = vGuide(c, S.mode);
   else if (!c) html = vHome();
   else if (S.view === 'tests') html = vTests(c);
@@ -1128,6 +1179,8 @@ document.addEventListener('click', e => {
     if (g.dataset.go.startsWith('mode:')) { const m = g.dataset.go.slice(5); S.openMode = S.openMode === m ? null : m; renderPanel(); save(); return; }
     go(g.dataset.go); render(); return;
   }
+  const pk = e.target.closest('[data-pick]');
+  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
   const cp = e.target.closest('[data-copy]');
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
@@ -1147,6 +1200,21 @@ document.addEventListener('click', e => {
       if (c && c.live) { api(`/api/clients/${c.id}/verifier`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Balise trouvée sur la page' : 'Balise pas encore visible sur la page'); await chargerEtat(); render(); }); }).catch(e => toast(e.message)); }
       else toast('Vérification lancée : résultat dans une minute');
       break;
+    case 'contexte': {
+      if (!c) break;
+      const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
+      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined };
+      if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
+      api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
+        .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
+      break;
+    }
+    case 'proposer': {
+      if (!c) break;
+      api(`/api/clients/${c.id}/propositions/${act.dataset.nom}`).then(async r => { toast('Test en préparation : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Test prêt à lancer' : 'La préparation a échoué'); await chargerEtat(); render(); }); }).catch(e => toast(e.message));
+      break;
+    }
+    case 'rapport': if (c) copier(rapportTexte(c), 'Rapport copié'); break;
     case 'capturer': case 'recapturer': {
       const u = act.dataset.url || document.getElementById('url')?.value || ''; S.urlSaisie = u;
       api('/api/clients', { url: u }).then(async r => { S.urlSaisie = ''; await chargerEtat(); S.ctx = r.id; S.view = 'dash'; render(); })

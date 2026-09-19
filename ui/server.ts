@@ -33,6 +33,7 @@ import { existsSync } from "node:fs"
 import { join, resolve, extname, normalize } from "node:path"
 import { chromium } from "playwright"
 import { CLIENTS_ROOT, marque, slugify } from "../engine/shared/paths.ts"
+import { Contexte } from "../engine/variant/contexte.ts"
 import { step } from "../engine/shared/log.ts"
 
 const SCOPE = "ui"
@@ -49,7 +50,7 @@ const MIME: Record<string, string> = {
 }
 
 /* ---------- jobs : ce qui prend du temps se suit, ligne par ligne ---------- */
-type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown }
+type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown; campagne?: string }
 const jobs = new Map<string, Job>()
 function nouveauJob(type: string): Job {
   const job: Job = { id: Math.random().toString(36).slice(2, 10), type, etat: "en cours", lignes: [], debut: new Date().toISOString() }
@@ -113,6 +114,13 @@ async function etat() {
       const meta = await lireJson<any>(join(base, "meta.json"), null)
       const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
       const express = await lireJson<Express>(join(d, "express.json"), { installe: false })
+      // le brain : ce que le buyer a dit de la campagne, ce que la machine en a conclu, ce qu'elle propose
+      const contexte = await lireJson<any>(join(d, "context.json"), null)
+      const diag = await lireJson<any>(join(d, "diagnostic.json"), null)
+      const dejaTests = new Set(tests.map((t) => t.id))
+      const propositions = (await lireJson<any[]>(join(d, "propositions.json"), [])).filter((p) => !dejaTests.has(p.nom))
+      const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
+      const brainEnCours = !!brainJob
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
       const resultats = await lireJson<{ luLe: string; source?: string; versions: Record<string, { n: number; c: number }> } | null>(join(d, "resultats.json"), null)
@@ -146,6 +154,10 @@ async function etat() {
         imgUrl: existsSync(join(base, "clone.png")) ? `/files/${c}/${camp}/baseline/clone.png` : null,
         capture,
         job: captureEnCours ? encours!.job : undefined,
+        contexte,
+        diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0 } : null,
+        propositions,
+        brainEnCours, brainJob: brainJob?.id,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
             label: express.installe ? "Installé" : publie === false ? "Balise pas encore publiée" : "À installer",
@@ -227,6 +239,28 @@ async function textes(c: string, camp: string): Promise<Texte[]> {
 }
 
 /* ---------- créer un test : spec → variante → tag → Vercel ---------- */
+/** Les trois pas d'un test, du fichier de spec à la balise publiée. Partagé : test écrit à la
+ *  main par le buyer, ou proposé par le brain. */
+async function pipelineTest(job: Job, c: string, camp: string, id: string, base: string, specPath: string) {
+  const d = dossier(c, camp)
+    const maj = async (patch: Partial<Test>) => {
+      const all = await lireJson<Test[]>(join(d, "tests.json"), [])
+      const t = all.find((x) => x.id === id); if (t) Object.assign(t, patch)
+      await ecrireJson(join(d, "tests.json"), all)
+    }
+    dire(job, "1 · la variante : on applique le changement sur la copie et on la photographie")
+    let code = await lancer(job, TSX, [join(ROOT, "engine/apply/run.ts"), base, specPath])
+    if (code !== 0) { await maj({ etat: "echec", erreur: "La variante n’a pas pu être produite : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
+    dire(job, "2 · le tag : on retrouve chaque cible sur la vraie page et on prépare la balise")
+    code = await construireTag(job, c, camp)
+    if (code !== 0) { await maj({ etat: "echec", erreur: "La cible n’a pas été retrouvée sur la page en ligne : " + job.lignes.slice(-4).join(" / ") }); finir(job, false); return }
+    dire(job, "3 · en ligne : on publie la balise et la config sur " + BASE_TAGS)
+    code = await publierTag(job, c, camp)
+    if (code !== 0) { await maj({ etat: "echec", erreur: "La publication sur Vercel a échoué : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
+    await maj({ etat: "pret" })
+    finir(job, true, { id })
+}
+
 async function creerTest(c: string, camp: string, entree: { titre: string; pourquoi: string; edits: Array<{ anchor: string; text: string }> }) {
   const d = dossier(c, camp); const base = join(d, "baseline")
   const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
@@ -256,25 +290,46 @@ async function creerTest(c: string, camp: string, entree: { titre: string; pourq
   const specPath = join(d, "specs", `${id}.json`)
   await ecrireJson(specPath, spec)
 
-  ;(async () => {
-    const maj = async (patch: Partial<Test>) => {
-      const all = await lireJson<Test[]>(join(d, "tests.json"), [])
-      const t = all.find((x) => x.id === id); if (t) Object.assign(t, patch)
-      await ecrireJson(join(d, "tests.json"), all)
-    }
-    dire(job, "1 · la variante : on applique le changement sur la copie et on la photographie")
-    let code = await lancer(job, TSX, [join(ROOT, "engine/apply/run.ts"), base, specPath])
-    if (code !== 0) { await maj({ etat: "echec", erreur: "La variante n’a pas pu être produite : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
-    dire(job, "2 · le tag : on retrouve chaque cible sur la vraie page et on prépare la balise")
-    code = await construireTag(job, c, camp)
-    if (code !== 0) { await maj({ etat: "echec", erreur: "La cible n’a pas été retrouvée sur la page en ligne : " + job.lignes.slice(-4).join(" / ") }); finir(job, false); return }
-    dire(job, "3 · en ligne : on publie la balise et la config sur " + BASE_TAGS)
-    code = await publierTag(job, c, camp)
-    if (code !== 0) { await maj({ etat: "echec", erreur: "La publication sur Vercel a échoué : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
-    await maj({ etat: "pret" })
-    finir(job, true, { id })
-  })()
+  pipelineTest(job, c, camp, id, base, specPath)
   return { job, id }
+}
+
+/** Le brain : écrit context.json, puis signaux → jugement → diagnostic → 3 specs (job). */
+async function lancerBrain(c: string, camp: string, contexte: unknown): Promise<Job> {
+  const d = dossier(c, camp)
+  const v = Contexte.safeParse(contexte)
+  if (!v.success) throw Object.assign(new Error("Il manque au moins ce que promet l’annonce et comment se conclut la vente : " + v.error.issues.map((i) => i.path.join(".")).join(", ")), { code: 400 })
+  await ecrireJson(join(d, "context.json"), v.data)
+  const job = nouveauJob("brain")
+  job.campagne = d
+  ;(async () => {
+    dire(job, "1 · LPWS lit la page : titres, boutons, preuves, prix")
+    dire(job, "2 · puis juge ce qui ne se compte pas, et compare à l’annonce")
+    dire(job, "3 · puis écrit trois variantes, une par cible")
+    const code = await lancer(job, TSX, [join(ROOT, "engine/variant/run.ts"), resolve(d), "--refaire"])
+    finir(job, code === 0)
+  })()
+  return job
+}
+
+/** Une proposition du brain devient un test : même pipeline qu'un test écrit à la main. */
+async function creerTestDepuisProposition(c: string, camp: string, nom: string) {
+  const d = dossier(c, camp); const base = join(d, "baseline")
+  const props = await lireJson<Array<{ nom: string; titre: string; teste: string; pourquoi: string; regle: string }>>(join(d, "propositions.json"), [])
+  const p = props.find((x) => x.nom === nom)
+  if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
+  const specPath = join(d, "specs", `${nom}.json`)
+  if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
+  const spec = await lireJson<any>(specPath, {})
+  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
+  if (tests.some((t) => t.id === nom)) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
+  const txt = await textes(c, camp)
+  const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
+  const job = nouveauJob("test")
+  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id })
+  await ecrireJson(join(d, "tests.json"), tests)
+  pipelineTest(job, c, camp, nom, base, specPath)
+  return { job, id: nom }
 }
 
 /** reconstruit loader + config avec TOUTES les specs des tests vivants de la page */
@@ -457,6 +512,8 @@ createServer(async (req, res) => {
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
+      if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
+      if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
     if (p.startsWith("/assets/")) {
       const rel = normalize(decodeURIComponent(p.slice(8)))

@@ -223,6 +223,54 @@ règle de kabylesystem est « interface en anglais ». C'est un choix produit, p
 
 ---
 
+## 2026-09-19 · Le brain (étape « Créer ») et la lecture des résultats (étape « Mesurer »)
+
+**Les deux trous qui restaient** : la machine savait copier, modifier et livrer une page, mais
+c'est le buyer qui décidait quoi tester en tapant lui-même le nouveau titre, et personne ne
+relisait jamais si la variante gagnait.
+
+### `engine/measure` : GA4 → conversions par version → le verdict (`5908b14`)
+La balise pose la version vue en **propriété utilisateur** GA4 (`lpws_variante`) ; `npm run
+measure` interroge l'API GA4 Data avec un compte de service (JWT signé, pas de bibliothèque
+Google), écrit `resultats.json` par campagne, et l'écran du test affiche le verdict dans les
+mots du buyer (« avantage variante +35 %, certitude 84 %, encore ~8 jours »). Prouvé sur une
+réponse GA4 enregistrée ; **jamais sur une vraie propriété**.
+
+### `engine/variant` : le brain (`c517955`)
+Trois décisions prises avec kabylesystem : diagnostiquer **et** proposer trois variantes (pas
+d'analyse d'image en v1) · demander les neuf questions du brain mais deux seulement
+obligatoires (ce que promet l'annonce, comment se conclut la vente) · séparer sans jamais les
+mélanger les **tests** qu'on sait exécuter des **conseils** à transmettre au client · une
+variante par cible (titre, bouton, structure).
+
+| Temps | Nature | Ce que ça fait |
+|---|---|---|
+| `signaux.ts` | script | compte sur la page rendue aux deux tailles : hero, boutons et pli, nav, formulaire, preuves, prix, garantie |
+| `jugement.ts` | modèle, sur le plan | 8 questions typées indépendantes, validées par schéma, jamais d'explication demandée |
+| `regles.ts` | données | les 30 règles de `brain.html` + 4 de recherche payante, exécutables : vrai / faux / **non évaluable** |
+| `diagnostic.ts` | script | jointure et classement (impact × preuve × pertinence ÷ risque, stratégiques devant) |
+| `variantes.ts` | modèle, sur le plan | écrit dans un cadre fermé, sortie au contrat de `apply/spec.ts` |
+
+**Mesuré sur HubSpot** (annonce fictive « Grow Traffic & Convert More Leads ») : signaux 3,9 s,
+jugement 33 s, **6 tests possibles, 1 conseil, 9 non évaluables**, 3 variantes en 76 s, toutes
+valides et appliquées. Premier constat : la promesse de l'annonce n'est pas dans le titre.
+
+**Dans l'interface** : après la copie, l'écran « Votre campagne » (2 champs obligatoires, le
+reste optionnel) lance l'analyse ; le tableau de bord montre « LPWS propose 3 tests » avec
+la raison et la source, « Créer ce test » enchaîne sur le pipeline existant ; et « À
+transmettre au client » avec « Copier le rapport ».
+
+**Ma critique des 30 règles, gardée** : bonnes comme texte (chaque règle porte son
+contre-exemple), inutilisables telles quelles par une machine (prose, pas de signal typé),
+12 sur 30 seulement testables avec nos verbes, 20 qui exigent des entrées jamais demandées,
+priorité déclarée et pas calculée, biais B2B. Tout ça est ce que `regles.ts` corrige.
+
+**Limites** : pas de créa, 9 règles sans capteur, un jugement jamais mesuré contre des pages
+annotées à la main (feuille de route 2.7), des règles en TypeScript et pas en fichier de
+données pur.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

@@ -139,8 +139,9 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 **Ce que ça veut dire :** décider *quoi* mettre sur la page et *pourquoi*. C'est le cœur de
 la valeur, et la seule partie que personne d'autre ne fait.
 
-**Où on en est :** la logique est entièrement cartographiée
-([docs/brain.html](brain.html)), le moteur n'existe pas. Les hypothèses sont écrites à la main.
+**Où on en est :** le moteur existe ([`engine/variant`](../engine/variant/readme.md)) : signaux
+comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une par cible. Il manque
+`page.json`, la créa, et un jeu de test annoté pour mesurer le jugement.
 
 ## 2.1 · La représentation de la page (`page.json`)
 - ✅ Contrat posé : sections typées, emplacements ancrés
@@ -152,43 +153,42 @@ la valeur, et la seule partie que personne d'autre ne fait.
 
 ## 2.2 · Le contexte du client
 - ✅ Les neuf questions identifiées et formulées en langage humain
-- ⬜ Schéma `context.json` : offre, cible, mode de vente, panier moyen, marge, source de trafic, étape du funnel, promesse publicitaire, volume mensuel, limites légales
-- ⬜ Pré-remplissage par lecture de la page — proposer, jamais affirmer
-- ⬜ Ingestion du texte de l'annonce
+- ✅ Schéma `context.json` ([`contexte.ts`](../engine/variant/contexte.ts)) : deux champs obligatoires (annonce, mode de vente), le reste optionnel
+- 🟡 Pré-remplissage : l'offre est pré-remplie avec la marque, le reste non
+- ✅ Ingestion du texte de l'annonce (titre, description, mots-clés)
 - ⬜ ⚠️ Ingestion de la **créa** (image/vidéo) — demande un modèle qui voit, brique entièrement manquante alors que c'est l'ancre du message en paid social
 
 ## 2.3 · La knowledge base
 - ✅ 30 règles rédigées, 28 sources avec leurs biais assumés
 - 🟡 Issues de la recherche v1, orientée B2B : la famille e-commerce est mince
 - 🔴 **Lancer la recherche v2** — le brief est prêt ([docs/recherche-v2-brief.md](recherche-v2-brief.md)), livrable : 80 à 120 règles rééquilibrées
-- ⬜ Extraire la KB de la page HTML vers un fichier de données validé par schéma
-- ⬜ Implémenter les **cinq familles d'exécution** : diagnostic, interdiction, garde-fou, méthodologique, humilité — quatre chemins distincts dans le moteur, pas une boucle unique
+- 🟡 KB extraite de la page HTML vers [`regles.ts`](../engine/variant/regles.ts) : exécutable, typée, pas encore un fichier de données pur
+- 🟡 Trois sorties distinctes dans le moteur : test / conseil / méthode ; les refus et garde-fous restent à brancher
 - ⬜ Ajouter la famille e-commerce : revenu par visiteur, retours, remise contre marge, guide des tailles, frais de port, achat invité, paiement fractionné, contenu client
 - ⬜ ⚠️ Ajouter la continuité créa → haut de page : **totalement absente** de la v1
 - ⬜ Verrouiller les refus comme filtre de sortie, pas comme simple conseil
 
 ## 2.4 · L'extraction des signaux
-- ⬜ Lister les signaux dont les règles ont besoin
-- ⬜ Séparer le mécanique (compter des champs, détecter une navigation, mesurer la vitesse) du jugement (générique ou spécifique)
-- ⬜ Mécanique → scripts
-- ⬜ Jugement → skill, **une question typée indépendante par signal** *(garde l'option d'un modèle de décision rapide plus tard)*
-- ⬜ Score de concordance annonce → page : entités de promesse, recouvrement de sens et de mots, présence du chiffre
+- ✅ Signaux listés et typés ([`signaux.ts`](../engine/variant/signaux.ts), [`jugement.ts`](../engine/variant/jugement.ts))
+- ✅ Mécanique → script (page rendue aux deux tailles) · jugement → 8 questions typées indépendantes, sur le plan
+- ⬜ Mécanique manquante : checkout, badges de paiement, vitesse (brancher `lcp.ts`), consentement
+- 🟡 Concordance annonce → page : jugée (question typée) + chiffre de l'annonce repris ou non (script) ; pas encore un score continu
 - ⬜ Concordance visuelle créa → haut de page
-- ⬜ Mise en cache des signaux par capture
+- ✅ Mise en cache des signaux et du jugement par capture (`--refaire` pour recalculer)
 
 ## 2.5 · Le moteur de diagnostic
-- ⬜ Jointure déterministe entre signaux et règles — **aucun LLM ici**
-- ⬜ Filtrage par contexte : niche, source de trafic, montant
-- ⬜ Hiérarchisation : impact × preuve × pertinence ÷ risque, plus une catégorie « stratégique » qui échappe au sous-scoring
-- ⬜ Sortie : constats classés, chacun traçable jusqu'à sa source
+- ✅ Jointure déterministe ([`diagnostic.ts`](../engine/variant/diagnostic.ts)), aucun modèle
+- ✅ Filtrage par niche et trafic, montant pour les règles qui en dépendent
+- ✅ Hiérarchisation impact × preuve × pertinence ÷ risque, catégorie stratégique devant
+- ✅ Constats classés, chacun avec sa règle et ses sources ; les non évaluables listés avec ce qui manquait
 - ⬜ Les quatre points d'arrêt : pas de contexte → demander · illégal → refuser · cosmétique → rediriger · rien à dire → l'avouer
-- ⬜ Régime de changement selon le trafic : peu de trafic → gros changements assumés · beaucoup → tests chirurgicaux
+- 🟡 Régime calculé (gros changements sous 200 k visiteurs/mois), pas encore répercuté sur l'ampleur des éditions
 
 ## 2.6 · La génération de variantes
 - ✅ Contrat : pas d'hypothèse, de métrique, de risque et de diagnostic → pas de variante
-- ⬜ Skill `variant` : un constat choisi devient une spec valide
-- ⬜ N'écrire que ce que le client affirme déjà — jamais inventer une statistique
-- ⬜ Proposer un plan de 3 à 5 variantes hiérarchisées plutôt qu'une seule
+- ✅ [`variantes.ts`](../engine/variant/variantes.ts) : un constat devient une spec valide, au contrat de `apply/spec.ts`
+- ✅ Cadre fermé : n'écrire que ce que la page affirme, une ancre existante ou rien
+- ✅ Trois variantes, une par cible (titre, bouton, structure), proposées au buyer qui choisit
 
 ## 2.7 · La qualité du brain
 - 🔴 **Jeu de test annoté inexistant** — sans lui, la confiance affichée à côté d'un diagnostic est décorative

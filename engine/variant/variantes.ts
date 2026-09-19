@@ -102,8 +102,22 @@ export async function ecrireVariantes(
   const base = join(campagne, "baseline")
   const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(join(base, "anchors.json"), "utf8"))
   const parAncre = new Map(empreintes.map((e) => [e.a, e]))
-  const choisis = constats.filter((k) => k.test).slice(0, 3)
+  /* UNE VARIANTE PAR CIBLE, pas les trois meilleurs constats quoi qu'ils touchent.
+   * Décidé avec kabylesystem le 2026-09-19 : sur HubSpot, les trois meilleurs constats visaient
+   * tous le titre, et le buyer se retrouvait avec un A/B/C du même mot. Il veut de la diversité :
+   * un test de titre, un test de bouton, un test de structure. Si une famille est vide, on
+   * complète avec le meilleur constat restant. */
+  const famille = (k: Constat) => k.test!.cible === "titre" || k.test!.cible === "sous-titre" ? "titre"
+    : k.test!.cible === "cta" ? "bouton" : "structure"
+  const testables = constats.filter((k) => k.test)
+  const choisis: Constat[] = []
+  for (const f of ["titre", "bouton", "structure"] as const) {
+    const k = testables.find((x) => famille(x) === f && !choisis.includes(x))
+    if (k) choisis.push(k)
+  }
+  for (const k of testables) if (choisis.length < 3 && !choisis.includes(k)) choisis.push(k)
   if (!choisis.length) { step(SCOPE, "aucun constat testable : rien à écrire"); return [] }
+  step(SCOPE, `cibles retenues : ${choisis.map((k) => `${famille(k)} (${k.id})`).join(" · ")}`)
 
   let props: z.infer<typeof Propositions> | null = null
   for (let essai = 1; essai <= 2 && !props; essai++) {
@@ -139,9 +153,22 @@ export async function ecrireVariantes(
     if (!v.success) { step(SCOPE, `« ${p.titre} » hors contrat : ${v.error.issues[0]?.path.join(".")} ${v.error.issues[0]?.message}`); continue }
     const fichier = join(campagne, "specs", `${nom}.json`)
     await writeFile(fichier, JSON.stringify(v.data, null, 2))
+    // ce que le buyer lit : des mots, pas des ancres. Le texte d'origine vient des signaux (casse
+    // réelle) quand on le connaît, sinon de l'empreinte (normalisée en minuscules)
+    const nommer = (a: string): string => {
+      if (a === m.nav.anchor) return "le menu de navigation"
+      if (a === m.hero.titreAnchor) return `le titre « ${m.hero.titre.slice(0, 60)} »`
+      if (a === m.hero.sousTitreAnchor) return `le sous-titre « ${m.hero.sousTitre.slice(0, 60)} »`
+      const cta = m.ctas.find((x) => x.anchor === a); if (cta) return `le bouton « ${cta.texte.slice(0, 50)} »`
+      const sec = m.sections.find((x) => x.anchor === a); if (sec) return `la section « ${sec.titre || "sans titre"} »`
+      return `« ${(parAncre.get(a)?.text ?? a).slice(0, 50)} »`
+    }
     const e0 = p.edits[0]
-    const teste = e0.op === "set" ? `« ${(parAncre.get(e0.anchor)?.text ?? "").slice(0, 60)} » devient « ${(e0.text ?? "").slice(0, 60)} »`
-      : `${e0.op} ${e0.anchor}${e0.before ? " avant " + e0.before : e0.after ? " après " + e0.after : ""}`
+    const teste = e0.op === "set" ? `${nommer(e0.anchor)} devient « ${(e0.text ?? "").slice(0, 70)} »`
+      : e0.op === "remove" ? `Retirer ${nommer(e0.anchor)}`
+      : e0.op === "duplicate" ? `Dupliquer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
+      : e0.op === "swap" ? `Échanger ${nommer(e0.anchor)} et ${nommer(e0.with ?? "")}`
+      : `Déplacer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
     sorties.push({ nom, regle: k.id, fichier, titre: p.titre, teste })
     step(SCOPE, `✓ ${p.titre} → ${fichier}`)
   }
