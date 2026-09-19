@@ -31,7 +31,7 @@ import { spawn } from "node:child_process"
 import { readFile, writeFile, readdir, stat, mkdir, copyFile, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, extname, normalize } from "node:path"
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../engine/shared/navigateur.ts"
 import { CLIENTS_ROOT, marque, slugify } from "../engine/shared/paths.ts"
 import { Contexte } from "../engine/variant/contexte.ts"
 import { step } from "../engine/shared/log.ts"
@@ -233,7 +233,7 @@ async function textes(c: string, camp: string): Promise<Texte[]> {
   const deja = await lireJson<Texte[] | null>(cache, null)
   if (deja) return deja
   if (!existsSync(join(base, "capture.html"))) return []
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await page.goto("file://" + join(base, "capture.html"), { waitUntil: "domcontentloaded", timeout: 60_000 })
@@ -482,7 +482,7 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
 async function sonderBalise(c: string, camp: string, job?: Job): Promise<Express> {
   const d = dossier(c, camp)
   const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     let demande = false

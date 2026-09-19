@@ -13,7 +13,7 @@
  * Usage : npm run ui            → ui/dist/index.html
  *         npm run ui:deploy     → build puis `vercel deploy --prod` depuis ui/dist
  */
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../engine/shared/navigateur.ts"
 import { readFile, writeFile, mkdir, readdir, stat, cp } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, basename, dirname } from "node:path"
@@ -46,7 +46,7 @@ const files = (await walk(CLIENTS)).map((p) => [keyOf(p), p] as const).filter(([
 const html = await readFile(SRC, "utf8")
 if (!html.includes("/*THUMBS*/")) throw new Error("ui/index.html : marqueur /*THUMBS*/ absent")
 
-const browser = await chromium.launch()
+const browser = await lancerNavigateur()
 const page = await browser.newPage()
 const img: Record<string, string> = {}
 let total = 0

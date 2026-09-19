@@ -87,6 +87,18 @@ playground, mesure), sur les données réelles du corpus.
   `lpws-ui`, Chromium + `claude` + Vercel installés). C'est **la seule instance qui publie** sur
   `lpws-app.vercel.app` ; en local, lancer avec `LPWS_SANS_VERCEL=1`.
 
+## Fait le 2026-09-19 (soir) — Contrôler, les cinq points (détail dans [kusaila.md](kusaila.md))
+- **Corpus, un seul navigateur partout** (Chromium complet ; le headless shell est reconnu par
+  Akamai ET rend le texte autrement que le juge) : HubSpot 0,05 % / 0,16 % · Jira 0,8 % / 0,4 % ·
+  Salesforce 1,2 % / 0,04 % (clonable, 403 avant) · Asana 2,1 % / 0,2 % (bloquait 18 min avant) ·
+  monday 4,7 % / 0,9 % (était 24 % / 30 % ; ce n'était pas un scroll-jack).
+- Capture : SRI retiré des feuilles localisées · imbrications non re-parsables neutralisées ·
+  shadow DOM recopié en `<template shadowrootmode>` · animations menées à terme avant la photo ·
+  dimensions intrinsèques des vidéos figées · délai de 20 s par ressource.
+- Re-liage : **471/471 sur Jira, 0 faux, 0 ambiguë** (départage par distance à la diagonale).
+- Brain : capteurs vitesse (LCP réel), mesure (tags présents), paiement ; 3 règles de plus évaluables.
+- Juge de la balise : coupe la balise déjà en ligne, teste le candidat seul.
+
 ## La feuille de route
 [docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
 (contrôler · créer · distribuer · nourrir), avec l'état de chaque micro-tâche. C'est la
@@ -109,9 +121,9 @@ qu'il a fallu pour amener le tag à 9/9, **quatre étaient dans le juge**, pas d
 le juge avant d'accuser le code.
 
 ## Blocages / parking
-- Le clone Asana (uses/project-management) s'interrompt pendant la récupération des fichiers, cause inconnue.
 - `lpws.vercel.app` (le projet de Yann) sert une démo sans `t/` ni `v/` : à redéployer complet depuis `ui/dist`,
   ou basculer sur `lpws-app.vercel.app` (le projet qui publie aujourd'hui).
 - Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
 - Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
-- Gel trop brutal (animation figée) · Salesforce anti-bot · Monday scroll-jack.
+- monday desktop 4,7 % (seuil 3 %) : une colonne vidéo 24 px plus étroite dans un flex centré, cause non isolée.
+- Les ancres ne descendent pas dans le shadow DOM (en-tête Salesforce visible, pas éditable).

@@ -11,7 +11,8 @@
  *
  * Usage : npm run lcp -- <dossier-baseline> <spec.json> [--tirs 5]
  */
-import { chromium, type Browser } from "playwright"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { type Browser } from "playwright"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildTag } from "./build.ts"
@@ -47,7 +48,7 @@ export async function mesurerLcp(baseline: string, specPath: string, tirs = 5) {
   const { cfg, client, loader } = await buildTag(baseline, [specPath], { part: 100, base: BASE })
   const attente = cfg.delaiMax + 1_500
 
-  const b = await chromium.launch()
+  const b = await lancerNavigateur()
   try {
     const sans: number[] = []
     const avec: number[] = []

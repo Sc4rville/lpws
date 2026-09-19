@@ -13,7 +13,7 @@
  * Hors ligne : les requêtes vers googletagmanager/facebook sont coupées et comptées. On
  * vérifie que la page les DEMANDE, pas qu'un compte tiers réponde.
  */
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { DeployConfig } from "./config.ts"
@@ -44,7 +44,7 @@ export type CheckReport = {
 }
 
 export async function checkDeploy(dir: string, cfg: DeployConfig): Promise<CheckReport> {
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   await page.addInitScript({ content: "window.__name = (f) => f" })
 

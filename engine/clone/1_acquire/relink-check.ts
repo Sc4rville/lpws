@@ -8,7 +8,7 @@
  *   capture B  → re-marquage complet, donc numérotation décalée
  *   relier(A,B) → doit retrouver les mêmes éléments malgré le décalage
  */
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { markDom } from "./mark.ts"
@@ -41,7 +41,7 @@ function injecteBanniere(): void {
   document.body.insertBefore(p, document.body.firstChild)
 }
 
-const browser = await chromium.launch()
+const browser = await lancerNavigateur()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 await page.addInitScript({ content: "window.__name = (f) => f" })
 await page.route(`${ORIGIN}/**`, async (route) => {

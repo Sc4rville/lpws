@@ -31,7 +31,10 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ⬜ Attendre la fin des animations avant de geler *(héros Jira figé en pleine transition : fidèle mais pas livrable)*
 - ⬜ Délai maximum par ressource au rapatriement *(clone Asana interrompu sans message, cause non identifiée)*
 - ⬜ Stratégie pour les sites anti-bot *(Salesforce/Akamai — à décider quand un vrai client le demande)*
-- ⬜ Stratégie scroll-jack *(Monday : détecté et rapporté, clone inexploitable en l'état)*
+- ✅ monday : ce n'était pas un scroll-jack mais une feuille CSS refusée (SRI) et une imbrication `<button>` non re-parsable ; corrigés (4,7 % / 0,9 %)
+- ✅ Anti-bot (Akamai / Salesforce) : Chromium complet + UA réel, un seul navigateur pour la capture et le juge
+- ✅ Shadow DOM recopié en `<template shadowrootmode>` (Salesforce : en-tête, vidéo, pied)
+- ✅ Animations menées à terme avant la photo de référence (Asana) · délai par ressource (plus de capture éternelle)
 - ⬜ Décider s'il faut un troisième viewport (tablette)
 
 ### 1.1.2 · Rendre la page autonome
@@ -66,7 +69,7 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Diff visuel contre le live, desktop et mobile
 - ✅ Rendu en http local *(en `file://` Chromium refuse les polices locales)*
 - ✅ Métriques de santé : débordement, images cassées, blocs restés invisibles, titres rognés
-- ✅ Drapeau scroll-jack et preuve tronquée au lieu d'un plantage
+- ✅ Hauteur aberrante : preuve tronquée au lieu d'un plantage (le drapeau ne dit plus « scroll-jack », il ne le savait pas)
 - 🔴 Mesure la page **entière** : un titre qui passe à trois lignes décale tout et fait exploser le score
 - ⬜ Juge v2 : diff **par section ancrée**
 - ⬜ Verdict par section (savoir *laquelle* a cassé)

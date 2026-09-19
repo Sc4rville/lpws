@@ -42,8 +42,11 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   // 1. compter
   const fSig = join(campagne, "signaux.json")
   let m: SignauxMecaniques
-  if (!opts.refaire && existsSync(fSig)) { m = SignauxMecaniques.parse(JSON.parse(await readFile(fSig, "utf8"))); step(SCOPE, "signaux : cache") }
+  // un cache d'avant un nouveau capteur ne passe plus le schéma : on recompte, on ne plante pas
+  const cache = !opts.refaire && existsSync(fSig) ? SignauxMecaniques.safeParse(JSON.parse(await readFile(fSig, "utf8"))) : null
+  if (cache?.success) { m = cache.data; step(SCOPE, "signaux : cache") }
   else {
+    if (cache) step(SCOPE, "signaux : le cache date d'avant un nouveau capteur, on recompte")
     m = await timed(SCOPE, "signaux mécaniques (deux tailles d'écran)", () => extraireSignaux(base))
     await writeFile(fSig, JSON.stringify(m, null, 2))
   }

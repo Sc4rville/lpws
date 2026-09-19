@@ -11,7 +11,8 @@
  * question indépendante avec un type de sortie déclaré (cf. ETAT.md) : testable seule,
  * remplaçable seule.
  */
-import { chromium, type Page } from "playwright"
+import { type Page } from "playwright"
+import { lancerNavigateur, UA } from "../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { z } from "zod"
@@ -45,6 +46,12 @@ export const SignauxMecaniques = z.object({
   fonctionnalitesListees: z.number(),
   personnalisationIdentite: z.boolean(),
   sections: z.array(z.object({ anchor: z.string(), y: z.number(), h: z.number(), titre: z.string() })),
+  /** marqueurs de confiance de paiement lus sur la page (texte, alt, aria) */
+  paiement: z.object({ marqueurs: z.array(z.string()) }),
+  /** ce que la page charge pour mesurer : sans aucun tag, aucune conversion ne peut remonter */
+  mesure: z.object({ gtm: z.boolean(), gtag: z.boolean(), meta: z.boolean(), autres: z.array(z.string()) }),
+  /** LCP médian de la vraie page, en ms ; null si la page n'a pas pu être mesurée */
+  vitesse: z.object({ lcpMs: z.number().nullable(), tirs: z.number() }),
 })
 export type SignauxMecaniques = z.infer<typeof SignauxMecaniques>
 
@@ -108,6 +115,8 @@ function lirePage(hauteurPli: number) {
   const motsLongs = mots.filter((m) => m.replace(/[^\p{L}]/gu, "").length >= 12).length
   const fonctionnalites = [...document.querySelectorAll('section li, [class*="feature" i] li, [class*="feature" i] h3, [class*="feature" i] h4')].filter(visible).length
   const perso = /\{\s*(company|entreprise|first ?name|prénom)\s*\}|\bBonjour [A-Z][a-z]+\b/i.test(corps)
+  const altTexte = [...document.querySelectorAll("img[alt], [aria-label]")].map((e) => e.getAttribute("alt") || e.getAttribute("aria-label") || "").join(" ")
+  const paiementMarqueurs = [...new Set(((corps + " " + altTexte).match(/paiement s[ée]curis[ée]|secure (?:checkout|payment)|\bssl\b|3-?d ?secure|\bvisa\b|mastercard|paypal|apple pay|google pay|\bstripe\b|chiffr[ée]e?s?|encrypted/gi) ?? []).map((x) => x.toLowerCase()))].slice(0, 8)
 
   const sections = [...document.querySelectorAll('[data-lpws^="s"]')].map((s) => {
     const r = s.getBoundingClientRect()
@@ -134,6 +143,7 @@ function lirePage(hauteurPli: number) {
     fonctionnalitesListees: fonctionnalites,
     personnalisationIdentite: perso,
     sections,
+    paiement: { marqueurs: paiementMarqueurs },
   }
 }
 
@@ -152,7 +162,7 @@ async function servir(page: Page, baseline: string) {
 
 /** Les signaux mécaniques d'une baseline, mesurés aux deux tailles d'écran. */
 export async function extraireSignaux(baseline: string): Promise<SignauxMecaniques> {
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   try {
     const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } })
     await servir(desktop, baseline)
@@ -166,10 +176,47 @@ export async function extraireSignaux(baseline: string): Promise<SignauxMecaniqu
     await mobile.waitForTimeout(500)
     const m = await mobile.evaluate(lirePage, 844)
 
+    const meta = JSON.parse(await readFile(join(baseline, "meta.json"), "utf8").catch(() => "{}"))
     return SignauxMecaniques.parse({
       ...d,
       ctaAuDessusDuPliDesktop: d.ctas.some((c) => c.auDessusDuPli),
       ctaAuDessusDuPliMobile: m.ctas.some((c) => c.auDessusDuPli),
+      mesure: await lireMesure(baseline),
+      vitesse: meta.source ? await mesurerVitesse(meta.source) : { lcpMs: null, tirs: 0 },
     })
   } finally { await browser.close() }
+}
+
+/** Les tags de mesure vus au chargement de la vraie page (resources.json de la capture). */
+async function lireMesure(baseline: string): Promise<SignauxMecaniques["mesure"]> {
+  const res: { url?: string }[] = JSON.parse(await readFile(join(baseline, "resources.json"), "utf8").catch(() => "[]"))
+  const urls = res.map((r) => r.url ?? "")
+  const a = (re: RegExp) => urls.some((u) => re.test(u))
+  const autres = ["clarity.ms", "hotjar.com", "segment.com", "segment.io", "mixpanel.com", "amplitude.com", "matomo", "plausible.io", "posthog.com", "snap.licdn.com", "ads-twitter.com", "tiktok.com/i18n/pixel", "analytics.tiktok.com"]
+    .filter((h) => urls.some((u) => u.includes(h)))
+  return { gtm: a(/googletagmanager\.com\/gtm\.js/), gtag: a(/gtag\/js|google-analytics\.com\/g\/collect|googletagmanager\.com\/gtag/), meta: a(/connect\.facebook\.net\/[^/]+\/fbevents\.js/), autres }
+}
+
+/** LCP médian sur la vraie page, trois chargements : c'est la vitesse que le visiteur subit, pas celle du clone. */
+async function mesurerVitesse(url: string, tirs = 3): Promise<SignauxMecaniques["vitesse"]> {
+  const valeurs: number[] = []
+  const browser = await lancerNavigateur()
+  for (let i = 0; i < tirs; i++) {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: UA })
+    const page = await ctx.newPage()
+    try {
+      await page.goto(url, { waitUntil: "load", timeout: 45_000 })
+      const lcp: number = await page.evaluate(() => new Promise<number>((res) => {
+        let v = 0
+        const po = new PerformanceObserver((l) => { for (const e of l.getEntries()) v = e.startTime })
+        po.observe({ type: "largest-contentful-paint", buffered: true })
+        setTimeout(() => { po.disconnect(); res(Math.round(v)) }, 3000)
+      }))
+      if (lcp > 0) valeurs.push(lcp)
+    } catch { /* page injoignable ce coup-ci : le tir ne compte pas */ }
+    await ctx.close()
+  }
+  await browser.close()
+  valeurs.sort((x, y) => x - y)
+  return { lcpMs: valeurs.length ? valeurs[Math.floor(valeurs.length / 2)] : null, tirs: valeurs.length }
 }

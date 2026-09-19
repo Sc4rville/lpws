@@ -23,7 +23,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { build } from "esbuild"
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { VariantSpec } from "../../apply/spec.ts"
 import { markDom } from "../../clone/1_acquire/mark.ts"
 import { fingerprintDom, type Empreinte } from "../../clone/1_acquire/fingerprint.ts"
@@ -71,7 +71,7 @@ export async function buildLoader(client: string, base: string, cfg: ConfigServi
 async function resoudreSurLeLive(
   url: string, capturees: Empreinte[], ancres: string[], budgetMasque: number,
 ): Promise<{ cibles: Record<string, Cible>; manquees: string[]; tardives: string[]; apparitionMax: number; urlFinale: string; perdParametres: boolean; stats: string }> {
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   try {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 900 },

@@ -17,7 +17,7 @@
  *
  * Usage : npm run tag:check -- <dossier-baseline> <spec.json> [--url <live>]
  */
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildTag } from "./build.ts"
@@ -37,7 +37,7 @@ async function ouvrir(
   url: string, loader: string | null, cfg: ConfigServie | null, client: string, suffixe: string,
   attente: number,
 ): Promise<Vu> {
-  const browser = await chromium.launch()
+  const browser = await lancerNavigateur()
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
     userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -48,8 +48,15 @@ async function ouvrir(
   page.on("console", (m) => {
     if (m.type() === "error" && /Content Security Policy/i.test(m.text())) cspBloque = true
   })
+  // LE JUGE TESTE LE CANDIDAT, PAS CE QUI EST DÉJÀ EN LIGNE. Une fois la balise posée par le
+  // client, la page charge SA copie du loader et SA config publiée (un test à 100 % sur la démo
+  // Relay) : le témoin voyait la variante en ligne (« fuite »), la cible du titre semblait
+  // « absente ». On coupe la balise de la page, quel que soit son hôte, et on sert la config
+  // candidate à toute adresse /v/<client>.json.
+  const echap = client.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  await page.route(new RegExp(`/t/${echap}\\.js(\\?|$)`), (r) => r.abort())
   if (cfg) {
-    await page.route(`${BASE}/v/${client}.json`, (r) =>
+    await page.route(new RegExp(`/v/${echap}\\.json(\\?|$)`), (r) =>
       r.fulfill({ contentType: "application/json", body: JSON.stringify(cfg) }))
   }
   if (loader) await page.addInitScript({ content: loader })

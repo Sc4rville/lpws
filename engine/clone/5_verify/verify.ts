@@ -18,6 +18,7 @@
  * Usage : npm run verify -- <dossier-baseline> [--seuil 0.03]
  * Export : verifyBaseline(dir, seuil)
  */
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { chromium, type Page } from "playwright"
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -137,7 +138,7 @@ export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise
   const capture = join(dir, "capture.html")
   if (!existsSync(capture)) fail(SCOPE, `${capture} introuvable — lancer l'acquisition d'abord`)
 
-  const browser = await chromium.launch({ args: ["--no-sandbox", "--hide-scrollbars"] })
+  const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
     const out: Partial<Verdict> = { seuil }
     for (const [label, viewport, ref] of [

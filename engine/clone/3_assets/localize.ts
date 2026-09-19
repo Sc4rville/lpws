@@ -20,7 +20,8 @@
  * Usage : npm run assets -- <dossier-baseline>
  * Export : localizeAssets(dir)
  */
-import { chromium } from "playwright"
+import { recopieOmbre } from "../1_acquire/ombre.ts"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -47,7 +48,7 @@ export async function localizeAssets(dir: string): Promise<AssetsReport> {
   const map = buildLocalMap(resources)
 
   const cumul = { locaux: 0, distants: new Set<string>(), srcsetNonCaptures: 0, stylesInline: 0 }
-  const browser = await chromium.launch({ args: ["--no-sandbox"] })
+  const browser = await lancerNavigateur()
   try {
     for (const nom of ["capture.html", "capture.mobile.html"]) {
     const fichier = join(dir, nom)
@@ -151,7 +152,7 @@ export async function localizeAssets(dir: string): Promise<AssetsReport> {
         })
       }, { sel: selecteur, texts: nouveaux })
 
-    await writeFile(fichier, await page.content())
+    await writeFile(fichier, await page.evaluate(recopieOmbre).then(() => page.content()))
     await page.close()
 
     cumul.locaux += stats.locaux // r.reecrites des styles inline déjà comptées dedans

@@ -33,10 +33,12 @@
  *                           `local` pointe vers assets/ quand les octets sont rapatriés
  *   meta.json               source, date, stats, notes d'honnêteté
  */
-import { chromium, type Page } from "playwright"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { type Page } from "playwright"
 import { writeFile, rm, mkdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
+import { recopieOmbre } from "./ombre.ts"
 import { markDom } from "./mark.ts"
 import { fingerprintDom } from "./fingerprint.ts"
 import { step, timed } from "../../shared/log.ts"
@@ -167,6 +169,13 @@ function dismantleOverlays(): void {
  * évaluations ultérieures (autoScroll mobile) créent de nouveaux timers, valides.
  */
 function freezePage(): void {
+  // UNE ANIMATION EN VOL N'EST PAS UN ÉTAT. Sur Asana, l'accordéon des intégrations s'ouvrait
+  // encore (334 px de vide dans la référence) alors que le DOM sérialisé portait déjà sa classe
+  // finale : référence et clone racontaient deux instants. On mène chaque animation CSS /
+  // Web Animations à son terme avant de photographier ; les boucles infinies sont arrêtées.
+  for (const a of document.getAnimations()) {
+    try { a.finish() } catch { try { a.cancel() } catch { /* déjà morte */ } }
+  }
   const dernierTimer = window.setTimeout(() => {}, 0) as unknown as number
   for (let i = 0; i <= dernierTimer; i++) { clearTimeout(i); clearInterval(i) }
   const dernierRaf = window.requestAnimationFrame(() => {})
@@ -210,6 +219,26 @@ export async function autoScroll(): Promise<void> {
  *    (provisoire : 2_styles/3_assets rapatrieront tout en local).
  */
 function sanitizeForCapture(baseHref: string): void {
+  // UN DOM VIVANT N'EST PAS TOUJOURS RE-PARSABLE. Le JS peut imbriquer <button> dans <button>
+  // ou <a> dans <a> ; l'analyseur HTML, lui, ferme le premier à l'ouverture du second, et tout
+  // ce qui suit remonte d'un cran, puis d'un autre à chaque </div> orphelin. Sur monday.com,
+  // cinq carrousels cachés (section mobile en display:none) se sont retrouvés dans le flux
+  // visible : +2 900 px, pris pour un scroll-jack. On remplace l'élément EXTÉRIEUR par une
+  // balise neutre en figeant ce que la feuille de style du navigateur lui donnait.
+  const UA = ["display", "font", "color", "background-color", "padding", "border", "text-align",
+    "cursor", "letter-spacing", "line-height", "text-decoration", "align-items", "margin"]
+  document.querySelectorAll("button button, button a, a a, a button").forEach((interne) => {
+    const ext = interne.parentElement?.closest("button, a") as HTMLElement | null
+    if (!ext || ext.dataset.lpwsRetague) return
+    const cs = getComputedStyle(ext)
+    const neutre = document.createElement(ext.tagName === "BUTTON" ? "div" : "span")
+    for (const a of [...ext.attributes]) if (!/^(type|disabled|form|href|target|rel|download)$/.test(a.name)) neutre.setAttribute(a.name, a.value)
+    neutre.setAttribute("role", ext.tagName === "BUTTON" ? "button" : "link")
+    neutre.dataset.lpwsRetague = ext.tagName.toLowerCase()
+    for (const prop of UA) neutre.style.setProperty(prop, cs.getPropertyValue(prop))
+    neutre.append(...ext.childNodes)
+    ext.replaceWith(neutre)
+  })
   document.querySelectorAll("script, link[rel='preload'][as='script'], link[rel='modulepreload']")
     .forEach((e) => e.remove())
   document.querySelectorAll("meta[http-equiv='Content-Security-Policy' i]").forEach((e) => e.remove())
@@ -221,6 +250,14 @@ function sanitizeForCapture(baseHref: string): void {
   document.querySelectorAll("video").forEach((v) => {
     v.removeAttribute("autoplay")
     if (!v.getAttribute("preload")) v.setAttribute("preload", "auto")
+    // sans son flux (jugé réseau coupé), une vidéo n'a plus de ratio : le navigateur retombe
+    // sur 300×150 et la mise en page bouge (monday : 398 px en ligne, 384 dans le clone,
+    // tout le bas de page décalé). On écrit ses dimensions intrinsèques dans les attributs.
+    const w = v.videoWidth || Math.round(v.getBoundingClientRect().width)
+    const h = v.videoHeight || Math.round(v.getBoundingClientRect().height)
+    if (w > 0 && h > 0 && !v.hasAttribute("width") && !v.hasAttribute("height")) {
+      v.setAttribute("width", String(w)); v.setAttribute("height", String(h))
+    }
   })
   // le lazy-load a déjà eu lieu (autoScroll) et l'état est figé : dans le clone, tout doit
   // se rendre sans scroll — sinon les images sous le pli manquent au screenshot du juge
@@ -298,7 +335,7 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
   await rm(join(dir, "assets"), { recursive: true, force: true })
   await mkdir(join(dir, "assets"), { recursive: true })
 
-  const browser = await chromium.launch({ args: ["--no-sandbox", "--hide-scrollbars"] })
+  const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
     const page: Page = await browser.newPage({ viewport: DESKTOP, userAgent: UA })
     // tsx/esbuild enveloppe les fonctions d'un helper __name ; il n'existe pas dans la page
@@ -389,6 +426,7 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
       await page.waitForTimeout(400) // laisse peindre l'état gelé
       await page.screenshot({ path: join(dir, "original.png"), fullPage: true })
       await posterizeVideos(page, dir, "desktop")
+      await page.evaluate(recopieOmbre) // avant la sérialisation, cf. ombre.ts
       await page.evaluate(sanitizeForCapture, url)
       return page.content()
     })
@@ -408,6 +446,7 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
       await page.waitForTimeout(400)
       await page.screenshot({ path: join(dir, "original.mobile.png"), fullPage: true })
       await posterizeVideos(page, dir, "mobile")
+      await page.evaluate(recopieOmbre)
       await page.evaluate(sanitizeForCapture, url) // idempotent (base/adopted gardés)
       return page.content()
     })
@@ -417,7 +456,11 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
     const assetsLocaux = await timed(SCOPE, "rapatriement des octets (css/fonts/images)", async () => {
       let fichiers = 0, octets = 0
       for (const [u, pending] of bodies) {
-        const body = await pending
+        // un flux qui ne finit jamais (event-stream, long-poll, média interrompu) rendrait la
+        // capture éternelle : Asana est resté 18 min ici sans un mot. Passé le délai, la
+        // ressource reste distante et on le dit.
+        const body = await Promise.race([pending, new Promise<null>((res) => setTimeout(() => res(null), 20_000).unref())])
+        if (body === null && seen.get(u)) step(SCOPE, `octets jamais arrivés en 20 s, reste distant : ${u.slice(0, 120)}`)
         const r = seen.get(u)
         if (!body || !r || body.length === 0) continue
         if (body.length > MAX_ASSET_BYTES) {

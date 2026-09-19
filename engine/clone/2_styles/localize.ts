@@ -20,7 +20,8 @@
  * Usage : npm run styles -- <dossier-baseline>
  * Export : localizeStyles(dir) ; rewriteCssText et buildLocalMap sont réutilisés par 3_assets.
  */
-import { chromium } from "playwright"
+import { recopieOmbre } from "../1_acquire/ombre.ts"
+import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, basename } from "node:path"
@@ -124,7 +125,7 @@ export async function localizeStyles(dir: string): Promise<StylesReport> {
 
   // 2 · capture(.mobile).html : <link> vers assets/, <style> réécrits — Chromium, réseau coupé
   let liensLocalises = 0
-  const browser = await chromium.launch({ args: ["--no-sandbox"] })
+  const browser = await lancerNavigateur()
   try {
     for (const nom of ["capture.html", "capture.mobile.html"]) {
       const fichier = join(dir, nom)
@@ -147,7 +148,13 @@ export async function localizeStyles(dir: string): Promise<StylesReport> {
           if (!raw || raw.startsWith("assets/") || /^(data:|blob:)/i.test(raw)) return
           let abs: string
           try { abs = new URL(raw, base).href } catch { return }
-          if (m[abs]) { l.setAttribute("href", "assets/" + m[abs]); out.localises++ }
+          if (m[abs]) {
+            l.setAttribute("href", "assets/" + m[abs]); out.localises++
+            // la feuille est réécrite (urls → assets/) : l'empreinte SRI d'origine ne correspond
+            // plus et le navigateur refuserait TOUTE la feuille en silence (monday : 2,4 Mo de
+            // CSS perdus, méga-menu déplié en flux sur 30 000 px, pris pour un scroll-jack)
+            l.removeAttribute("integrity"); l.removeAttribute("crossorigin")
+          }
           else { l.setAttribute("href", abs); out.distants.push(abs) }
         })
         return out
@@ -174,7 +181,7 @@ export async function localizeStyles(dir: string): Promise<StylesReport> {
           })
         }, nouveaux)
 
-      await writeFile(fichier, await page.content())
+      await writeFile(fichier, await page.evaluate(recopieOmbre).then(() => page.content()))
       await page.close()
       step(SCOPE, `${nom} : ${liens.localises} <link> localisés · ${stylesTouches} <style> réécrits`)
     }

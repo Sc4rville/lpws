@@ -15,7 +15,9 @@
  * Le texte est posé via textContent : pas d'injection de balises, donc pas de HTML libre
  * qui contournerait la règle des ancres.
  */
-import { chromium, type Browser } from "playwright"
+import { recopieOmbre } from "../clone/1_acquire/ombre.ts"
+import { lancerNavigateur } from "../shared/navigateur.ts"
+import { type Browser } from "playwright"
 import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -276,7 +278,7 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
 export async function applyEdits(
   baselineDir: string, outDir: string, edits: Edit[],
 ): Promise<ApplyReport[]> {
-  const browser: Browser = await chromium.launch({ args: ["--no-sandbox"] })
+  const browser: Browser = await lancerNavigateur()
   const rapports: ApplyReport[] = []
   try {
     for (const [source, cible] of [
@@ -306,7 +308,7 @@ export async function applyEdits(
           `ancres introuvables dans ${source} : ${manquantes.join(", ")} — ` +
           "la variante n'est pas applicable sur cette baseline (recapturer ou corriger la spec)")
 
-      await writeFile(join(outDir, cible), await page.content())
+      await writeFile(join(outDir, cible), await page.evaluate(recopieOmbre).then(() => page.content()))
       await page.close()
       rapports.push({ fichier: cible, appliquees: journal.length, journal, manquesDesign: ds.manques })
       step(SCOPE, `${cible} : ${edits.length} édition(s) → ${journal.length} changement(s)` +

@@ -322,6 +322,42 @@ des comptes utilisateurs (un mot de passe pour deux), Intégral.
 
 ---
 
+## 2026-09-19 (soir) · Contrôler : les cinq points que j'avais listés comme « pas parfaits »
+
+kabylesystem : « bah règle tout ça ». Méthode : cause prouvée avant chaque correctif (skill
+`systematic-debugging`), une hypothèse à la fois, mesure avant/après par le juge du corpus.
+
+| Point | Cause trouvée | Correctif | Avant → après |
+|---|---|---|---|
+| monday « scroll-jack » | ce n'était pas un scroll-jack : la feuille CSS de 2,4 Mo porte un attribut `integrity` (empreinte SRI) ; réécrite en local, l'empreinte ne correspond plus et le navigateur la **refuse en silence** ; le méga-menu se déplie en flux sur 30 000 px | `2_styles` retire `integrity`/`crossorigin` sur toute feuille localisée | 24 % / 30 % (capture tronquée à 16 000 px) → 4,7 % / 0,9 % |
+| monday, suite | le JS imbrique `<button>` dans `<button>` ; l'analyseur HTML ferme le premier à l'ouverture du second et chaque `</div>` orphelin fait remonter la suite d'un cran : cinq carrousels d'une section mobile cachée se retrouvaient dans le flux visible | `sanitizeForCapture` remplace l'élément extérieur par une balise neutre (`role`, styles UA figés en inline) | (compris dans la ligne du dessus) |
+| Salesforce 403 | Akamai reconnaît le « headless shell » de Playwright ; le Chromium complet en headless avec un UA sans « Headless » passe | `engine/shared/navigateur.ts` : un seul lanceur, `channel: "chromium"` + UA | échec franc → 1,2 % / 0,04 % |
+| Salesforce, suite | Lightning rend l'en-tête, la barre de recherche, la vidéo et le pied dans des **racines fantômes** (shadow DOM) que `outerHTML` ignore : trous blancs dans le clone. Et chaque étape qui recharge puis réécrit `capture.html` les perdait à nouveau (l'analyseur consomme le gabarit) | `1_acquire/ombre.ts` : chaque racine ouverte recopiée en `<template shadowrootmode="open">` (+ feuilles construites), rappelé avant chaque `page.content()` (acquire, 2_styles, 3_assets, apply) | 2,7 % / 27,7 % → 1,2 % / 0,04 % |
+| Asana bloqué | `res.body()` d'une ressource qui ne finit jamais : 18 min sans un mot | délai de 20 s par ressource, la ressource reste distante et c'est dit | bloqué → 2,1 % / 0,2 % |
+| Asana, suite | l'accordéon des intégrations s'ouvrait encore à la photo (334 px de vide dans la référence) alors que le DOM sérialisé portait sa classe finale : référence et clone racontaient deux instants | `freezePage` mène toutes les animations à leur terme (`document.getAnimations()`) avant la photo | 6,2 % → 1,3 % desktop |
+| Jira 13 % d'ancres ambiguës | menu dupliqué (desktop + mobile) : deux copies au même score, et le départage prenait le **signe** de l'écart d'ordre, donc la copie croisée | départage par la distance à la diagonale (`Math.abs`) | 411/471 → **471/471, 0 faux, 0 ambiguë** (HubSpot 973/973, Relay 68/68) |
+| 9 règles sans capteur | 6 rendaient `null` sans condition | trois capteurs : **vitesse** (LCP médian de la vraie page, 3 tirs), **mesure** (tags GTM / gtag / Meta / autres vus au chargement : sans aucun, aucune conversion ne peut remonter), **paiement** (marqueurs de confiance : sécurisé, Visa, PayPal…) ; `te-vitesse`, `te-mesure-cassee`, `fr-securite-paiement` les lisent | Relay : aucun tag, LCP 316 ms · HubSpot : GTM + gtag, LCP 688 ms |
+
+**La régression que j'ai créée, puis comprise** : après le nouveau lanceur, Jira est passé à
+**14 %** de différence. Cause : la référence était photographiée par le Chromium complet, le
+clone jugé par le headless shell, deux moteurs dont les métriques de texte diffèrent (Salesforce
+mobile : même police chargée, lignes coupées ailleurs). **Un seul navigateur partout** (juge,
+apply, interface compris) : Jira 0,8 % / 0,4 %, HubSpot 0,05 % / 0,16 %.
+
+**Le juge de la balise testait ce qui était en ligne, pas le candidat** : la page de démo a un
+test à 100 %, sa propre balise appliquait la variante, le témoin « fuyait ». Le juge coupe
+désormais la balise de la page (quel que soit l'hôte) et sert la config candidate à toute
+adresse `/v/<client>.json`. Relay : 3/3, masque 85 ms, retard 17 ms.
+
+**Ce qui reste, dit tel quel** : monday desktop 4,7 % (une colonne vidéo dans un flex
+`align-items:center` fait 677 px au lieu de 701 : le rétrécissement au contenu diffère de 24 px,
+cause non isolée après huit sondes, le seuil est à 3 %) · les 3 règles restantes sans capteur sont
+de méthode (`me-qualite`, `me-couleur-bouton`) ou hors page (`fr-compte-obligatoire` : le tunnel de
+commande) · les ancres ne descendent pas dans le shadow DOM (l'en-tête Salesforce est visible
+mais pas éditable).
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

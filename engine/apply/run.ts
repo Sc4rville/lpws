@@ -14,7 +14,7 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { chromium } from "playwright"
+import { lancerNavigateur } from "../shared/navigateur.ts"
 import { VariantSpec } from "./spec.ts"
 import { applyEdits } from "./apply.ts"
 import { visualDiff } from "../clone/5_verify/diff.ts"
@@ -43,7 +43,7 @@ async function shoot(
   vdir: string, bdir: string, fichier: string,
   viewport: { width: number; height: number }, out: string, ancres: string[] = [],
 ): Promise<Record<string, number>> {
-  const browser = await chromium.launch({ args: ["--no-sandbox", "--hide-scrollbars"] })
+  const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
     const page = await browser.newPage({ viewport })
     await page.addInitScript({ content: "window.__name = (f) => f" })

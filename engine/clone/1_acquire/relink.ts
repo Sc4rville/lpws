@@ -166,7 +166,9 @@ export function relier(avant: Empreinte[], apres: Empreinte[]): Rapport {
       const s = score(avant[i], apres[j])
       if (s >= SEUIL_FENETRE) locales.push({ i, j, s })
     }
-    locales.sort((x, y) => y.s - x.s || (x.i - x.j) - (y.i - y.j))
+    // à score égal, la paire la plus proche de la diagonale : un menu dupliqué (desktop + mobile)
+    // donne deux copies au même score, et le signe seul choisissait la copie croisée
+    locales.sort((x, y) => y.s - x.s || Math.abs(x.i - x.j) - Math.abs(y.i - y.j))
     const retenues: { i: number; j: number; s: number }[] = []
     const vuA = new Set<number>(), vuB = new Set<number>()
     for (const p of locales) {
