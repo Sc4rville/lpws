@@ -27,6 +27,16 @@
 
 /** Marque le DOM. Retourne le nombre d'éléments et de sections marqués. */
 export function markDom(): { elements: number; sections: number } {
+  // LES ANCRES DESCENDENT DANS LE SHADOW DOM (racines ouvertes). En-tête, recherche, vidéo,
+  // pied chez Salesforce (Lightning) vivent là : sans ça, visibles dans le clone, jamais éditables.
+  // Fonction de page : les aides sont recopiées ici, page.evaluate n'embarque que ce corps.
+  const racinesDom = (): (Document | ShadowRoot)[] => {
+    const out: (Document | ShadowRoot)[] = [document]
+    for (let i = 0; i < out.length; i++) out[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(el.shadowRoot) })
+    return out
+  }
+  const tous = (sel: string): Element[] => racinesDom().flatMap((r) => [...r.querySelectorAll(sel)])
+  const parentDe = (el: Element): Element | null => el.parentElement ?? ((el.getRootNode() as ShadowRoot).host ?? null)
   // structure (sections de haut niveau) + contenu (ce qu'une variante voudra éditer)
   const SELECTOR = [
     // structure
@@ -40,7 +50,7 @@ export function markDom(): { elements: number; sections: number } {
   ].join(",")
 
   let n = 0
-  document.querySelectorAll(SELECTOR).forEach((el) => {
+  tous(SELECTOR).forEach((el) => {
     // les svg décoratifs imbriqués dans un élément déjà marqué n'apportent rien
     if (el.tagName.toLowerCase() === "svg" && (el.parentElement?.closest("a,button") ?? null)) return
     el.setAttribute("data-lpws", `e${++n}`)

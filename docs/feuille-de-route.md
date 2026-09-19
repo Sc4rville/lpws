@@ -31,9 +31,9 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ⬜ Attendre la fin des animations avant de geler *(héros Jira figé en pleine transition : fidèle mais pas livrable)*
 - ⬜ Délai maximum par ressource au rapatriement *(clone Asana interrompu sans message, cause non identifiée)*
 - ⬜ Stratégie pour les sites anti-bot *(Salesforce/Akamai — à décider quand un vrai client le demande)*
-- ✅ monday : ce n'était pas un scroll-jack mais une feuille CSS refusée (SRI) et une imbrication `<button>` non re-parsable ; corrigés (4,7 % / 0,9 %)
+- ✅ monday : ce n'était pas un scroll-jack mais une feuille CSS refusée (SRI), une imbrication `<button>` non re-parsable et une affiche de vidéo plus petite que sa trame ; corrigés (0,2 % / 0,9 %)
 - ✅ Anti-bot (Akamai / Salesforce) : Chromium complet + UA réel, un seul navigateur pour la capture et le juge
-- ✅ Shadow DOM recopié en `<template shadowrootmode>` (Salesforce : en-tête, vidéo, pied)
+- ✅ Shadow DOM recopié en `<template shadowrootmode>` (Salesforce : en-tête, vidéo, pied) ; les ancres, sélecteurs (`hôte >>> intérieur`), le loader et apply y descendent (lien de l'en-tête Salesforce édité et jugé 3/3)
 - ✅ Animations menées à terme avant la photo de référence (Asana) · délai par ressource (plus de capture éternelle)
 - ⬜ Décider s'il faut un troisième viewport (tablette)
 

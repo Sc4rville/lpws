@@ -23,7 +23,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { build } from "esbuild"
-import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { lancerNavigateur, UA } from "../../shared/navigateur.ts"
 import { VariantSpec } from "../../apply/spec.ts"
 import { markDom } from "../../clone/1_acquire/mark.ts"
 import { fingerprintDom, type Empreinte } from "../../clone/1_acquire/fingerprint.ts"
@@ -75,7 +75,7 @@ async function resoudreSurLeLive(
   try {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 900 },
-      userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      userAgent: UA,
     })
     // cf. note __name dans 1_acquire/render.ts : esbuild nomme les fonctions injectées
     await page.addInitScript({ content: "window.__name = (f) => f" })
@@ -110,8 +110,13 @@ async function resoudreSurLeLive(
     for (const a of ancres) {
       const vivante = lien.get(a)
       const c = vivante ? derives[vivante] : null
-      if (c) brutes[a] = c
-      else manquees.push(a)
+      if (c) { brutes[a] = c; step(SCOPE, `  ${a} → ${vivante} → ${c.sel}${c.rang !== undefined ? ` (rang ${c.rang})` : ""}`) }
+      else {
+        // dire À QUELLE ÉTAPE la cible tombe : re-liage ou dérivation, ce n'est pas la même réparation
+        const amb = rapport.ambigus.find((x) => x.avant === a)
+        step(SCOPE, `  ${a} : ${!vivante ? (amb ? `ambiguë sur le live (${amb.candidats.map((k) => k.apres + ":" + k.score).join(", ")})` : "introuvable sur le live") : `re-liée en ${vivante} mais aucun sélecteur unique dérivable`}`)
+        manquees.push(a)
+      }
     }
 
     /* ——— la seconde passe, et elle n'est pas optionnelle ———
@@ -124,7 +129,9 @@ async function resoudreSurLeLive(
     // à la seconde et fausse la mesure du « ce que voit le visiteur »
     await page.close()
 
-    const tot = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    // même identité que la première page : sans UA, le Chromium headless se présente en
+    // « HeadlessChrome » et Akamai sert « Access Denied » à cette seconde ouverture (Salesforce)
+    const tot = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
     await tot.addInitScript({ content: "window.__name = (f) => f" })
     await tot.goto(urlNeutre, { waitUntil: "domcontentloaded", timeout: 60_000 })
 
@@ -158,7 +165,7 @@ async function resoudreSurLeLive(
       if (c) {
         cibles[a] = c
         if (apparitions[a] > budgetMasque) tardives.push(a)
-      } else manquees.push(a)
+      } else { step(SCOPE, `  ${a} : dérivée (${brutes[a].sel}) mais introuvable à l'ouverture de la page, ${24 * 150} ms durant`); manquees.push(a) }
     }
     const apparitionMax = Math.max(0, ...Object.values(apparitions))
 

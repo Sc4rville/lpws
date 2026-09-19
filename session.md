@@ -98,6 +98,10 @@ playground, mesure), sur les données réelles du corpus.
 - Re-liage : **471/471 sur Jira, 0 faux, 0 ambiguë** (départage par distance à la diagonale).
 - Brain : capteurs vitesse (LCP réel), mesure (tags présents), paiement ; 3 règles de plus évaluables.
 - Juge de la balise : coupe la balise déjà en ligne, teste le candidat seul.
+- **Les quatre restes réglés et prouvés** : Asana (corps `google-analytics.com/batch` sans fin, garde
+  chronométrée), monday **0,20 % / 0,91 %** (affiche de vidéo redessinée à la taille de la trame),
+  re-liage capture ↔ page vivante Jira 471/471 et HubSpot 973/973, **ancres dans le shadow DOM**
+  (Salesforce : 1 608 ancres dans l'ombre, lien de l'en-tête édité et jugé 3/3 sur le site).
 
 ## La feuille de route
 [docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
@@ -125,5 +129,4 @@ le juge avant d'accuser le code.
   ou basculer sur `lpws-app.vercel.app` (le projet qui publie aujourd'hui).
 - Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
 - Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
-- monday desktop 4,7 % (seuil 3 %) : une colonne vidéo 24 px plus étroite dans un flex centré, cause non isolée.
-- Les ancres ne descendent pas dans le shadow DOM (en-tête Salesforce visible, pas éditable).
+- Racines fantômes FERMÉES (`mode: closed`) : inaccessibles, restent un trou dans le clone.

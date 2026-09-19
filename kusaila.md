@@ -349,12 +349,25 @@ test à 100 %, sa propre balise appliquait la variante, le témoin « fuyait ».
 désormais la balise de la page (quel que soit l'hôte) et sert la config candidate à toute
 adresse `/v/<client>.json`. Relay : 3/3, masque 85 ms, retard 17 ms.
 
-**Ce qui reste, dit tel quel** : monday desktop 4,7 % (une colonne vidéo dans un flex
-`align-items:center` fait 677 px au lieu de 701 : le rétrécissement au contenu diffère de 24 px,
-cause non isolée après huit sondes, le seuil est à 3 %) · les 3 règles restantes sans capteur sont
-de méthode (`me-qualite`, `me-couleur-bouton`) ou hors page (`fr-compte-obligatoire` : le tunnel de
-commande) · les ancres ne descendent pas dans le shadow DOM (l'en-tête Salesforce est visible
-mais pas éditable).
+**Puis « t'es sûr ? » et « règle tout, tu dois tout m'affirmer »** : les quatre restes, un par un.
+
+| Reste | Preuve obtenue | Correctif |
+|---|---|---|
+| Asana : cause du blocage inconnue | la garde chronométrée a parlé, deux fois de suite : `google-analytics.com/batch`, réponse 200 dont le corps ne finit jamais ; `attendreOctets` testé sur une promesse qui ne se résout pas (null après 1 500 ms) | la garde ne dépend plus de la boucle d'événements (`clearTimeout`, sans `unref`), et le journal nomme la ressource |
+| monday desktop 4,7 % | toutes les propriétés calculées identiques sur la chaîne ; le seul écart : l'affiche de la vidéo (700×397) contre la trame (2080×1180). La page vivante lisait la vidéo, donc se dimensionnait sur la trame ; le clone, figé, sur l'affiche : une colonne ajustée au contenu perdait 24 px | `3_assets` redessine chaque affiche à la taille de la trame (servi en http : une image en `file://` souille le canvas). monday : **0,20 % / 0,91 %**, fidèle |
+| Jira 471/471 sur une mutation synthétique | re-liage **capture ↔ page vivante** (`npm run tag`) : Jira 471/471, HubSpot 973/973, 0 ambiguë, 0 perdue | rien à corriger, c'était à mesurer |
+| les ancres n'entraient pas dans le shadow DOM | Salesforce : 1 957 empreintes au lieu de 1 100, dont **1 608 dans des racines fantômes** ; un lien de l'en-tête (deux niveaux d'ombre) édité sur le clone, résolu en `hgf-c360nav >>> #l1-4-l2-1 > … >>> a.c360-panel-linkedlist__hero-cta`, jugé **3/3** sur salesforce.com, témoin 0, aperçu 1, stop 0 | marquage, empreintes, sélecteurs (`hôte >>> intérieur`), loader, apply et juge descendent dans les racines ouvertes ; le juge lit aussi les textes édités dans l'ombre |
+
+Trouvé en chemin : la **seconde ouverture** du constructeur de balise n'avait pas de User-Agent
+(Akamai lui servait « Access Denied », d'où « cible introuvable à l'ouverture ») ; un
+**aria-label qui répète le titre** n'est plus un sélecteur (il change avec le titre) ; trois
+« Start for free » identiques se départagent par leur **rang** relevé à la construction ; le
+constructeur dit désormais **à quelle étape** une cible tombe (re-liage, dérivation, ouverture).
+
+**Corpus final, même navigateur pour la référence et le juge** : HubSpot 0,05 % / 0,16 % ·
+Jira 0,8 % / 0,4 % · Salesforce **0,03 % / 0,04 %** · Asana 2,1 % / 0,2 % · monday 0,20 % / 0,91 %.
+Ce qui reste hors capteur : `me-qualite`, `me-couleur-bouton` (méthode) et
+`fr-compte-obligatoire` (le tunnel de commande, pas la page).
 
 ---
 

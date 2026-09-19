@@ -30,6 +30,9 @@ export type Cible = {
   role: string
   /** début du texte au moment de la construction — tronqué, c'est un témoin pas une copie */
   texte: string
+  /** quand plusieurs éléments portent le même rôle et le même texte (« Start for free » trois
+   *  fois sur une page) : le rang du nôtre dans l'ordre du document, pour choisir sans deviner */
+  rang?: number
 }
 
 /**
@@ -47,6 +50,25 @@ export type Cible = {
 export function resoudreCibles(
   arg: { ancres?: string[]; cibles?: Record<string, Cible> },
 ): Record<string, Cible | null> {
+  // LES ANCRES DESCENDENT DANS LE SHADOW DOM (racines ouvertes). En-tête, recherche, vidéo,
+  // pied chez Salesforce (Lightning) vivent là : sans ça, visibles dans le clone, jamais éditables.
+  // Fonction de page : les aides sont recopiées ici, page.evaluate n'embarque que ce corps.
+  const racinesDom = (): (Document | ShadowRoot)[] => {
+    const out: (Document | ShadowRoot)[] = [document]
+    for (let i = 0; i < out.length; i++) out[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(el.shadowRoot) })
+    return out
+  }
+  // « hôte >>> intérieur » : l'intérieur se cherche dans la racine fantôme de chaque hôte ;
+  // sans « >>> », un sélecteur se cherche dans toutes les racines
+  const tous = (sel: string): Element[] => {
+    const parts = sel.split(" >>> ")
+    if (parts.length === 1) return racinesDom().flatMap((r) => [...r.querySelectorAll(sel)])
+    let racines: (Document | ShadowRoot)[] = [document]
+    for (const seg of parts.slice(0, -1)) {
+      racines = racines.flatMap((r) => [...r.querySelectorAll(seg)]).map((h) => h.shadowRoot).filter((x): x is ShadowRoot => !!x)
+    }
+    return racines.flatMap((r) => [...r.querySelectorAll(parts[parts.length - 1])])
+  }
   const jetable = (c: string) =>
     /^(css|sc|jsx|emotion|styles?)[-_][a-z0-9]{4,}$/i.test(c)
     || /^[a-z]{1,3}[-_]?[0-9a-f]{6,}$/i.test(c)
@@ -80,12 +102,25 @@ export function resoudreCibles(
   /** Dérive le sélecteur le plus court qui désigne CET élément et lui seul. */
   const deriver = (el: Element | null): Cible | null => {
     if (!el) return null
+    // dans une racine fantôme, le sélecteur est unique DANS cette racine et préfixé par celui de
+    // l'hôte (« article > pbc-button:nth-of-type(2) >>> a.cta_button ») ; sinon, unique partout
+    const racine = el.getRootNode()
+    const ombre = racine instanceof ShadowRoot ? racine : null
+    let prefixe = ""
+    if (ombre) {
+      const hote = deriver(ombre.host)
+      if (!hote) return null
+      prefixe = hote.sel + " >>> "
+    }
     const seul = (sel: string): boolean => {
       try {
-        const trouve = document.querySelectorAll(sel)
+        const trouve = ombre ? [...ombre.querySelectorAll(sel)] : tous(sel)
         return trouve.length === 1 && trouve[0] === el
       } catch { return false }
     }
+    const memes = tous("*").filter((n) => roleDe(n) === roleDe(el) && norme(n) === norme(el))
+    const rang = memes.length > 1 ? memes.indexOf(el) : undefined
+    const cible = (sel: string): Cible => ({ sel: prefixe + sel, role: roleDe(el), texte: norme(el), ...(rang !== undefined ? { rang } : {}) })
 
     /* 1. les poignées que le site a posées lui-même : elles ont un sens, elles durent */
     const candidats: string[] = []
@@ -93,12 +128,14 @@ export function resoudreCibles(
     if (id && !jetable(id) && !/^\d/.test(id)) candidats.push(`#${echappe(id)}`)
     for (const attr of ["data-testid", "data-test", "data-cy", "data-qa", "name", "aria-label"]) {
       const v = el.getAttribute(attr)
-      if (v && v.length < 80) candidats.push(`[${attr}="${v.replace(/"/g, '\\"')}"]`)
+      // un aria-label qui répète le titre (« Start for free: The world's #1 agentic CRM… »)
+      // change avec le titre : trop long ou avec une phrase dedans, on ne s'y fie pas
+      if (v && v.length < 80 && !(attr === "aria-label" && (v.length > 40 || /[:.]\s/.test(v)))) candidats.push(`[${attr}="${v.replace(/"/g, '\\"')}"]`)
     }
     const tag = el.tagName.toLowerCase()
     const classes = [...el.classList].filter((c) => c && !jetable(c))
     if (classes.length) candidats.push(tag + classes.slice(0, 3).map((c) => "." + echappe(c)).join(""))
-    for (const c of candidats) if (seul(c)) return { sel: c, role: roleDe(el), texte: norme(el) }
+    for (const c of candidats) if (seul(c)) return cible(c)
 
     /* 2. sinon un chemin par position, MAIS ancré sur une poignée stable.
      *
@@ -114,35 +151,36 @@ export function resoudreCibles(
       const pid = n.getAttribute("id")
       if (pid && !jetable(pid) && !/^\d/.test(pid)) {
         const essai = `#${echappe(pid)} > ${chemin}`
-        if (seul(essai)) return { sel: essai, role: roleDe(el), texte: norme(el) }
+        if (seul(essai)) return cible(essai)
       }
       for (const attr of ["data-testid", "data-test", "data-cy", "data-qa"]) {
         const v = n.getAttribute(attr)
         if (!v || v.length >= 80) continue
         const essai = `[${attr}="${v.replace(/"/g, '\\"')}"] ${chemin}`
-        if (seul(essai)) return { sel: essai, role: roleDe(el), texte: norme(el) }
+        if (seul(essai)) return cible(essai)
       }
       const pcls = [...n.classList].filter((c) => c && !jetable(c))
       if (pcls.length) {
         const essai = `${n.tagName.toLowerCase()}${pcls.slice(0, 2).map((c) => "." + echappe(c)).join("")} ${chemin}`
-        if (seul(essai)) return { sel: essai, role: roleDe(el), texte: norme(el) }
+        if (seul(essai)) return cible(essai)
       }
       chemin = `${pas(n)} > ${chemin}`
       n = n.parentElement
     }
+    if (seul(chemin)) return cible(chemin)
     return null
   }
 
   const out: Record<string, Cible | null> = {}
 
   if (arg.ancres) {
-    for (const a of arg.ancres) out[a] = deriver(document.querySelector(`[data-lpws="${a}"]`))
+    for (const a of arg.ancres) out[a] = deriver(tous(`[data-lpws="${a}"]`)[0] ?? null)
     return out
   }
 
   for (const [a, c] of Object.entries(arg.cibles ?? {})) {
     let el: Element | null = null
-    try { el = document.querySelector(c.sel) } catch { el = null }
+    try { el = tous(c.sel)[0] ?? null } catch { el = null }
     const colle = (x: Element) => {
       const t = norme(x)
       return roleDe(x) === c.role && (t === c.texte || t.indexOf(c.texte) === 0 || c.texte.indexOf(t) === 0)
@@ -150,11 +188,13 @@ export function resoudreCibles(
     if (el && colle(el)) { out[a] = deriver(el); continue }
 
     // le sélecteur ne tient pas sur cet état : on repart du témoin
-    const tous = [...document.querySelectorAll("*")]
-    const exact = tous.filter((n) => roleDe(n) === c.role && norme(n) === c.texte)
+    const toutElement = tous("*")
+    const exact = toutElement.filter((n) => roleDe(n) === c.role && norme(n) === c.texte)
     const proches = exact.length ? exact
-      : tous.filter((n) => roleDe(n) === c.role && c.texte.length > 8 && norme(n).indexOf(c.texte) === 0)
-    out[a] = proches.length === 1 ? deriver(proches[0]) : null
+      : toutElement.filter((n) => roleDe(n) === c.role && c.texte.length > 8 && norme(n).indexOf(c.texte) === 0)
+    // plusieurs candidats identiques : le rang relevé à la construction tranche, le témoin a déjà tenu
+    out[a] = proches.length === 1 ? deriver(proches[0])
+      : (c.rang !== undefined && proches.length > c.rang ? deriver(proches[c.rang]) : null)
   }
   return out
 }

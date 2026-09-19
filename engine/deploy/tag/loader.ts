@@ -138,6 +138,30 @@ const roleDe = (n: Element): string => {
  * Le témoin ne réclame pas l'identique : le client a le droit de corriger une coquille ou de
  * faire tourner un titre. Il réclame que ce soit encore LE MÊME élément.
  */
+/** Toutes les racines : le document et chaque racine fantôme ouverte (Lightning, web components). */
+function racinesOmbre(): ShadowRoot[] {
+  const out: ShadowRoot[] = []
+  const files: (Document | ShadowRoot)[] = [document]
+  for (let i = 0; i < files.length; i++) files[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) { out.push(el.shadowRoot); files.push(el.shadowRoot) } })
+  return out
+}
+/** querySelectorAll qui descend dans le shadow DOM : une cible d'en-tête Salesforce est là-dedans. */
+function partout(sel: string): Element[] {
+  const parts = sel.split(" >>> ")
+  if (parts.length === 1) {
+    const out: Element[] = [...document.querySelectorAll(sel)]
+    for (const r of racinesOmbre()) out.push(...r.querySelectorAll(sel))
+    return out
+  }
+  // « hôte >>> intérieur » : l'intérieur vit dans la racine fantôme de l'hôte
+  let racines: (Document | ShadowRoot)[] = [document]
+  for (const seg of parts.slice(0, -1)) {
+    const hotes = racines.flatMap((r) => [...r.querySelectorAll(seg)])
+    racines = hotes.map((h) => h.shadowRoot).filter((x): x is ShadowRoot => !!x)
+  }
+  return racines.flatMap((r) => [...r.querySelectorAll(parts[parts.length - 1])])
+}
+
 function concorde(el: Element, c: Cible): boolean {
   if (roleDe(el) !== c.role) return false
   const a = c.texte
@@ -176,11 +200,13 @@ function resoudre(edits: EditTag[]): { resolus: Resolu[]; abandons: string[] } {
    */
   const trouver = (c: Cible): Element | null => {
     let tous: Element[] = []
-    try { tous = [...document.querySelectorAll(c.sel)] } catch { tracer(`sel invalide ${c.sel}`); return null }
+    try { tous = partout(c.sel) } catch { tracer(`sel invalide ${c.sel}`); return null }
     if (tous.length === 0) { tracer(`0 candidat pour ${c.sel}`); return null }
     const colle = tous.filter((el) => concorde(el, c))
     if (colle.length !== 1) tracer(`${tous.length} candidat(s), ${colle.length} concordant(s) pour ${c.sel}`)
-    return colle.length === 1 ? colle[0] : null
+    if (colle.length === 1) return colle[0]
+    // plusieurs concordants (trois « Start for free ») : le rang relevé à la construction, si le compte tient
+    return c.rang !== undefined && colle.length > c.rang ? colle[c.rang] : null
   }
   for (const e of edits) {
     const el = trouver(e.cible)
@@ -387,7 +413,7 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
         }
         // le nœud a été remplacé : on le retrouve
         let tous: Element[] = []
-        try { tous = [...document.querySelectorAll(a.cible.sel)] } catch { continue }
+        try { tous = partout(a.cible.sel) } catch { continue }
         if (tous.some((el) => lu(el) === a.texte)) continue
         const repris = tous.filter((el) => concorde(el, a.cible))
         if (repris.length === 0) continue
@@ -400,6 +426,7 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
     if (observateur) { observateur.disconnect(); observateur = null }
     const obs2 = new MutationObserver(verifier)
     obs2.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+    for (const r of racinesOmbre()) obs2.observe(r, { childList: true, subtree: true, characterData: true })
     setTimeout(() => {
       obs2.disconnect()
       const w = window as unknown as { __lpws?: Record<string, unknown> }
@@ -424,6 +451,7 @@ function poser(cfg: ConfigServie, reveler: () => void, t0: number): void {
   if (!fini && typeof MutationObserver !== "undefined") {
     observateur = new MutationObserver(essayer)
     observateur.observe(document.documentElement, { childList: true, subtree: true })
+    for (const r of racinesOmbre()) observateur.observe(r, { childList: true, subtree: true })
     setTimeout(() => { if (!fini) { essayer(); terminer("controle-repli", 0, [`aucune cible après ${essais} essai(s)`]) } },
       delaiMax)
   }

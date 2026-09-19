@@ -11,7 +11,7 @@
  *
  * Usage : npm run lcp -- <dossier-baseline> <spec.json> [--tirs 5]
  */
-import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { lancerNavigateur, UA } from "../../shared/navigateur.ts"
 import { type Browser } from "playwright"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -28,7 +28,7 @@ const SONDE = `(function(){ if(window.top!==window.self) return;
 })();`
 
 async function mesure(b: Browser, url: string, loader: string | null, cfg: unknown, client: string, attente: number): Promise<number> {
-  const p = await b.newPage({ viewport: { width: 1440, height: 900 } })
+  const p = await b.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
   await p.addInitScript({ content: SONDE })
   if (cfg) await p.route(`${BASE}/v/${client}.json`, (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify(cfg) }))

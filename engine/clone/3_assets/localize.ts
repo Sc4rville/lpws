@@ -20,7 +20,9 @@
  * Usage : npm run assets -- <dossier-baseline>
  * Export : localizeAssets(dir)
  */
+import { createHash } from "node:crypto"
 import { recopieOmbre } from "../1_acquire/ombre.ts"
+import type { Browser } from "playwright"
 import { lancerNavigateur } from "../../shared/navigateur.ts"
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -153,6 +155,7 @@ export async function localizeAssets(dir: string): Promise<AssetsReport> {
       }, { sel: selecteur, texts: nouveaux })
 
     await writeFile(fichier, await page.evaluate(recopieOmbre).then(() => page.content()))
+    await redessinerAffiches(browser, dir, fichier)
     await page.close()
 
     cumul.locaux += stats.locaux // r.reecrites des styles inline déjà comptées dedans
@@ -182,4 +185,54 @@ if (process.argv[1]?.replace(/\\/g, "/").endsWith("3_assets/localize.ts")) {
   const dir = process.argv.slice(2).find((a) => !a.startsWith("--"))
   if (!dir) fail(SCOPE, "usage : npm run assets -- <dossier-baseline>")
   localizeAssets(dir).then((r) => console.log(JSON.stringify(r, null, 2)))
+}
+
+/**
+ * L'AFFICHE D'UNE VIDÉO DOIT AVOIR LA TAILLE DE SA TRAME. Figée avant lecture, une vidéo est
+ * dimensionnée sur son poster (monday : 700×397) là où la page vivante, qui la lisait, se
+ * dimensionnait sur la trame (2080×1180) ; une colonne ajustée au contenu perdait 24 px et tout
+ * le bas de page se décalait (4,7 % de différence). 1_acquire a écrit width/height ; ici, poster
+ * local en main, on le redessine à cette taille. Servi en http (une image chargée en file://
+ * souille le canvas et toDataURL refuse), puis le fichier HTML est corrigé sur disque.
+ */
+export async function redessinerAffiches(browser: Browser, dir: string, fichier: string): Promise<number> {
+  let html = await readFile(fichier, "utf8")
+  const videos = [...html.matchAll(/<video\b[^>]*>/g)].map((m) => m[0])
+    .filter((t) => /poster="assets\/[^"]+"/.test(t) && /\bwidth="\d+"/.test(t) && /\bheight="\d+"/.test(t))
+  if (videos.length === 0) return 0
+  const page = await browser.newPage()
+  await page.route("http://clone.lpws/**", async (route) => {
+    const chemin = decodeURIComponent(new URL(route.request().url()).pathname)
+    if (chemin === "/") return route.fulfill({ contentType: "text/html", body: "<!doctype html><title>affiches</title>" })
+    try { await route.fulfill({ body: await readFile(join(dir, "." + chemin)) }) } catch { await route.fulfill({ status: 404, body: "" }) }
+  })
+  await page.goto("http://clone.lpws/", { waitUntil: "load" })
+  let n = 0
+  const faits = new Map<string, string>()
+  for (const tag of videos) {
+    const poster = tag.match(/poster="([^"]+)"/)![1], w = Number(tag.match(/\bwidth="(\d+)"/)![1]), h = Number(tag.match(/\bheight="(\d+)"/)![1])
+    const cle = `${poster}@${w}x${h}`
+    if (!faits.has(cle)) {
+      const data: string | null = await page.evaluate(async (arg: { poster: string; w: number; h: number }) => {
+        try {
+          const img = new Image(); img.src = "/" + arg.poster; await img.decode()
+          if (img.naturalWidth === arg.w && img.naturalHeight === arg.h) return null
+          const c = document.createElement("canvas"); c.width = arg.w; c.height = arg.h
+          c.getContext("2d")!.drawImage(img, 0, 0, arg.w, arg.h)
+          return c.toDataURL("image/jpeg", 0.85)
+        } catch { return null }
+      }, { poster, w, h })
+      if (!data) { faits.set(cle, ""); continue }
+      const octets = Buffer.from(data.split(",")[1], "base64")
+      const nom = "assets/poster-" + createHash("sha1").update(octets).digest("hex").slice(0, 12) + ".jpg"
+      await writeFile(join(dir, nom), octets)
+      faits.set(cle, nom)
+    }
+    const nouveau = faits.get(cle)
+    if (!nouveau) continue
+    html = html.replace(tag, tag.replace(`poster="${poster}"`, `poster="${nouveau}"`)); n++
+  }
+  await page.close()
+  if (n) { await writeFile(fichier, html); step(SCOPE, `${fichier.split("/").pop()} : ${n} affiche(s) de vidéo redessinée(s) à la taille de la trame`) }
+  return n
 }

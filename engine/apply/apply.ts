@@ -89,7 +89,17 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
     for (const m of A) if (B.has(m)) inter++
     return inter / Math.max(A.size + B.size - inter, 1) >= 0.4
   }
-  const get = (a?: string) => a ? document.querySelector(`[data-lpws="${a}"]`) : null
+  // LES ANCRES DESCENDENT DANS LE SHADOW DOM (racines ouvertes). En-tête, recherche, vidéo,
+  // pied chez Salesforce (Lightning) vivent là : sans ça, visibles dans le clone, jamais éditables.
+  // Fonction de page : les aides sont recopiées ici, page.evaluate n'embarque que ce corps.
+  const racinesDom = (): (Document | ShadowRoot)[] => {
+    const out: (Document | ShadowRoot)[] = [document]
+    for (let i = 0; i < out.length; i++) out[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(el.shadowRoot) })
+    return out
+  }
+  const tous = (sel: string): Element[] => racinesDom().flatMap((r) => [...r.querySelectorAll(sel)])
+  const parentDe = (el: Element): Element | null => el.parentElement ?? ((el.getRootNode() as ShadowRoot).host ?? null)
+  const get = (a?: string) => a ? (tous(`[data-lpws="${a}"]`)[0] ?? null) : null
   const lire = (el: Element): string => {
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
       return el.value || el.placeholder || ""

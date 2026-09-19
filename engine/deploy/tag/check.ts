@@ -17,7 +17,7 @@
  *
  * Usage : npm run tag:check -- <dossier-baseline> <spec.json> [--url <live>]
  */
-import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { lancerNavigateur, UA } from "../../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildTag } from "./build.ts"
@@ -40,7 +40,7 @@ async function ouvrir(
   const browser = await lancerNavigateur()
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
-    userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    userAgent: UA,
   })
   // la CSP du site peut refuser notre domaine AVANT que l'interception serve quoi que ce soit :
   // on note le refus, c'est lui qui décide du mode piloté ou figé
@@ -83,8 +83,14 @@ async function ouvrir(
         mode: w.__lpws?.mode ?? "aucun",
         remises: w.__lpws?.remises ?? 0,
         // pas de troncature : un texte de variante plus long que la limite passait pour absent
-        textes: [...document.querySelectorAll("[data-lpws-edited],[data-lpws-added]")]
-          .map((el) => (el.textContent || "").replace(/\s+/g, " ").trim()),
+        // les éléments édités peuvent vivre dans une racine fantôme (en-tête Lightning) :
+        // document.querySelectorAll ne les voit pas, le juge concluait « texte absent » à tort
+        textes: ((): string[] => {
+          const racines: (Document | ShadowRoot)[] = [document]
+          for (let i = 0; i < racines.length; i++) racines[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) racines.push(el.shadowRoot) })
+          return racines.flatMap((r) => [...r.querySelectorAll("[data-lpws-edited],[data-lpws-added]")])
+            .map((el) => (el.textContent || "").replace(/\s+/g, " ").trim())
+        })(),
       }
     })
     return { ...vu, cspBloque }

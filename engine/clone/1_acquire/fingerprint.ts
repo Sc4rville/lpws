@@ -37,6 +37,16 @@ export type Empreinte = {
 }
 
 export function fingerprintDom(): Empreinte[] {
+  // LES ANCRES DESCENDENT DANS LE SHADOW DOM (racines ouvertes). En-tête, recherche, vidéo,
+  // pied chez Salesforce (Lightning) vivent là : sans ça, visibles dans le clone, jamais éditables.
+  // Fonction de page : les aides sont recopiées ici, page.evaluate n'embarque que ce corps.
+  const racinesDom = (): (Document | ShadowRoot)[] => {
+    const out: (Document | ShadowRoot)[] = [document]
+    for (let i = 0; i < out.length; i++) out[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(el.shadowRoot) })
+    return out
+  }
+  const tous = (sel: string): Element[] => racinesDom().flatMap((r) => [...r.querySelectorAll(sel)])
+  const parentDe = (el: Element): Element | null => el.parentElement ?? ((el.getRootNode() as ShadowRoot).host ?? null)
   const roleDe = (el: Element): Empreinte["role"] => {
     const t = el.tagName.toLowerCase()
     if (/^h[1-6]$/.test(t)) return "heading"
@@ -67,8 +77,8 @@ export function fingerprintDom(): Empreinte[] {
 
   const cheminDe = (el: Element): string => {
     const p: string[] = []
-    let c: Element | null = el.parentElement
-    for (let i = 0; i < 4 && c; i++) { p.unshift(c.tagName.toLowerCase()); c = c.parentElement }
+    let c: Element | null = parentDe(el)
+    for (let i = 0; i < 4 && c; i++) { p.unshift(c.tagName.toLowerCase()); c = parentDe(c) }
     return p.join(">")
   }
 
@@ -81,11 +91,11 @@ export function fingerprintDom(): Empreinte[] {
   }
 
   const sectionDe = (el: Element): string => {
-    let c: Element | null = el.parentElement
+    let c: Element | null = parentDe(el)
     while (c) {
       const a = c.getAttribute("data-lpws")
       if (a && /^s\d+$/.test(a)) return a
-      c = c.parentElement
+      c = parentDe(c)
     }
     return ""
   }
@@ -93,7 +103,7 @@ export function fingerprintDom(): Empreinte[] {
   const out: Empreinte[] = []
   const compteurs = new Map<string, number>()
 
-  document.querySelectorAll("[data-lpws]").forEach((el) => {
+  tous("[data-lpws]").forEach((el) => {
     const a = el.getAttribute("data-lpws")
     if (!a) return
     const role = roleDe(el)

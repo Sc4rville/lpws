@@ -258,6 +258,19 @@ function sanitizeForCapture(baseHref: string): void {
     if (w > 0 && h > 0 && !v.hasAttribute("width") && !v.hasAttribute("height")) {
       v.setAttribute("width", String(w)); v.setAttribute("height", String(h))
     }
+    // LA TAILLE INTRINSÈQUE D'UNE VIDÉO, C'EST SON IMAGE, PAS SON AFFICHE. Tant qu'elle a joué,
+    // le navigateur la dimensionne sur la trame (2080 px sur monday) ; dans le clone, figée
+    // avant la première trame, c'est l'affiche (poster) qui compte, plus étroite, et une colonne
+    // ajustée au contenu perd 24 px : tout le bas de page se décale. On remplace l'affiche par
+    // la trame courante, à la taille de la vidéo : même largeur intrinsèque, même image.
+    if (v.videoWidth > 0 && v.readyState >= 2 && (v.currentTime > 0 || v.played.length > 0)) {
+      try {
+        const c = document.createElement("canvas")
+        c.width = v.videoWidth; c.height = v.videoHeight
+        c.getContext("2d")!.drawImage(v, 0, 0)
+        v.setAttribute("poster", c.toDataURL("image/jpeg", 0.8))
+      } catch { /* vidéo d'une autre origine : le canvas est souillé, l'affiche d'origine reste */ }
+    }
   })
   // le lazy-load a déjà eu lieu (autoScroll) et l'état est figé : dans le clone, tout doit
   // se rendre sans scroll — sinon les images sous le pli manquent au screenshot du juge
@@ -328,6 +341,17 @@ async function posterizeVideos(page: Page, dir: string, state: string): Promise<
       document.querySelectorAll("video")[arg.i]?.setAttribute("poster", arg.src)
     }, { i: b.i, src: `assets/${name}` })
   }
+}
+
+/** Délai maximal d'attente des octets d'une réponse déjà reçue (en-têtes arrivés, corps qui traîne). */
+export const DELAI_OCTETS = 20_000
+
+/** Les octets d'une réponse, ou null passé le délai : un corps qui ne finit jamais ne bloque pas la capture. */
+export function attendreOctets<T>(pending: Promise<T>, delai: number): Promise<T | null> {
+  return new Promise((res) => {
+    const t = setTimeout(() => res(null), delai)
+    pending.then((v) => { clearTimeout(t); res(v) }, () => { clearTimeout(t); res(null) })
+  })
 }
 
 export async function acquire(url: string, dir: string): Promise<AcquireResult> {
@@ -459,8 +483,11 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
         // un flux qui ne finit jamais (event-stream, long-poll, média interrompu) rendrait la
         // capture éternelle : Asana est resté 18 min ici sans un mot. Passé le délai, la
         // ressource reste distante et on le dit.
-        const body = await Promise.race([pending, new Promise<null>((res) => setTimeout(() => res(null), 20_000).unref())])
-        if (body === null && seen.get(u)) step(SCOPE, `octets jamais arrivés en 20 s, reste distant : ${u.slice(0, 120)}`)
+        const t0 = Date.now()
+        const body = await attendreOctets(pending, DELAI_OCTETS)
+        const duree = Date.now() - t0
+        if (body === null && seen.get(u)) step(SCOPE, `octets jamais arrivés en ${DELAI_OCTETS / 1000} s, reste distant : ${u.slice(0, 120)}`)
+        else if (duree > 5_000) step(SCOPE, `octets lents (${(duree / 1000).toFixed(1)} s, ${seen.get(u)?.type}) : ${u.slice(0, 100)}`)
         const r = seen.get(u)
         if (!body || !r || body.length === 0) continue
         if (body.length > MAX_ASSET_BYTES) {

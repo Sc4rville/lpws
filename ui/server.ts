@@ -31,7 +31,7 @@ import { spawn } from "node:child_process"
 import { readFile, writeFile, readdir, stat, mkdir, copyFile, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, extname, normalize } from "node:path"
-import { lancerNavigateur } from "../engine/shared/navigateur.ts"
+import { lancerNavigateur, UA } from "../engine/shared/navigateur.ts"
 import { CLIENTS_ROOT, marque, slugify } from "../engine/shared/paths.ts"
 import { Contexte } from "../engine/variant/contexte.ts"
 import { step } from "../engine/shared/log.ts"
@@ -235,7 +235,7 @@ async function textes(c: string, camp: string): Promise<Texte[]> {
   if (!existsSync(join(base, "capture.html"))) return []
   const browser = await lancerNavigateur()
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
     await page.goto("file://" + join(base, "capture.html"), { waitUntil: "domcontentloaded", timeout: 60_000 })
     // ce que le buyer veut changer d'abord : le titre, l'accroche, le bouton : pas le menu
     const out: Texte[] = await page.evaluate(() => {
@@ -484,7 +484,7 @@ async function sonderBalise(c: string, camp: string, job?: Job): Promise<Express
   const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
   const browser = await lancerNavigateur()
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
     let demande = false
     page.on("request", (r) => { if (r.url().startsWith(BASE_TAGS + "/t/")) demande = true })
     if (job) dire(job, `ouverture de ${meta.source}`)

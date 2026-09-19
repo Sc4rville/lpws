@@ -32,7 +32,9 @@ const MIME: Record<string, string> = {
 }
 
 function nettoieMarquage(): void {
-  document.querySelectorAll("[data-lpws]").forEach((e) => e.removeAttribute("data-lpws"))
+  const racines: (Document | ShadowRoot)[] = [document]
+  for (let i = 0; i < racines.length; i++) racines[i].querySelectorAll("*").forEach((el) => { if (el.shadowRoot) racines.push(el.shadowRoot) })
+  for (const r of racines) r.querySelectorAll("[data-lpws]").forEach((e) => e.removeAttribute("data-lpws"))
 }
 
 function injecteBanniere(): void {
