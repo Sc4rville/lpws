@@ -107,7 +107,9 @@ async function resoudreSurLeLive(
 
     const brutes: Record<string, Cible> = {}
     const manquees: string[] = []
+    const fermees = new Set(capturees.filter((e) => e.ombre === "fermee").map((e) => e.a))
     for (const a of ancres) {
+      if (fermees.has(a)) { step(SCOPE, `  ${a} : dans une racine fantôme FERMÉE, la balise ne peut pas y écrire chez le visiteur (Intégral le pourrait)`); manquees.push(a); continue }
       const vivante = lien.get(a)
       const c = vivante ? derives[vivante] : null
       if (c) { brutes[a] = c; step(SCOPE, `  ${a} → ${vivante} → ${c.sel}${c.rang !== undefined ? ` (rang ${c.rang})` : ""}`) }

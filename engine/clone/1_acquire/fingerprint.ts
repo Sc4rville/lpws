@@ -17,6 +17,8 @@
  */
 
 export type Empreinte = {
+  /** « fermee » : sous une racine fantôme fermée, la balise ne pourra pas y écrire chez le visiteur */
+  ombre?: "fermee"
   /** l'ancre observée à cette capture — un rang, donc instable : c'est tout le problème */
   a: string
   tag: string
@@ -103,6 +105,18 @@ export function fingerprintDom(): Empreinte[] {
   const out: Empreinte[] = []
   const compteurs = new Map<string, number>()
 
+  // un élément sous un hôte dont la racine était FERMÉE : visible dans le clone (on l'a ouverte à
+  // la capture), mais la balise, chez le visiteur, n'y entrera pas
+  const sousOmbreFermee = (el: Element): boolean => {
+    let n: Node | null = el
+    while (n) {
+      const racine = n.getRootNode()
+      if (!(racine instanceof ShadowRoot)) return false
+      if ((racine.host as Element & { __lpwsOmbreFermee?: boolean }).__lpwsOmbreFermee) return true
+      n = racine.host
+    }
+    return false
+  }
   tous("[data-lpws]").forEach((el) => {
     const a = el.getAttribute("data-lpws")
     if (!a) return
@@ -112,7 +126,7 @@ export function fingerprintDom(): Empreinte[] {
     const rang = (compteurs.get(clef) ?? 0) + 1
     compteurs.set(clef, rang)
 
-    out.push({
+    out.push({ ...(sousOmbreFermee(el) ? { ombre: "fermee" as const } : {}),
       a,
       tag: el.tagName.toLowerCase(),
       role,

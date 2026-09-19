@@ -1,0 +1,37 @@
+{
+  "page": "clients/corpus/monday",
+  "contexte": {
+    "annonce": {
+      "titre": "monday.com | Work Management Software",
+      "description": "Plan, manage and track all your team's work in one place. Free forever plan.",
+      "motsCles": [
+        "work management software",
+        "project management platform",
+        "team task management"
+      ]
+    },
+    "vente": "libre-service",
+    "cible": "operations and PMO teams in mid-size companies",
+    "offre": "free plan"
+  },
+  "attendu": {
+    "promesseDansTitre": false,
+    "titreType": "resultat",
+    "cadreDeReference": false,
+    "niveauLecture": "professionnel",
+    "objectionsTraitees": false,
+    "preuveAligneeCible": false,
+    "ctaAligneVente": true,
+    "risquePercuEleve": false
+  },
+  "justifications": {
+    "promesseDansTitre": "titre « People and agents working as one team » : rien sur planifier/suivre le travail en un seul endroit",
+    "titreType": "décrit l'état obtenu (une seule équipe), pas la catégorie",
+    "cadreDeReference": "aucune alternative nommée",
+    "niveauLecture": "« AI workspace where people and agents drive business results »",
+    "objectionsTraitees": "pas de FAQ ni de réponse aux doutes",
+    "preuveAligneeCible": "« over 60 % of the Fortune 500 » ; cible déclarée : PME et ETI",
+    "ctaAligneVente": "« Get Started · No credit card needed » : libre-service",
+    "risquePercuEleve": "plan gratuit, sans carte, temps illimité"
+  }
+}

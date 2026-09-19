@@ -1,0 +1,39 @@
+{
+  "page": "clients/vercel/demo",
+  "contexte": {
+    "annonce": {
+      "titre": "Relay Shared Inbox | Answer Customers 2x Faster",
+      "description": "One inbox for email, chat and social. Free 14-day trial, no card.",
+      "motsCles": [
+        "shared inbox software",
+        "customer support inbox",
+        "help desk for small teams"
+      ]
+    },
+    "vente": "libre-service",
+    "offre": "Relay, shared support inbox",
+    "cible": "small support teams of 3 to 30 people",
+    "trafic": "google-search",
+    "visiteursMois": 40000
+  },
+  "attendu": {
+    "promesseDansTitre": true,
+    "titreType": "categorie",
+    "cadreDeReference": true,
+    "niveauLecture": "simple",
+    "objectionsTraitees": true,
+    "preuveAligneeCible": true,
+    "ctaAligneVente": false,
+    "risquePercuEleve": false
+  },
+  "justifications": {
+    "promesseDansTitre": "le sous-titre reprend « shared inbox » et « answers faster »",
+    "titreType": "« Customer support software for small teams » nomme la catégorie",
+    "cadreDeReference": "« without stepping on each other », « from four inboxes to one » : l'alternative, ce sont les boîtes séparées",
+    "niveauLecture": "phrases courtes, mots courants",
+    "objectionsTraitees": "FAQ : carte bancaire, import, limites",
+    "preuveAligneeCible": "« Teams of three to thirty », témoignages de petites structures",
+    "ctaAligneVente": "premier bouton « Get a demo » sur une offre en libre-service",
+    "risquePercuEleve": "19 $ par siège, 14 jours sans carte"
+  }
+}

@@ -32,7 +32,7 @@ function arg(flag: string): string | undefined {
 
 async function main() {
   const url = process.argv.slice(2).find((a) => a.startsWith("http"))
-  if (!url) fail(SCOPE, "usage : npm run clone -- <url> [--client x] [--campaign y] [--seuil 0.03]")
+  if (!url) fail(SCOPE, "usage : npm run clone -- <url> [--client x] [--campaign y] [--seuil 0.03] [--auth user:pass] [--cookie \"a=1; b=2\"]")
 
   // par défaut, le dossier porte la MARQUE du client ("atlassian"), pas l'hôte ni un lot
   const client = arg("--client") ?? marque(url)
@@ -45,7 +45,7 @@ async function main() {
   step(SCOPE, `${url} → ${dir}`)
 
   // 1 · acquisition
-  const meta = await acquire(url, dir)
+  const meta = await acquire(url, dir, { auth: arg("--auth") ?? process.env.LPWS_AUTH, cookies: arg("--cookie") ?? process.env.LPWS_COOKIES })
 
   // 2-3 · localisation : le clone devient self-contained (ou dit ce qui lui manque)
   const styles = await localizeStyles(dir)

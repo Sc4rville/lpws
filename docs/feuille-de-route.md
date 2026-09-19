@@ -35,6 +35,7 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Anti-bot (Akamai / Salesforce) : Chromium complet + UA réel, un seul navigateur pour la capture et le juge
 - ✅ Shadow DOM recopié en `<template shadowrootmode>` (Salesforce : en-tête, vidéo, pied) ; les ancres, sélecteurs (`hôte >>> intérieur`), le loader et apply y descendent (lien de l'en-tête Salesforce édité et jugé 3/3)
 - ✅ Animations menées à terme avant la photo de référence (Asana) · délai par ressource (plus de capture éternelle)
+- ✅ Racines fantômes fermées ouvertes à la capture (et refusées par la balise, en le disant) · iframes d'un autre domaine photographiés · pages sous login (`--auth`, `--cookie`) ; page-laboratoire `ui/demo/lab/`
 - ⬜ Décider s'il faut un troisième viewport (tablette)
 
 ### 1.1.2 · Rendre la page autonome
@@ -194,7 +195,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 - ✅ Trois variantes, une par cible (titre, bouton, structure), proposées au buyer qui choisit
 
 ## 2.7 · La qualité du brain
-- 🔴 **Jeu de test annoté inexistant** — sans lui, la confiance affichée à côté d'un diagnostic est décorative
+- 🟡 **Jeu de test annoté** : 6 pages, 48 réponses justifiées (`engine/variant/annotations/`), accord du jugement 69 % → 73 % (`npm run brain:eval`) ; relecture par un media buyer attendue, le modèle n'est pas déterministe d'un tir à l'autre
 - ⬜ Choisir 12 à 15 pages pondérées selon le mix réel
 - ⬜ Annoter la structure : où est le héros, la preuve, quel type de page
 - ⬜ Annoter les signaux **à l'aveugle**, avant de voir la réponse de la machine

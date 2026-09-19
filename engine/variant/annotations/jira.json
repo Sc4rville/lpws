@@ -1,0 +1,37 @@
+{
+  "page": "clients/corpus/jira",
+  "contexte": {
+    "annonce": {
+      "titre": "Jira | Agile Project Management Software",
+      "description": "Plan, track and ship work with the tool teams love. Free for up to 10 users.",
+      "motsCles": [
+        "project management software",
+        "agile project management tool",
+        "jira software"
+      ]
+    },
+    "vente": "libre-service",
+    "cible": "software teams",
+    "offre": "free plan up to 10 users"
+  },
+  "attendu": {
+    "promesseDansTitre": false,
+    "titreType": "resultat",
+    "cadreDeReference": false,
+    "niveauLecture": "technique",
+    "objectionsTraitees": false,
+    "preuveAligneeCible": true,
+    "ctaAligneVente": true,
+    "risquePercuEleve": true
+  },
+  "justifications": {
+    "promesseDansTitre": "titre « Turn plans into agent-ready tasks » : agents IA, pas « plan, track and ship »",
+    "titreType": "le titre dit ce qu'on obtient (des tâches prêtes pour les agents)",
+    "cadreDeReference": "aucune comparaison à une alternative ; « more than project management » n'en est pas une",
+    "niveauLecture": "tokens, MCP, CLI, coding agents",
+    "objectionsTraitees": "pas de FAQ, pas de réponse aux doutes prix/temps/risque",
+    "preuveAligneeCible": "85 % du Fortune 500, chiffres sur les agents : cible équipes logicielles",
+    "ctaAligneVente": "« Sign up » avec un email pro, « Get it free » : libre-service",
+    "risquePercuEleve": "outil d'entreprise, migration, gouvernance (« audit trail »)"
+  }
+}

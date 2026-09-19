@@ -18,7 +18,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { Contexte } from "./contexte.ts"
 import { extraireSignaux, SignauxMecaniques } from "./signaux.ts"
-import { juger, SignauxJuges } from "./jugement.ts"
+import { corpsDe, juger, SignauxJuges } from "./jugement.ts"
 import { diagnostiquer, type Diagnostic } from "./diagnostic.ts"
 import { ecrireVariantes } from "./variantes.ts"
 import { FAMILLES } from "./regles.ts"
@@ -58,8 +58,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   if (!opts.sansJugement) {
     if (!opts.refaire && existsSync(fJug)) { j = SignauxJuges.parse(JSON.parse(await readFile(fJug, "utf8"))); step(SCOPE, "jugement : cache") }
     else {
-      const corps = (await readFile(join(base, "capture.html"), "utf8"))
-        .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+      const corps = corpsDe(await readFile(join(base, "capture.html"), "utf8"))
       j = await timed(SCOPE, "jugement (8 questions typées, sur le plan)", () => juger(m, ctx, corps))
       if (j) await writeFile(fJug, JSON.stringify(j, null, 2))
     }

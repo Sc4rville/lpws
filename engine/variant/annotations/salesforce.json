@@ -1,0 +1,38 @@
+{
+  "page": "clients/corpus/salesforce",
+  "contexte": {
+    "annonce": {
+      "titre": "Salesforce CRM | The #1 AI CRM for Sales",
+      "description": "Manage leads, deals and customers with AI agents. Start free for 30 days.",
+      "motsCles": [
+        "crm software",
+        "sales crm",
+        "best crm for small business"
+      ]
+    },
+    "vente": "libre-service",
+    "cible": "small business sales teams",
+    "offre": "30-day free trial (Starter Suite)",
+    "panierMoyen": 300
+  },
+  "attendu": {
+    "promesseDansTitre": true,
+    "titreType": "mixte",
+    "cadreDeReference": true,
+    "niveauLecture": "professionnel",
+    "objectionsTraitees": true,
+    "preuveAligneeCible": false,
+    "ctaAligneVente": false,
+    "risquePercuEleve": true
+  },
+  "justifications": {
+    "promesseDansTitre": "« The world's #1 agentic CRM » reprend « #1 AI CRM » et les agents de l'annonce",
+    "titreType": "« #1 agentic CRM » (catégorie) + « powers the Agentic Enterprise » (résultat)",
+    "cadreDeReference": "section « Build vs. buy: the true CRM cost comparison »",
+    "niveauLecture": "agentic, enterprise, personalization",
+    "objectionsTraitees": "« build vs buy » répond au coût, « What is CRM? » au doute de départ",
+    "preuveAligneeCible": "« Trusted by enterprises », logos enterprise ; cible déclarée : petites entreprises",
+    "ctaAligneVente": "premier bouton « Watch demo », l'essai « Start for free » en second",
+    "risquePercuEleve": "CRM : migration, contrat, effort d'implémentation"
+  }
+}

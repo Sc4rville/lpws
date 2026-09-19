@@ -392,6 +392,37 @@ jugement (35 s) pendant que les variantes s'écrivent.
 
 ---
 
+## 2026-09-20 · Racines fermées, iframes étrangers, pages sous login, et le jugement mesuré
+
+kabylesystem : « règle tout ça, pareil pour Créer teste avec des pages annotées à la main ».
+
+**Page-laboratoire** `ui/demo/lab/` (https://lpws-app.vercel.app/demo/lab/) : un composant à
+racine fantôme **fermée**, un à racine ouverte, un **iframe d'un autre domaine**. Clone : 0,00 % /
+0,00 %, 3 gabarits d'ombre, l'iframe devenu image, le texte de la racine fermée présent.
+
+| Cas | Ce qu'on fait | Preuve |
+|---|---|---|
+| racine fantôme fermée | dans NOTRE navigateur de capture, `attachShadow({mode:"closed"})` est forcé en ouvert et l'hôte marqué ; l'empreinte porte `ombre: "fermee"` | clone complet ; `apply` édite le bouton (« Start free » ×2 dans la variante) ; la balise **refuse en le disant** : « racine fantôme FERMÉE, la balise ne peut pas y écrire chez le visiteur (Intégral le pourrait) » |
+| iframe d'un autre domaine | photographié à sa taille dans la page rendue, remplacé par `<img data-lpws-iframe="…">` dans le HTML sérialisé, par état (desktop / mobile) | 0 `<iframe>` restant, 1 image, juge à 0,00 % |
+| page derrière un login | `--auth user:pass` (HTTP) et `--cookie "a=1; b=2"` (session), ou `LPWS_AUTH` / `LPWS_COOKIES` ; sans, le message dit quoi faire | l'interface LPWS elle-même (mot de passe) capturée : 33 ancres, titre « LPWS » ; sans identifiants : « demande un identifiant : relancer avec --auth » |
+
+**Le jugement contre des pages annotées à la main** (feuille de route 2.7) :
+`engine/variant/annotations/` : six pages (HubSpot, Jira, monday, Salesforce, Asana, Relay),
+un contexte d'annonce chacune, les huit réponses attendues **avec leur raison**, à faire relire
+par un media buyer. `npm run brain:eval` rejoue le jugement et compare.
+
+| | accord |
+|---|---|
+| première mesure | **69 %** (33/48) : `cadreDeReference` 3/6, `titreType` 3/6, `objectionsTraitees` 3/6 |
+| après avoir précisé ces trois définitions et donné au juge les faits mécaniques (section FAQ, formulaire, premier bouton) et le texte de la page **sans les menus** (avant, les 2 500 premiers caractères d'un grand site étaient un menu) | **73 %** (35/48) : `cadreDeReference` 6/6, `niveauLecture` 4/6 |
+
+Ce que la mesure dit : le modèle n'est pas déterministe (Jira 7/8 puis 4/8 d'un tir à l'autre
+sur les mêmes entrées), et une partie des désaccords sont des cas limites (« mixte » contre
+« résultat », « build vs buy » en bandeau de blog compte-t-il comme objection traitée ?). C'est
+exactement ce que le buyer doit trancher demain dans les justifications ; le score bougera avec.
+
+---
+
 ## Ce que j'ai signalé sans le coder
 
 - **Le calcul de l'échantillon est en bloc 4** (4.2) alors que c'est lui qui dit si un client

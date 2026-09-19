@@ -40,14 +40,23 @@ const CONSIGNE = `Tu es un capteur, pas un conseiller. Tu réponds à des questi
 Réponds UNIQUEMENT par un objet JSON, sans texte autour, sans balises de code, avec exactement ces clés :
 {
  "promesseDansTitre": {"valeur": bool, "confiance": 0..1},   // la promesse de l'annonce (bénéfice, offre, mécanisme) est reprise, même reformulée, dans le titre ou le sous-titre
- "titreType": {"valeur": "categorie"|"resultat"|"mixte", "confiance": 0..1},   // le titre nomme ce que c'est (catégorie) ou ce que le visiteur obtient (résultat)
- "cadreDeReference": {"valeur": bool, "confiance": 0..1},   // la page dit à quoi le produit se compare (alternative, faire à la main, ne rien faire)
+ "titreType": {"valeur": "categorie"|"resultat"|"mixte", "confiance": 0..1},   // « categorie » : le titre nomme ce que c'est (« Marketing Software ») ; « resultat » : ce que le visiteur obtient ou fait (« Manage projects efficiently ») ; « mixte » SEULEMENT si le titre contient à la fois un nom de catégorie ET un résultat explicite
+ "cadreDeReference": {"valeur": bool, "confiance": 0..1},   // quelque part dans la page (pas seulement le titre), le produit est situé face à une alternative : un concurrent, « build vs buy », « instead of », « without adding more tools », « from four inboxes to one », faire à la main, ne rien faire
  "niveauLecture": {"valeur": "simple"|"professionnel"|"technique", "confiance": 0..1},
- "objectionsTraitees": {"valeur": bool, "confiance": 0..1},   // la page répond à des doutes (prix, temps, risque, « et si ça ne marche pas »)
+ "objectionsTraitees": {"valeur": bool, "confiance": 0..1},   // la page répond à des doutes (prix, temps, risque, « et si ça ne marche pas ») : une section FAQ compte, une garantie ou « sans carte » compte, un simple argumentaire produit ne compte pas
  "preuveAligneeCible": {"valeur": bool, "confiance": 0..1},   // les preuves (logos, témoignages) ressemblent à la cible déclarée ; true si aucune cible déclarée
  "ctaAligneVente": {"valeur": bool, "confiance": 0..1},   // le bouton principal correspond au mode de vente (libre-service → essayer/commencer ; commercial → démo/contact ; achat → acheter/ajouter)
  "risquePercuEleve": {"valeur": bool, "confiance": 0..1}   // la décision engage (prix, contrat, effort de migration) au point qu'une garantie compterait
 }`
+
+/** Le texte de la page tel que le juge le lit : sans scripts, sans menus ni pied de page. Sur un
+ *  grand site, les 2 500 premiers caractères du body sont un menu : le juge ne voyait pas la page. */
+export function corpsDe(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<template[\s\S]*?<\/template>/gi, " ")
+    .replace(/<(header|nav|footer)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+}
 
 function texteDe(m: SignauxMecaniques, c: Contexte, corps: string): string {
   return `ANNONCE
@@ -69,6 +78,9 @@ sections : ${m.sections.map((s) => s.titre).filter(Boolean).slice(0, 12).join(" 
 preuves : ${m.preuves.logos} logos, ${m.preuves.temoignages.nombre} témoignages, avis ${m.preuves.avis.presents ? "présents" : "absents"}
 prix visible : ${m.prix.visible ? m.prix.valeurs.slice(0, 3).join(", ") : "non"}
 garantie : ${m.garantie.presente ? m.garantie.extrait : "aucune"}
+section FAQ / objections : ${m.objections.sectionPresente ? "présente" : "absente"}
+formulaire : ${m.formulaire.present ? `${m.formulaire.champs} champs` : "aucun"}
+bouton principal (premier au-dessus du pli) : ${m.ctas[0] ? `« ${m.ctas[0].texte} »` : "(aucun)"}
 
 TEXTE DE LA PAGE (début)
 ${corps.slice(0, 2500)}`

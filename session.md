@@ -103,12 +103,20 @@ playground, mesure), sur les données réelles du corpus.
   re-liage capture ↔ page vivante Jira 471/471 et HubSpot 973/973, **ancres dans le shadow DOM**
   (Salesforce : 1 608 ancres dans l'ombre, lien de l'en-tête édité et jugé 3/3 sur le site).
 
+## Fait le 2026-09-20 — racines fermées, iframes, login, jugement mesuré (détail dans [kusaila.md](kusaila.md))
+- Page-laboratoire `ui/demo/lab/` : racine fantôme fermée (ouverte à la capture, refusée par la balise en le
+  disant), iframe étranger (photographié), 0,00 %. Pages sous login : `--auth` / `--cookie`.
+- **Jugement mesuré** contre 6 pages annotées à la main (`engine/variant/annotations/`) : 69 % → 73 %
+  après avoir précisé trois définitions et donné le texte sans menus. `npm run brain:eval`.
+
 ## La feuille de route
 [docs/feuille-de-route.md](docs/feuille-de-route.md) — l'arbre complet en quatre blocs
 (contrôler · créer · distribuer · nourrir), avec l'état de chaque micro-tâche. C'est la
 référence ; la liste courte ci-dessous n'en garde que le haut.
 
 ## À faire (dans l'ordre)
+0. **Le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées) et corrige ce qu'il
+   conteste, puis `npm run brain:eval` ; puis il lit les 3 propositions Relay dans l'interface.
 1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
    une vraie propriété GA4 pour confirmer `customUser:lpws_variante` et `keyEvents`, et trancher la
    langue de l'interface (FR aujourd'hui).
@@ -129,4 +137,4 @@ le juge avant d'accuser le code.
   ou basculer sur `lpws-app.vercel.app` (le projet qui publie aujourd'hui).
 - Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
 - Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
-- Racines fantômes FERMÉES (`mode: closed`) : inaccessibles, restent un trou dans le clone.
+- Racine fantôme fermée : visible et éditable dans le clone, mais la balise Express ne peut pas y écrire (Intégral le pourrait).

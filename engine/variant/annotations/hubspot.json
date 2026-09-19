@@ -1,0 +1,37 @@
+{
+  "page": "clients/corpus/hubspot",
+  "contexte": {
+    "annonce": {
+      "titre": "HubSpot Marketing Hub | Grow Traffic & Convert More Leads",
+      "description": "Marketing automation, email, ads and SEO in one platform. Free 14-day trial.",
+      "motsCles": [
+        "marketing automation software",
+        "lead generation software",
+        "email marketing tool"
+      ]
+    },
+    "vente": "libre-service",
+    "cible": "SMB marketing teams",
+    "offre": "14-day free trial"
+  },
+  "attendu": {
+    "promesseDansTitre": false,
+    "titreType": "categorie",
+    "cadreDeReference": true,
+    "niveauLecture": "professionnel",
+    "objectionsTraitees": true,
+    "preuveAligneeCible": false,
+    "ctaAligneVente": false,
+    "risquePercuEleve": true
+  },
+  "justifications": {
+    "promesseDansTitre": "titre « Marketing Software », sous-titre « the platform where your CRM, content, and campaigns actually work together » : ni trafic ni leads",
+    "titreType": "« Marketing Software » nomme la catégorie",
+    "cadreDeReference": "« run every campaign without adding more tools » : l'alternative, c'est l'empilement d'outils",
+    "niveauLecture": "CRM, demand, pipeline, AEO : vocabulaire de marketeur",
+    "objectionsTraitees": "section « Frequently Asked Questions » sur la page",
+    "preuveAligneeCible": "9 logos de grandes marques, cible déclarée : équipes marketing de PME",
+    "ctaAligneVente": "premier bouton « Get a demo » alors que la vente est en libre-service ; l'essai vient en second",
+    "risquePercuEleve": "plateforme CRM + marketing : migration, contrat annuel, prix"
+  }
+}

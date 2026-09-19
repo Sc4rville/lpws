@@ -1,0 +1,364 @@
+{
+  "date": "2026-09-19T23:03:34.912Z",
+  "accord": 0.7291666666666666,
+  "parQuestion": {
+    "promesseDansTitre": {
+      "ok": 3,
+      "total": 6
+    },
+    "titreType": {
+      "ok": 4,
+      "total": 6
+    },
+    "cadreDeReference": {
+      "ok": 6,
+      "total": 6
+    },
+    "niveauLecture": {
+      "ok": 4,
+      "total": 6
+    },
+    "objectionsTraitees": {
+      "ok": 4,
+      "total": 6
+    },
+    "preuveAligneeCible": {
+      "ok": 5,
+      "total": 6
+    },
+    "ctaAligneVente": {
+      "ok": 5,
+      "total": 6
+    },
+    "risquePercuEleve": {
+      "ok": 4,
+      "total": 6
+    }
+  },
+  "pages": [
+    {
+      "page": "asana",
+      "accord": 0.75,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "titreType": {
+          "attendu": "resultat",
+          "obtenu": "mixte",
+          "confiance": 0.6,
+          "ok": false
+        },
+        "cadreDeReference": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.6,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "professionnel",
+          "obtenu": "professionnel",
+          "confiance": 0.85,
+          "ok": true
+        },
+        "objectionsTraitees": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.75,
+          "ok": true
+        },
+        "preuveAligneeCible": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.6,
+          "ok": true
+        },
+        "ctaAligneVente": {
+          "attendu": true,
+          "obtenu": false,
+          "confiance": 0.7,
+          "ok": false
+        },
+        "risquePercuEleve": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.75,
+          "ok": true
+        }
+      }
+    },
+    {
+      "page": "hubspot",
+      "accord": 0.625,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": false,
+          "obtenu": true,
+          "confiance": 0.6,
+          "ok": false
+        },
+        "titreType": {
+          "attendu": "categorie",
+          "obtenu": "categorie",
+          "confiance": 0.85,
+          "ok": true
+        },
+        "cadreDeReference": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "professionnel",
+          "obtenu": "professionnel",
+          "confiance": 0.8,
+          "ok": true
+        },
+        "objectionsTraitees": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "preuveAligneeCible": {
+          "attendu": false,
+          "obtenu": true,
+          "confiance": 0.5,
+          "ok": false
+        },
+        "ctaAligneVente": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.8,
+          "ok": true
+        },
+        "risquePercuEleve": {
+          "attendu": true,
+          "obtenu": false,
+          "confiance": 0.65,
+          "ok": false
+        }
+      }
+    },
+    {
+      "page": "jira",
+      "accord": 0.5,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": false,
+          "obtenu": true,
+          "confiance": 0.6,
+          "ok": false
+        },
+        "titreType": {
+          "attendu": "resultat",
+          "obtenu": "resultat",
+          "confiance": 0.85,
+          "ok": true
+        },
+        "cadreDeReference": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.6,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "technique",
+          "obtenu": "professionnel",
+          "confiance": 0.6,
+          "ok": false
+        },
+        "objectionsTraitees": {
+          "attendu": false,
+          "obtenu": true,
+          "confiance": 0.7,
+          "ok": false
+        },
+        "preuveAligneeCible": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.55,
+          "ok": true
+        },
+        "ctaAligneVente": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "risquePercuEleve": {
+          "attendu": true,
+          "obtenu": false,
+          "confiance": 0.75,
+          "ok": false
+        }
+      }
+    },
+    {
+      "page": "monday",
+      "accord": 0.875,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.75,
+          "ok": true
+        },
+        "titreType": {
+          "attendu": "resultat",
+          "obtenu": "resultat",
+          "confiance": 0.5,
+          "ok": true
+        },
+        "cadreDeReference": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.6,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "professionnel",
+          "obtenu": "professionnel",
+          "confiance": 0.7,
+          "ok": true
+        },
+        "objectionsTraitees": {
+          "attendu": false,
+          "obtenu": true,
+          "confiance": 0.7,
+          "ok": false
+        },
+        "preuveAligneeCible": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.55,
+          "ok": true
+        },
+        "ctaAligneVente": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.9,
+          "ok": true
+        },
+        "risquePercuEleve": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.65,
+          "ok": true
+        }
+      }
+    },
+    {
+      "page": "relay",
+      "accord": 0.875,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.9,
+          "ok": true
+        },
+        "titreType": {
+          "attendu": "categorie",
+          "obtenu": "categorie",
+          "confiance": 0.85,
+          "ok": true
+        },
+        "cadreDeReference": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "simple",
+          "obtenu": "professionnel",
+          "confiance": 0.6,
+          "ok": false
+        },
+        "objectionsTraitees": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.95,
+          "ok": true
+        },
+        "preuveAligneeCible": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.7,
+          "ok": true
+        },
+        "ctaAligneVente": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.9,
+          "ok": true
+        },
+        "risquePercuEleve": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.7,
+          "ok": true
+        }
+      }
+    },
+    {
+      "page": "salesforce",
+      "accord": 0.75,
+      "details": {
+        "promesseDansTitre": {
+          "attendu": true,
+          "obtenu": false,
+          "confiance": 0.85,
+          "ok": false
+        },
+        "titreType": {
+          "attendu": "mixte",
+          "obtenu": "resultat",
+          "confiance": 0.5,
+          "ok": false
+        },
+        "cadreDeReference": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.9,
+          "ok": true
+        },
+        "niveauLecture": {
+          "attendu": "professionnel",
+          "obtenu": "professionnel",
+          "confiance": 0.7,
+          "ok": true
+        },
+        "objectionsTraitees": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.85,
+          "ok": true
+        },
+        "preuveAligneeCible": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.4,
+          "ok": true
+        },
+        "ctaAligneVente": {
+          "attendu": false,
+          "obtenu": false,
+          "confiance": 0.7,
+          "ok": true
+        },
+        "risquePercuEleve": {
+          "attendu": true,
+          "obtenu": true,
+          "confiance": 0.7,
+          "ok": true
+        }
+      }
+    }
+  ]
+}

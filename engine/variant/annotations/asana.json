@@ -1,0 +1,37 @@
+{
+  "page": "clients/corpus/asana",
+  "contexte": {
+    "annonce": {
+      "titre": "Asana Project Management | Manage projects efficiently",
+      "description": "Plan, organize and track projects in one tool. Free for teams up to 10.",
+      "motsCles": [
+        "project management software",
+        "project management tool",
+        "task management app"
+      ]
+    },
+    "vente": "libre-service",
+    "cible": "cross-functional teams",
+    "offre": "free plan"
+  },
+  "attendu": {
+    "promesseDansTitre": true,
+    "titreType": "resultat",
+    "cadreDeReference": true,
+    "niveauLecture": "professionnel",
+    "objectionsTraitees": true,
+    "preuveAligneeCible": true,
+    "ctaAligneVente": true,
+    "risquePercuEleve": false
+  },
+  "justifications": {
+    "promesseDansTitre": "« Manage projects efficiently, even when priorities shift » reprend l'annonce mot pour mot",
+    "titreType": "un bénéfice (gérer efficacement), pas une catégorie",
+    "cadreDeReference": "« every team has their own tools… reduce silos » : l'alternative, ce sont les outils dispersés",
+    "niveauLecture": "PMO, portfolio, system of record",
+    "objectionsTraitees": "FAQ : « Can I try Asana for free? », sans carte",
+    "preuveAligneeCible": "leader Gartner/G2, 12 000 avis, « 42 % faster » pour des équipes transverses",
+    "ctaAligneVente": "inscription Google/Microsoft, « Get started » : libre-service",
+    "risquePercuEleve": "gratuit, sans carte"
+  }
+}

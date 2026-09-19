@@ -316,6 +316,53 @@ function sanitizeForCapture(baseHref: string): void {
  * construction. Une vidéo sans frame affichée (readyState < 2) garde son poster d'origine,
  * identique des deux côtés.
  */
+/**
+ * UN IFRAME D'UN AUTRE DOMAINE NE SE SÉRIALISE PAS : son document appartient à un autre site. Le
+ * clone en garde une IMAGE, à sa taille, prise dans la page rendue (le pixel, lui, est à nous), et
+ * l'adresse d'origine dans data-lpws-iframe. Le juge compare des pixels : il n'y voit rien. Aucune
+ * ancre n'y descend : on n'édite pas le site d'un autre.
+ */
+async function photographierIframes(page: Page, dir: string, state: string): Promise<void> {
+  const boxes = await page.evaluate(() => {
+    const de = document.documentElement
+    const docW = de.scrollWidth, docH = de.scrollHeight
+    return [...document.querySelectorAll("iframe")].map((f, i) => {
+      const r = f.getBoundingClientRect()
+      const x = Math.max(0, r.x + window.scrollX), y = Math.max(0, r.y + window.scrollY)
+      const w = Math.min(r.width, docW - x), h = Math.min(r.height, docH - y)
+      return { i, x, y, w, h, visible: getComputedStyle(f).display !== "none" && getComputedStyle(f).visibility !== "hidden" }
+    })
+  })
+  for (const b of boxes) {
+    if (!b.visible || b.w < 10 || b.h < 10) continue
+    const buf = await page.screenshot({
+      fullPage: true, type: "jpeg", quality: 85,
+      clip: { x: b.x, y: b.y, width: Math.floor(b.w), height: Math.floor(b.h) },
+    })
+    const name = `iframe-${state}-${b.i}.jpg`
+    await writeFile(join(dir, "assets", name), buf)
+    await page.evaluate((arg: { i: number; src: string; w: number; h: number }) => {
+      const f = document.querySelectorAll("iframe")[arg.i]
+      if (!f) return
+      f.setAttribute("data-lpws-image", arg.src)
+      f.setAttribute("data-lpws-largeur", String(Math.round(arg.w)))
+      f.setAttribute("data-lpws-hauteur", String(Math.round(arg.h)))
+    }, { i: b.i, src: `assets/${name}`, w: b.w, h: b.h })
+  }
+}
+
+/** Dans le HTML sérialisé, chaque <iframe data-lpws-image> devient l'image qu'il affichait. */
+function remplacerIframes(html: string): string {
+  return html.replace(/<iframe\b([^>]*)>[\s\S]*?<\/iframe>/gi, (tout, attrs: string) => {
+    const image = attrs.match(/data-lpws-image="([^"]+)"/)?.[1]
+    if (!image) return tout
+    const src = attrs.match(/\ssrc="([^"]*)"/)?.[1] ?? ""
+    const w = attrs.match(/data-lpws-largeur="(\d+)"/)?.[1], h = attrs.match(/data-lpws-hauteur="(\d+)"/)?.[1]
+    const garde = ["class", "id", "style", "title", "data-lpws"].map((a) => attrs.match(new RegExp(`\\s${a}="([^"]*)"`))).filter(Boolean).map((m) => ` ${m![0].trim()}`).join("")
+    return `<img${garde} src="${image}" width="${w}" height="${h}" data-lpws-iframe="${src}" alt="">`
+  })
+}
+
 async function posterizeVideos(page: Page, dir: string, state: string): Promise<void> {
   const boxes = await page.evaluate(() => {
     const de = document.documentElement
@@ -354,14 +401,38 @@ export function attendreOctets<T>(pending: Promise<T>, delai: number): Promise<T
   })
 }
 
-export async function acquire(url: string, dir: string): Promise<AcquireResult> {
+/** Accès à une page qui n'est pas publique : identifiants HTTP (« user:pass ») et/ou cookies « a=1; b=2 ». */
+export type Acces = { auth?: string; cookies?: string }
+
+export async function acquire(url: string, dir: string, acces: Acces = {}): Promise<AcquireResult> {
   // repartir propre : les hashs d'une capture précédente ne correspondent plus à rien
   await rm(join(dir, "assets"), { recursive: true, force: true })
   await mkdir(join(dir, "assets"), { recursive: true })
 
   const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
-    const page: Page = await browser.newPage({ viewport: DESKTOP, userAgent: UA })
+    const [user, ...motDePasse] = (acces.auth ?? "").split(":")
+    const page: Page = await browser.newPage({
+      viewport: DESKTOP, userAgent: UA,
+      ...(acces.auth ? { httpCredentials: { username: user, password: motDePasse.join(":") } } : {}),
+    })
+    if (acces.cookies) {
+      const domaine = new URL(url).hostname
+      await page.context().addCookies(acces.cookies.split(";").map((c) => c.trim()).filter(Boolean).map((c) => {
+        const i = c.indexOf("="); return { name: c.slice(0, i).trim(), value: c.slice(i + 1).trim(), domain: domaine, path: "/" }
+      }))
+    }
+    // LES RACINES FANTÔMES FERMÉES S'OUVRENT ICI, ET SEULEMENT ICI. Un composant créé avec
+    // attachShadow({ mode: "closed" }) est invisible à tout script, donc à la sérialisation :
+    // le clone montrerait un trou. Dans NOTRE navigateur de capture, on force le mode ouvert et
+    // on marque l'hôte : le clone est complet, et l'empreinte sait que la balise, elle, ne
+    // pourra pas y écrire chez le visiteur (elle n'a pas ce pouvoir sur le vrai site).
+    await page.addInitScript({ content: `
+      const attacher = Element.prototype.attachShadow
+      Element.prototype.attachShadow = function (init) {
+        if (init && init.mode === "closed") { this.__lpwsOmbreFermee = true; init = { ...init, mode: "open" } }
+        return attacher.call(this, init)
+      }` })
     // tsx/esbuild enveloppe les fonctions d'un helper __name ; il n'existe pas dans la page
     // → on le neutralise avant toute évaluation (chaîne brute : non transformée par esbuild)
     await page.addInitScript({ content: "window.__name = (f) => f" })
@@ -387,7 +458,11 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
     })
 
     const statut = await timed(SCOPE, `chargement ${url}`, async () => {
-      const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 })
+      const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch((e: Error) => {
+        if (/ERR_INVALID_AUTH_CREDENTIALS/.test(e.message))
+          throw new Error(`${url} demande un identifiant : relancer avec --auth user:pass (ou --cookie « a=1; b=2 » pour une session)`)
+        throw e
+      })
       await page.waitForTimeout(1500) // laisse le preloader/intro démarrer
       return resp?.status() ?? 0
     })
@@ -450,9 +525,10 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
       await page.waitForTimeout(400) // laisse peindre l'état gelé
       await page.screenshot({ path: join(dir, "original.png"), fullPage: true })
       await posterizeVideos(page, dir, "desktop")
+      await photographierIframes(page, dir, "desktop")
       await page.evaluate(recopieOmbre) // avant la sérialisation, cf. ombre.ts
       await page.evaluate(sanitizeForCapture, url)
-      return page.content()
+      return remplacerIframes(await page.content())
     })
     if (html.length < 500) throw new Error("document vide après rendu — acquisition échouée")
     await writeFile(join(dir, "capture.html"), html)
@@ -470,9 +546,10 @@ export async function acquire(url: string, dir: string): Promise<AcquireResult> 
       await page.waitForTimeout(400)
       await page.screenshot({ path: join(dir, "original.mobile.png"), fullPage: true })
       await posterizeVideos(page, dir, "mobile")
+      await photographierIframes(page, dir, "mobile")
       await page.evaluate(recopieOmbre)
       await page.evaluate(sanitizeForCapture, url) // idempotent (base/adopted gardés)
-      return page.content()
+      return remplacerIframes(await page.content())
     })
     await writeFile(join(dir, "capture.mobile.html"), htmlMobile)
 
