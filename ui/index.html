@@ -510,6 +510,9 @@ const DEMO = [
   },
 ];
 let CLIENTS = DEMO; let LIVE = false; let BASE = 'https://lpws.vercel.app';
+/** l'application complète (serveur + machine) : la démo statique y renvoie quand on lui demande d'agir */
+const APP = 'https://lpws.46.225.146.226.sslip.io';
+const SANS_SERVEUR = `Cette page est une démo sans serveur : elle ne peut pas copier de page. Ouvrez l’application — en local, npm run ui:serve puis http://localhost:4700 ; en ligne, ${APP}.`;
 const byId = id => CLIENTS.find(c => c.id === id);
 
 /* ---------- état ---------- */
@@ -982,9 +985,10 @@ async function chargerEtat() {
 }
 async function api(path, data) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data || {}) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.erreur || ('Erreur ' + r.status));
-  return j;
+  const j = await r.json().catch(() => null);
+  // un 404/405 sans JSON, c'est un serveur statique qui ne connaît pas l'API : le dire, pas le coder
+  if (!r.ok) throw new Error((j && j.erreur) || (!j && (r.status === 404 || r.status === 405) ? SANS_SERVEUR : 'Le serveur a répondu ' + r.status));
+  return j || {};
 }
 const ETAPES = [['clone/1_acquire', 'Copie de la page'], ['clone/2_styles', 'Styles'], ['clone/3_assets', 'Images et polices'], ['clone/5_verify', 'Vérification'], ['clone', 'Copie'], ['apply', 'Variante'], ['deploy/tag', 'Balise'], ['ui', '']];
 function humaniser(l) {
@@ -1015,10 +1019,10 @@ function vAjout(premiere = false) {
     <div class="duo">
       <div>
         <div class="hd" style="margin-bottom:20px"><div><h2>${premiere ? 'Votre première page' : 'Nouvelle page'}</h2><p class="lede">Collez l’adresse de la landing page du client. LPWS l’ouvre comme un visiteur et en fait une copie fidèle. Quelques minutes.</p></div></div>
-        <div class="card w">
+        ${LIVE ? `<div class="card w">
           <label class="fld">Adresse de la page<input class="inp mono" id="url" placeholder="https://www.client.com/landing" autocomplete="off" value="${esc(S.urlSaisie || '')}"></label>
           <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.page(16) + 'Copier la page', 'data-act="capturer"')}<span class="muted" id="url-err"></span></div>
-        </div>
+        </div>` : `<div class="card w"><p><b>Ici, c’est la démo.</b> Elle montre l’interface, elle ne copie pas de page. Pour onboarder un client, ouvrez l’application : en local, <span class="mono">npm run ui:serve</span> puis <span class="mono">localhost:4700</span> ; en ligne, <a href="${APP}" target="_blank" rel="noopener">${APP.replace('https://', '')}</a> (mot de passe partagé).</p></div>`}
       </div>
       <section class="hero side"><h2>Deux chemins, un seul trafic.</h2><p>La page du client d’un côté, votre variante de l’autre. Les visiteurs se partagent, les conversions tranchent.</p></section>
     </div>
@@ -1234,6 +1238,7 @@ document.addEventListener('click', e => {
     }
     case 'send-report': toast('L’envoi au client arrive : copiez le rapport en attendant'); break;
     case 'capturer': case 'recapturer': {
+      if (!LIVE) { toast(SANS_SERVEUR); break; }
       const u = act.dataset.url || document.getElementById('url')?.value || ''; S.urlSaisie = u;
       api('/api/clients', { url: u }).then(async r => { S.urlSaisie = ''; await chargerEtat(); S.ctx = r.id; S.view = 'dash'; render(); })
         .catch(e => { const z = document.getElementById('url-err'); if (z) z.textContent = e.message; else toast(e.message); });
