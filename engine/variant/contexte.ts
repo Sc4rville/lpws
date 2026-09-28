@@ -24,9 +24,18 @@ export const Annonce = z.object({
   motsCles: z.array(z.string()).default([]),
 })
 
+export const Crea = z.object({
+  /** le texte incrusté sur l'image ou dit dans les premières secondes de la vidéo */
+  accroche: z.string().min(3),
+  /** ce qu'on y voit, en une phrase : produit, scène, personne */
+  visuel: z.string().optional(),
+})
+
 export const Contexte = z.object({
   /** OBLIGATOIRE — « Que promet la publicité ? » : la comparaison la plus utile qu'on sache faire */
   annonce: Annonce,
+  /** « Que dit la créa ? » : en paid social, le visiteur n'a rien tapé, c'est l'image qu'il vient de voir qui fait l'attente */
+  crea: Crea.optional(),
   /** OBLIGATOIRE — « Comment se conclut la vente ? » : c'est ce qui décide du bon bouton */
   vente: Vente,
   /** déduit de la vente si absent : achat → ecom, commercial → b2b, libre-service → saas */
@@ -53,6 +62,11 @@ export const Contexte = z.object({
 
 export type Contexte = z.infer<typeof Contexte>
 export type Niche = z.infer<typeof Niche>
+
+/** Tout ce que l'annonce affirme, créa comprise : un chiffre qui y figure est une affirmation du client. */
+export function texteAnnonce(c: Contexte): string {
+  return [c.annonce.titre, c.annonce.description, c.crea?.accroche].filter(Boolean).join(" ")
+}
 
 /** La niche quand le buyer ne l'a pas dite : le mode de vente la trahit presque toujours. */
 export function nicheDe(c: Contexte): Niche {

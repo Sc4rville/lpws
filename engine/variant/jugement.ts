@@ -39,7 +39,7 @@ const CONSIGNE = `Tu es un capteur, pas un conseiller. Tu réponds à des questi
 
 Réponds UNIQUEMENT par un objet JSON, sans texte autour, sans balises de code, avec exactement ces clés :
 {
- "promesseDansTitre": {"valeur": bool, "confiance": 0..1},   // la promesse de l'annonce (bénéfice, offre, mécanisme) est reprise, même reformulée, dans le titre ou le sous-titre
+ "promesseDansTitre": {"valeur": bool, "confiance": 0..1},   // la promesse de l'annonce ou de sa créa (bénéfice, offre, mécanisme) est reprise, même reformulée, dans le titre ou le sous-titre
  "titreType": {"valeur": "categorie"|"resultat"|"mixte", "confiance": 0..1},   // « categorie » : le titre nomme ce que c'est (« Marketing Software ») ; « resultat » : ce que le visiteur obtient ou fait (« Manage projects efficiently ») ; « mixte » SEULEMENT si le titre contient à la fois un nom de catégorie ET un résultat explicite
  "cadreDeReference": {"valeur": bool, "confiance": 0..1},   // quelque part dans la page (pas seulement le titre), le produit est situé face à une alternative : un concurrent, « build vs buy », « instead of », « without adding more tools », « from four inboxes to one », faire à la main, ne rien faire
  "niveauLecture": {"valeur": "simple"|"professionnel"|"technique", "confiance": 0..1},
@@ -63,7 +63,7 @@ function texteDe(m: SignauxMecaniques, c: Contexte, corps: string): string {
 titre : ${c.annonce.titre}
 description : ${c.annonce.description ?? "(aucune)"}
 mots-clés / audience : ${c.annonce.motsCles.join(", ") || "(aucun)"}
-
+${c.crea ? `créa : accroche « ${c.crea.accroche} »${c.crea.visuel ? ", on y voit : " + c.crea.visuel : ""}\n` : ""}
 CONTEXTE
 mode de vente : ${c.vente}
 cible déclarée : ${c.cible ?? "(aucune)"}

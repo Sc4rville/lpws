@@ -160,7 +160,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 - ✅ Schéma `context.json` ([`contexte.ts`](../engine/variant/contexte.ts)) : deux champs obligatoires (annonce, mode de vente), le reste optionnel
 - 🟡 Pré-remplissage : l'offre est pré-remplie avec la marque, le reste non
 - ✅ Ingestion du texte de l'annonce (titre, description, mots-clés)
-- ⬜ ⚠️ Ingestion de la **créa** (image/vidéo) — demande un modèle qui voit, brique entièrement manquante alors que c'est l'ancre du message en paid social
+- 🟡 Ingestion de la **créa** : le buyer saisit son accroche (texte incrusté ou dit dans la vidéo) et ce qu'on y voit, avec la source de trafic (`crea`, `trafic` dans le formulaire) ; la lecture de l'image elle-même demande encore un modèle qui voit
 
 ## 2.3 · La knowledge base
 - ✅ 30 règles rédigées, 28 sources avec leurs biais assumés
@@ -169,7 +169,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 - ✅ KB en fichier de données validé par schéma : [`regles.json`](../engine/variant/regles.json), déclencheurs typés dans [`regles.ts`](../engine/variant/regles.ts) — prêt à recevoir les règles de la v2
 - 🟡 Trois sorties distinctes dans le moteur : test / conseil / méthode ; les refus et garde-fous restent à brancher
 - ⬜ Ajouter la famille e-commerce : revenu par visiteur, retours, remise contre marge, guide des tailles, frais de port, achat invité, paiement fractionné, contenu client
-- ⬜ ⚠️ Ajouter la continuité créa → haut de page : **totalement absente** de la v1
+- 🟡 Continuité créa → haut de page : `mm-accroche-crea` (accroche reprise ou non dans le titre, compté sans modèle), l'accroche et le visuel passent au jugement et à l'écriture, un chiffre de la créa compte comme une promesse de l'annonce ; la concordance **visuelle** reste à faire
 - 🟡 Verrouiller les refus comme filtre de sortie, pas comme simple conseil *([`garde.ts`](../engine/variant/garde.ts) : chiffre sans source, superlatif, urgence, faux témoignage, fausse personnalisation refusés sans modèle ; coût caché et ressorts non répliqués restent en consigne)*
 
 ## 2.4 · L'extraction des signaux

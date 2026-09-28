@@ -1313,15 +1313,22 @@ function vNouveau(c) {
 }
 
 /* ---------- le brain : la campagne, les propositions, les conseils ---------- */
+const TRAFICS = [['google-search', 'Google Search'], ['google-shopping', 'Google Shopping'], ['meta', 'Meta'], ['tiktok', 'TikTok'], ['linkedin', 'LinkedIn'], ['autre', 'Autre']];
+const SOCIAL = ['meta', 'tiktok', 'linkedin'];
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
+  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', trafic: 'google-search', accroche: '', visuel: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
+  const social = SOCIAL.includes(f.trafic);
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
     <div class="hd"><div><h2>Votre campagne</h2><p class="lede">Deux réponses suffisent pour que LPWS lise la page comme votre visiteur : ce que promet l’annonce, et comment se conclut la vente. Le reste affine.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
     <div class="duo">
       <div class="card w" style="display:grid;gap:18px">
-        ${champ('titre', 'Le titre de l’annonce', 'Tel qu’il s’affiche sur Google. C’est la comparaison la plus utile qu’on sache faire.', 'placeholder="Marketing Hub | Grow Traffic & Convert More Leads" required')}
+        <div class="fld">D’où vient le trafic
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${TRAFICS.map(([v, l]) => `<button class="btn ${(f.trafic || 'google-search') === v ? 'pri' : ''}" data-pick="trafic" data-v="${v}">${l}</button>`).join('')}</div>
+        </div>
+        ${social ? champ('titre', 'Le texte de l’annonce', 'Le texte principal, au-dessus de la créa.', 'placeholder="Notre chemise en lin ne froisse pas, même après 8 h de vol." required') : champ('titre', 'Le titre de l’annonce', 'Tel qu’il s’affiche sur Google. C’est la comparaison la plus utile qu’on sache faire.', 'placeholder="Marketing Hub | Grow Traffic & Convert More Leads" required')}
+        ${social ? champ('accroche', 'L’accroche de la créa', 'Le texte incrusté sur l’image, ou dit dans les trois premières secondes de la vidéo. C’est lui que le visiteur cherche en arrivant.', 'placeholder="La chemise en lin qui ne froisse pas"') + champ('visuel', 'Ce qu’on voit sur la créa', 'En une phrase : le produit, la scène, la personne.', 'placeholder="un homme en chemise bleue dans un aéroport"') : ''}
         ${champ('description', 'Sa description', '', 'placeholder="AI-powered marketing software. Start your free trial."')}
         ${champ('motsCles', 'Les mots-clés achetés', 'Séparés par des virgules. Ils décident si le titre parle la langue du visiteur.', 'placeholder="marketing automation, marketing hub"')}
         <div class="fld">Comment se conclut la vente
@@ -1752,7 +1759,7 @@ document.addEventListener('click', e => {
     naviguer(g.dataset.go); return;
   }
   const pk = e.target.closest('[data-pick]');
-  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois','tauxConversion','cpc']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
+  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','accroche','visuel','cible','offre','visiteursMois','tauxConversion','cpc']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
   const cp = e.target.closest('[data-copy]');
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
@@ -1784,7 +1791,7 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
+      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });

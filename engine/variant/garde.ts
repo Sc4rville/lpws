@@ -72,7 +72,7 @@ export type Portee = { verbes: string[]; ancres: Set<string> | null }
 export type CadreGarde = {
   /** le texte visible de la page (capture desktop) */
   page: string
-  /** le titre + la description de l'annonce : un chiffre de l'annonce est une affirmation du client */
+  /** l'annonce et l'accroche de sa créa (texteAnnonce) : un chiffre qui y figure est une affirmation du client */
   annonce: string
   /** le texte actuel de chaque ancre */
   avant: Map<string, string>
