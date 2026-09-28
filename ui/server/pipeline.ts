@@ -12,7 +12,7 @@ import { lireCompte, peutLancer } from "../../engine/compte/compte.ts"
 import { CLIENTS_ROOT } from "../../engine/shared/paths.ts"
 import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
 import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
-import { type Job, nouveauJob, dire, finir, lancer } from "./jobs.ts"
+import { type Job, jobs, nouveauJob, dire, finir, lancer } from "./jobs.ts"
 import { construireTag, appliquerParts, publierTag, sonderBalise, ecrireConfigClient } from "./tag.ts"
 
 /* ---------- onboarder une page : la capture, en sous-processus ---------- */
@@ -136,6 +136,27 @@ export async function lancerBrain(c: string, camp: string, contexte: unknown): P
     dire(job, "3 · puis écrit trois variantes, une par cible")
     const code = await lancer(job, TSX, [join(ROOT, "engine/variant/run.ts"), resolve(d), "--refaire"])
     finir(job, code === 0)
+  })()
+  return job
+}
+
+/** Décliner une proposition : N variantes de plus sur le même constat, à la consigne du buyer (job). */
+export async function lancerDeclinaison(c: string, camp: string, nom: string, entree: { consigne?: unknown; n?: unknown }): Promise<Job> {
+  const d = dossier(c, camp)
+  const props = await lireJson<Array<{ nom: string }>>(fichiersDe(d).propositions, [])
+  if (!props.some((p) => p.nom === nom)) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
+  if ([...jobs.values()].some((jb) => (jb.type === "decliner" || jb.type === "brain") && jb.etat === "en cours" && jb.campagne === d))
+    throw Object.assign(new Error("LPWS écrit déjà pour cette page : attendez la fin, une à deux minutes"), { code: 409 })
+  // « --x » en tête serait lu comme une option par la ligne de commande
+  const consigne = String(entree.consigne ?? "").replace(/\s+/g, " ").trim().replace(/^-+\s*/, "").slice(0, 300)
+  const n = Math.min(3, Math.max(1, Math.round(Number(entree.n) || 3)))
+  const job = nouveauJob("decliner")
+  job.campagne = d; job.sujet = nom
+  ;(async () => {
+    dire(job, `LPWS écrit ${n} autre${n > 1 ? "s" : ""} version${n > 1 ? "s" : ""} de ce test${consigne ? ` : « ${consigne} »` : ""}`)
+    const args = [join(ROOT, "engine/variant/run.ts"), resolve(d), "--decliner", nom, "--n", String(n)]
+    if (consigne) args.push("--consigne", consigne)
+    finir(job, (await lancer(job, TSX, args)) === 0)
   })()
   return job
 }

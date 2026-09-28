@@ -75,6 +75,7 @@ export async function etat() {
       const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
+      const declJob = [...jobs.values()].find((jb) => jb.type === "decliner" && jb.etat === "en cours" && jb.campagne === d)
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
       const resultats = await lireJson<Resultats | null>(fichiersDe(d).resultats, null)
@@ -121,6 +122,7 @@ export async function etat() {
         // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
         experiences: (await historique(cdir)).experiences.sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 20),
         brainEnCours, brainJob: brainJob?.id,
+        declinaison: declJob ? { job: declJob.id, source: declJob.sujet } : null,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
             label: express.installe ? "Installé" : publie === false ? "Balise pas encore publiée" : "À installer",

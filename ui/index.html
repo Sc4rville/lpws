@@ -1320,6 +1320,18 @@ function vCampagne(c) {
       </div>
     </div>`;
 }
+/* Décliner : d'une proposition, trois autres versions du même test, à la consigne du buyer */
+function carteProposition(c, p) {
+  const nom = esc(p.nom), dc = c.declinaison, ecrit = dc && dc.source === p.nom, occupe = !!dc;
+  const pied = ecrit
+    ? `<div class="d"><b>LPWS écrit d’autres versions de ce test.</b></div>${jobBox(dc.job)}`
+    : S.decl === p.nom
+    ? `<label class="fld" style="font-weight:600">D’autres versions de ce test<input class="inp" id="decl-consigne" maxlength="300" placeholder="Une consigne ? ex. plus court, parler de la livraison" value="${esc(S.declConsigne || '')}"><span class="muted" style="font-weight:400">Trois variantes différentes de celles déjà proposées, avec les mêmes garde-fous : rien que la page ou l’annonce n’affirme déjà.</span></label>
+       <div class="f">${GO(I.sparkle(15) + 'Écrire 3 versions', `data-act="decliner" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-fermer">Annuler</button></div>`
+    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : 'title="Trois autres versions de ce test, à votre consigne"'}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div>`;
+  const source = p.declineDe && (c.propositions || []).find(x => x.nom === p.declineDe);
+  return `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.declineDe ? `<span class="chip" title="${esc(source ? 'Déclinée de « ' + source.titre + ' »' : 'Déclinaison')}">Déclinaison</span>` : ''}${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div>${p.consigne ? `<div class="d"><b>Consigne.</b> ${esc(p.consigne)}</div>` : ''}<div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div>${pied}</div>`;
+}
 function brainBloc(c) {
   if (!c.live || c.capture.ok === null || c.capture.enCours) return '';
   if (c.brainEnCours) return `<div class="sec"><div class="live calm"><span class="chip"><span class="dot pulse"></span>Analyse en cours</span><h3>LPWS lit la page et écrit trois variantes</h3><div class="say">Une à deux minutes. La page reste utilisable.</div><div id="job-zone" style="margin-top:14px">${jobBox(c.brainJob)}</div></div></div>`;
@@ -1327,7 +1339,7 @@ function brainBloc(c) {
   const props = c.propositions || [], conseils = (c.diagnostic && c.diagnostic.conseils) || [];
   let h = '';
   if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
-    <div class="tests">${props.map(p => `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div><div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${esc(p.nom)}" data-client="${c.id}"`)}<button class="btn sm" data-act="refuser" data-nom="${esc(p.nom)}" data-client="${c.id}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div></div>`).join('')}</div></div>`;
+    <div class="tests">${props.map(p => carteProposition(c, p)).join('')}</div></div>`;
   else if (c.diagnostic) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées, ou aucun constat ne se traduit en test. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
   const ec = (c.diagnostic && c.diagnostic.ecartes) || [];
   if (ec.length) h += `<div class="sec"><div class="card"><h3>Pas re-proposé <span class="n">${ec.length}</span><span class="r"><button class="btn sm" data-go="view:suivi">Historique</button></span></h3>${ec.map(e => `<div class="ck off"><span class="i">${I.minus(12)}</span><div><b>${esc(nomRegle(e.id))}</b><div class="d">${esc(e.raison)}</div></div></div>`).join('')}</div></div>`;
@@ -1747,6 +1759,17 @@ document.addEventListener('click', e => {
       api(`/api/clients/${c.id}/propositions/${act.dataset.nom}`).then(async r => { toast('Test en préparation : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Test prêt à lancer' : 'La préparation a échoué'); await chargerEtat(); render(); }); }).catch(e => toast(e.message));
       break;
     }
+    case 'decliner-ouvrir': S.decl = act.dataset.nom; S.declConsigne = ''; render(); setTimeout(() => { const z = document.getElementById('decl-consigne'); if (z) z.focus(); }); break;
+    case 'decliner-fermer': S.decl = null; render(); break;
+    case 'decliner': {
+      if (!c) break;
+      const consigne = (document.getElementById('decl-consigne') || {}).value || '';
+      api(`/api/clients/${c.id}/propositions/${act.dataset.nom}/decliner`, { consigne, n: 3 }).then(async r => {
+        S.decl = null; toast('LPWS écrit trois autres versions : une minute environ'); await chargerEtat(); render();
+        suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Nouvelles versions proposées' : ((j.lignes || []).map(humaniser).filter(l => /ÉCHEC/.test(l)).pop() || 'Aucune version n’a passé les garde-fous').replace(/^.*ÉCHEC — /, '')); await chargerEtat(); render(); });
+      }).catch(e => toast(e.message));
+      break;
+    }
     case 'rapport': if (c) copier(rapportTexte(c), 'Rapport copié'); break;
     case 'refuser': {
       if (!c) break;
@@ -1846,6 +1869,7 @@ document.addEventListener('input', e => {
   if (e.target.id?.startsWith('cc-')) { S.cc = S.cc || {}; S.cc[e.target.id] = e.target.value; calcPlan(); }
   if (e.target.id === 'au-url') S.auditUrl = e.target.value;
   if (e.target.id === 'md-par') S.mandatPar = e.target.value;
+  if (e.target.id === 'decl-consigne') S.declConsigne = e.target.value;
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
   if (e.target.id === 'nt-text') S.ntText = e.target.value;
   if (e.target.id === 'nt-why') S.ntWhy = e.target.value;

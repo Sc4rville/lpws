@@ -15,7 +15,8 @@
  *
  * Tourne sur les crédits du plan (`claude -p`), comme le jugement.
  */
-import { readFile } from "node:fs/promises"
+import { readdir, readFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { z } from "zod"
 import { VariantSpec } from "../apply/spec.ts"
 import type { Constat } from "./diagnostic.ts"
@@ -25,7 +26,7 @@ import { slugify } from "../shared/paths.ts"
 import { controler, nomDeSpec, texteDuHtml, type Portee } from "./garde.ts"
 import { step } from "../shared/log.ts"
 import { demanderValide } from "../shared/modele.ts"
-import { ecrireJson, premierEcart } from "../shared/json.ts"
+import { ecrireJson, lireJson, premierEcart } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
 
 const SCOPE = "variant/variantes"
@@ -51,7 +52,11 @@ const Proposition = z.object({
  * les deux autres (constaté : un « pourquoi » trop court faisait tomber les trois variantes) */
 const Propositions = z.array(z.unknown()).min(1).max(4)
 
-function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string): string {
+/** Décliner : N variantes de plus pour UN constat, différentes de celles déjà écrites, avec
+ *  éventuellement la consigne du buyer (« plus court », « parler de la livraison »). */
+export type Declinaison = { n: number; consigne?: string; deja: string[] }
+
+function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, dec?: Declinaison): string {
   const ancres = [
     m.hero.titreAnchor && `${m.hero.titreAnchor} = TITRE « ${m.hero.titre} »`,
     m.hero.sousTitreAnchor && `${m.hero.sousTitreAnchor} = SOUS-TITRE « ${m.hero.sousTitre.slice(0, 120)} »`,
@@ -77,9 +82,9 @@ MODE DE VENTE : ${c.vente}${c.cible ? " · CIBLE : " + c.cible : ""}${c.offre ? 
 ANCRES DISPONIBLES
 ${ancres}
 
-CONSTATS À TRANSFORMER EN VARIANTES (une variante par constat, dans cet ordre)
+${dec ? `CONSTAT À DÉCLINER EN ${dec.n} VARIANTE${dec.n > 1 ? "S" : ""} (chacune avec "regle": "${constats[0].id}", différentes entre elles et de celles déjà proposées)` : "CONSTATS À TRANSFORMER EN VARIANTES (une variante par constat, dans cet ordre)"}
 ${constats.map((k, i) => `${i + 1}. [${k.id}] ${k.signal}\n   Action : ${k.action}\n   Consigne : ${k.test?.consigne}\n   Verbes autorisés : ${k.test?.verbes.join(", ")} · Cible : ${k.test?.cible}`).join("\n")}
-
+${dec?.deja.length ? `\nDÉJÀ PROPOSÉ POUR CE CONSTAT (ne pas le répéter, ni le reformuler à peine) :\n${dec.deja.map((x) => "- " + x).join("\n")}\n` : ""}${dec?.consigne ? `\nCONSIGNE DU MEDIA BUYER (à suivre dans les règles absolues, qui priment toujours) : ${dec.consigne}\n` : ""}
 Réponds UNIQUEMENT par un tableau JSON, sans texte autour, sans balises :
 [{"regle": "<id du constat>", "titre": "...", "hypothese": "Si ... alors ... parce que ...", "metrique": "...", "risque": "...", "edits": [{"anchor": "e123", "op": "set", "text": "...", "pourquoi": "..."}]}]`
 }
@@ -106,8 +111,10 @@ export type Refus = { regle: string; titre: string; raisons: string[]; edits: un
 
 export type VarianteProduite = { nom: string; regle: string; fichier: string; titre: string; teste: string }
 
+const normer = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+
 export async function ecrireVariantes(
-  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string,
+  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, dec?: Declinaison,
 ): Promise<VarianteProduite[]> {
   const f = fichiersDe(campagne)
   const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(f.ancres, "utf8"))
@@ -126,13 +133,14 @@ export async function ecrireVariantes(
     if (k) choisis.push(k)
   }
   for (const k of testables) if (choisis.length < 3 && !choisis.includes(k)) choisis.push(k)
+  if (dec) choisis.splice(0, choisis.length, ...testables.slice(0, 1))
   if (!choisis.length) { step(SCOPE, "aucun constat testable : rien à écrire"); return [] }
   step(SCOPE, `cibles retenues : ${choisis.map((k) => `${famille(k)} (${k.id})`).join(" · ")}`)
 
   // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
   // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
   // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
-  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
+  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue, dec), Propositions, "liste")
   if (!brutes) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
   const texteAvant = (a: string): string =>
@@ -157,16 +165,21 @@ export async function ecrireVariantes(
     refus.push({ regle: String(o.regle ?? "?"), titre: String(o.titre ?? "(sans titre)"), raisons: [`hors contrat : ${premierEcart(r.error)}`], edits: Array.isArray(o.edits) ? o.edits : [], le: new Date().toISOString() })
     step(SCOPE, `proposition hors contrat (${premierEcart(r.error)}) : refusée, les autres continuent`)
   }
-  const pris = new Set<string>()
+  // une déclinaison s'ajoute aux specs existantes : elle ne doit en écraser aucune
+  const pris = new Set<string>(dec && existsSync(f.specs) ? (await readdir(f.specs)).map((x) => x.replace(/\.json$/, "")) : [])
+  const dejaVus = new Set((dec?.deja ?? []).map(normer))
   const sorties: VarianteProduite[] = []
   for (const p of props) {
-    const k = choisis.find((x) => x.id === p.regle)
-    if (!k) { step(SCOPE, `proposition pour une règle inconnue (${p.regle}) : ignorée`); continue }
+    if (dec && sorties.length >= dec.n) break
+    // une déclinaison n'a qu'un constat : un « regle » mal recopié par le modèle ne la perd pas
+    const k = dec ? choisis[0] : choisis.find((x) => x.id === p.regle)
+    if (!k) { refuser(p, [`règle inconnue (${p.regle})`]); continue }
     // chaque ancre doit exister : une édition dans le vide n'est pas une variante
     const inconnue = p.edits.flatMap((e) => [e.anchor, e.before, e.after, e.with]).filter((a): a is string => !!a).find((a) => !parAncre.has(a))
     if (inconnue) { refuser(p, [`vise l'ancre ${inconnue} qui n'existe pas`]); continue }
     // le prompt demande ; le script vérifie
     const raisons = controler(p.edits, garde, porteeDe(k, m))
+    for (const e of p.edits) if (e.text && dejaVus.has(normer(e.text))) raisons.push(`« ${e.text.slice(0, 60)} » est déjà proposé`)
     if (raisons.length) { refuser(p, raisons); continue }
 
     const nom = nomDeSpec(p.titre, pris, slugify)
@@ -199,9 +212,11 @@ export async function ecrireVariantes(
       : e0.op === "swap" ? `Échanger ${nommer(e0.anchor)} et ${nommer(e0.with ?? "")}`
       : `Déplacer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
     sorties.push({ nom, regle: k.id, fichier, titre: p.titre, teste })
+    for (const e of p.edits) if (e.text) dejaVus.add(normer(e.text))
     step(SCOPE, `✓ ${p.titre} → ${fichier}`)
   }
   // le relevé des défauts d'écriture : ce que le modèle a tenté et pourquoi c'est tombé
-  await ecrireJson(f.refusees, refus)
+  // une déclinaison ajoute ses refus à ceux de l'analyse, elle ne les efface pas
+  await ecrireJson(f.refusees, dec ? [...await lireJson<Refus[]>(f.refusees, []), ...refus] : refus)
   return sorties
 }

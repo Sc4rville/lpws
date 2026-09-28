@@ -12,6 +12,7 @@
 - **Corpus fidèle** : HubSpot, Jira, Salesforce, Asana, monday tous sous 2,1 % desktop / 0,9 % mobile ([docs/corpus.md](docs/corpus.md)).
 - **Brain** (`engine/variant`) : signaux + jugements typés + 34 règles → diagnostic → 3 variantes.
   Jugement mesuré à 73 % contre 6 pages annotées (`npm run brain:eval`).
+  Décliner : chaque proposition donne à la demande 3 autres versions du même test (bouton « Décliner », `--decliner`).
 - **Mesure** : GA4 par fenêtre de test, un seul moteur stats (`engine/measure/stats.ts`, embarqué
   aussi dans l'UI), journal des expériences, « Peut-on conclure ? ».
 - **Modules business** : audit tracking, surveillance, compte/paliers/mandats, rapport client, coûts.
