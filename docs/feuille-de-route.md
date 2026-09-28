@@ -74,8 +74,8 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Un titre qui passe à trois lignes ne fait plus exploser le score : chaque section est recalée sur le live avant d'être comparée *(le verdict bloquant reste celui de la page ; le recalé dit si ce n'est qu'un décalage)*
 - ✅ Juge v2 : diff **par section ancrée** *(diff.ts, diffParSection — sections de mark.ts, bandesDuRendu)*
 - ✅ Verdict par section (savoir *laquelle* a cassé) *(verify.json `sections`, seuil 1 % par section)*
-- ⬜ Même découpage appliqué au delta de variante
-- ⬜ Round-trip à vide : page.json → apply → re-rendu → pixel identique
+- ✅ Même découpage appliqué au delta de variante *(delta.ts : une section changée sans édition = débordement, `propre` dans variant.json)*
+- ✅ Round-trip à vide : capture → apply sans édition → re-rendu → pixel identique *(`npm run aller-retour`, contre un témoin rendu au même moment ; neutre sur les 8 baselines locales)*
 
 ### 1.1.5 · Le corpus
 - ✅ Cinq pages choisies, verdicts suivis

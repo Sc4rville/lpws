@@ -11,6 +11,7 @@
     "verify": "tsx engine/clone/5_verify/verify.ts",
     "corpus": "tsx engine/clone/corpus.ts",
     "apply": "tsx engine/apply/run.ts",
+    "aller-retour": "tsx engine/apply/aller-retour.ts",
     "viewer": "tsx engine/viewer/server.ts",
     "relink": "tsx engine/clone/1_acquire/relink-cli.ts",
     "relink:check": "tsx engine/clone/1_acquire/relink-check.ts",

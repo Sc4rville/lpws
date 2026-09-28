@@ -19,8 +19,10 @@ import { estLance, lireArgs } from "../shared/cli.ts"
 import { lireValide } from "../shared/json.ts"
 import { VariantSpec } from "./spec.ts"
 import { applyEdits } from "./apply.ts"
-import { visualDiff } from "../clone/5_verify/diff.ts"
+import { visualDiff, type Bande } from "../clone/5_verify/diff.ts"
 import { DESKTOP, MOBILE, autoScroll } from "../clone/1_acquire/render.ts"
+import { bandesDuRendu } from "../clone/1_acquire/mark.ts"
+import { bandesTouchees, deltaParSection, type DeltaSections } from "./delta.ts"
 import { variantDir } from "../shared/paths.ts"
 import { step, timed, fail } from "../shared/log.ts"
 
@@ -34,10 +36,10 @@ const ORIGIN = "http://variant.lpws"
  * duplique pas 5 Mo d'images pour un headline) : la route sert d'abord le dossier de la
  * variante, puis la baseline en repli.
  */
-async function shoot(
+export async function shoot(
   vdir: string, bdir: string, fichier: string,
   viewport: { width: number; height: number }, out: string, ancres: string[] = [],
-): Promise<Record<string, number>> {
+): Promise<{ positions: Record<string, number>; bandes: Bande[]; touchees: string[] }> {
   const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
     const page = await nouvellePage(browser, { viewport })
@@ -49,7 +51,7 @@ async function shoot(
     // les positions se relèvent ICI, sur la page complètement rendue : mesurées pendant
     // l'édition (images pas encore chargées) elles étaient fausses de plusieurs milliers
     // de pixels, et le « clique pour t'y rendre » du cockpit tombait à côté
-    return await page.evaluate((as: string[]) => {
+    const positions = await page.evaluate((as: string[]) => {
       const out: Record<string, number> = {}
       for (const a of as) {
         const el = document.querySelector(`[data-lpws="${a}"]`)
@@ -57,6 +59,9 @@ async function shoot(
       }
       return out
     }, ancres)
+    const bandes = await page.evaluate(bandesDuRendu)
+    const touchees = await page.evaluate(bandesTouchees, { bandes: bandes.map((b) => b.anchor), ancres })
+    return { positions, bandes, touchees }
   } finally {
     await browser.close()
   }
@@ -78,15 +83,16 @@ export async function applyVariant(baseline: string, specPath: string) {
   const journal = rapports[0].journal
 
   const deltas: Record<string, { ratio: number; heightDelta: number }> = {}
+  const sections: Partial<Record<"desktop" | "mobile", DeltaSections>> = {}
   await timed(SCOPE, "rendu + delta vs baseline", async () => {
-    for (const [label, fichier, viewport, ref] of [
-      ["desktop", "variant.html", DESKTOP, "clone.png"],
-      ["mobile", "variant.mobile.html", MOBILE, "clone.mobile.png"],
+    for (const [label, fichier, viewport, ref, rapport] of [
+      ["desktop", "variant.html", DESKTOP, "clone.png", rapports[0]],
+      ["mobile", "variant.mobile.html", MOBILE, "clone.mobile.png", rapports[1] ?? rapports[0]],
     ] as const) {
       if (!existsSync(join(vdir, fichier))) continue
       const shot = join(vdir, label === "desktop" ? "variant.png" : "variant.mobile.png")
-      const positions = await shoot(vdir, baseline, fichier, viewport, shot,
-        journal.map((j) => j.anchor))
+      const ancres = [...new Set(rapport.journal.flatMap((j) => [j.anchor, j.dans ?? ""]).filter(Boolean))]
+      const { positions, bandes, touchees } = await shoot(vdir, baseline, fichier, viewport, shot, ancres)
       // le desktop fait foi pour l'affichage du journal
       if (label === "desktop")
         for (const j of journal) if (positions[j.anchor] != null) j.y = positions[j.anchor]
@@ -94,13 +100,19 @@ export async function applyVariant(baseline: string, specPath: string) {
       const d = await visualDiff(join(baseline, ref), shot,
         join(vdir, label === "desktop" ? "delta.png" : "delta.mobile.png"))
       deltas[label] = { ratio: d.ratio, heightDelta: d.heightDelta }
-      step(SCOPE, `${label} : ${(d.ratio * 100).toFixed(2)}% de pixels changés · Δhauteur ${d.heightDelta}px`)
+      const s = sections[label] = await deltaParSection(join(baseline, ref), shot, bandes, touchees)
+      step(SCOPE, `${label} : ${(d.ratio * 100).toFixed(2)}% de pixels changés · Δhauteur ${d.heightDelta}px · ` +
+        `${s.changees.length} section(s) changée(s), ${s.touchees.length} touchée(s)` +
+        (s.debordements.length ? ` · DÉBORDEMENT : ${s.debordements.join(", ")} changée(s) sans édition` : ""))
     }
   })
 
+  // propre = rien n'a bougé hors des sections éditées ; null = pas de baseline pour le dire
+  const vues = Object.values(sections)
+  const propre = vues.length ? vues.every((s) => s.debordements.length === 0) : null
   await writeFile(join(vdir, "variant.json"),
-    JSON.stringify({ ...spec, journal, deltas, baseline }, null, 2))
-  return { vdir, spec, journal, deltas }
+    JSON.stringify({ ...spec, journal, deltas, sections, propre, baseline }, null, 2))
+  return { vdir, spec, journal, deltas, sections, propre }
 }
 
 /* CLI */
@@ -109,6 +121,7 @@ if (estLance(import.meta.url)) {
   if (!baseline || !spec) fail(SCOPE, "usage : npm run apply -- <dossier-baseline> <spec.json>")
   applyVariant(baseline, spec).then((r) => {
     console.log(JSON.stringify({ variante: r.vdir, hypothese: r.spec.hypothese,
-      metrique: r.spec.metrique, deltas: r.deltas }, null, 2))
+      metrique: r.spec.metrique, deltas: r.deltas, propre: r.propre,
+      debordements: Object.fromEntries(Object.entries(r.sections).map(([v, s]) => [v, s.debordements])) }, null, 2))
   }).catch((e) => fail(SCOPE, String(e?.message ?? e)))
 }
