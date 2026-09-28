@@ -158,5 +158,8 @@ le juge avant d'accuser le code.
   remplacé par `loader.ts`) retiré ; `npm run typecheck` couvre aussi `ui/` ; `esbuild` déclaré.
 - Vérifié identique avant/après : clone démo 0 %/0 %, variant.json, `/api/etat`, relink 68/68,
   measure --exemple, tag:check (même refus sur la démo statique).
-- Reste : découper `ui/server.ts` (jobs · état · pipeline de test · tag · routes) sur ce socle.
+- `ui/server.ts` découpé : il ne garde que les routes et le mot de passe ; `ui/server/` porte
+  `config` · `jobs` · `etat` · `pipeline` (capture, textes, tests, brain) · `tag` (construire,
+  publier, sonder). Vérifié identique : `/api/etat` et `/textes` octet pour octet, test créé →
+  variante → balise (68/68 ancres), live / stop / vérifier.
 
