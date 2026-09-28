@@ -323,8 +323,8 @@ export async function applyEdits(
       if (desaccords.length > 0)
         fail(SCOPE,
           `l'ancre ne désigne plus la même chose dans ${source} :\n  ` + desaccords.join("\n  ") +
-          `\n  → la page du client a changé depuis la capture. Recapturer, puis re-lier les ancres ` +
-          `(npm run relink -- <ancienne> <nouvelle>) avant de rejouer cette variante.`)
+          `\n  → la page du client a changé depuis la capture. Recapturer, puis traduire la spec ` +
+          `(npm run rejouer -- <baseline> <spec.json>) avant de rejouer cette variante.`)
       if (manquantes.length > 0)
         throw new Error(
           `ancres introuvables dans ${source} : ${manquantes.join(", ")} — ` +

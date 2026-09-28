@@ -61,10 +61,10 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Rapport honnête : retrouvées / déplacées / ambiguës / perdues, jamais de tranchage au hasard
 - ✅ `apply` refuse une édition dont l'empreinte ne correspond plus (`attendu` dans [`spec.ts`](../engine/apply/spec.ts))
 - ✅ Preuve rejouable sur mutation connue : `npm run relink:check -- <baseline>`
-- ⬜ Versionner les captures d'un client au lieu de les écraser
+- ✅ Versionner les captures d'un client au lieu de les écraser *(`captures/<date>/` : empreintes, méta, verdict de la capture sortante, archivés avant chaque recapture)*
 - ⬜ Corpus de test du re-liage : les mêmes pages capturées à deux dates réelles *(la mutation synthétique prouve le mécanisme, pas la dérive d'un vrai site)*
 - ✅ Remplir `attendu` automatiquement à l'écriture d'une spec *(brain et édition manuelle l'écrivent depuis anchors.json)*
-- ⬜ Rejouer une spec ancienne sur une capture neuve en traduisant ses ancres par le rapport de re-liage
+- ✅ Rejouer une spec ancienne sur une capture neuve en traduisant ses ancres par le rapport de re-liage *(`npm run rejouer` : une ancre ambiguë ou perdue refuse toute la spec ; essayé sur la démo avec une bannière ajoutée : `e11 → e12`, apply propre)*
 
 ### 1.1.4 · Le juge
 - ✅ Diff visuel contre le live, desktop et mobile
@@ -302,7 +302,7 @@ maintenant et qui coûteront très cher à rattraper.
 
 ## 4.5 · Faire vivre la knowledge base
 - ✅ Tracer quelle règle a produit quelle variante et quel résultat *(`regle` dans chaque expérience)*
-- ⬜ Une règle qui perd plusieurs fois perd de la confiance ; une règle qui gagne en gagne
+- ✅ Une règle qui perd plusieurs fois perd de la confiance ; une règle qui gagne en gagne *(`bilanRegles` : comptes seulement, tous clients ; score × (gagnés+1)/(perdus+1) borné à [½, 1,5], à partir de deux tests tranchés)*
 - ⬜ Relire la KB à chaque nouvelle recherche
 
 ---

@@ -21,6 +21,7 @@ import { localizeStyles } from "./2_styles/localize.ts"
 import { localizeAssets } from "./3_assets/localize.ts"
 import { verifyBaseline, SEUIL_DEFAUT } from "./5_verify/verify.ts"
 import { baselineDir, marque, slugify } from "../shared/paths.ts"
+import { archiverCapture } from "./captures.ts"
 import { step, fail } from "../shared/log.ts"
 import { lireArgs } from "../shared/cli.ts"
 
@@ -41,6 +42,10 @@ async function main() {
 
   const dir = await baselineDir(client, campaign)
   step(SCOPE, `${url} → ${dir}`)
+
+  // 0 · l'identité de la capture sortante est gardée : sans elle, ses variantes ne se rejouent plus
+  const archive = await archiverCapture(dir)
+  if (archive) step(SCOPE, `capture précédente archivée → ${archive}`)
 
   // 1 · acquisition
   const meta = await acquire(url, dir, { auth: arg("--auth") ?? process.env.LPWS_AUTH, cookies: arg("--cookie") ?? process.env.LPWS_COOKIES })
