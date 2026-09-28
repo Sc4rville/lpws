@@ -64,6 +64,18 @@ export type CadreGarde = {
   avant: Map<string, string>
   /** les ancres qui sont des boutons (libellé court exigé) */
   boutons: Set<string>
+  /** régime « gros changements » : l'ampleur minimale d'une variante faite de textes seuls */
+  ampleurMin?: number
+}
+
+const mots = (s: string) => new Set(s.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]{2,}/gu) ?? [])
+
+/** Ce qui change d'un texte à l'autre, de 0 (mêmes mots) à 1 (aucun mot commun) : distance de Jaccard. */
+export function ampleur(avant: string, apres: string): number {
+  const a = mots(avant), b = mots(apres)
+  const union = new Set([...a, ...b]).size
+  if (!union) return 0
+  return 1 - [...a].filter((m) => b.has(m)).length / union
 }
 
 const norme = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase()
@@ -101,6 +113,13 @@ export function controler(edits: EditPropose[], g: CadreGarde, portee?: Portee):
     } else if (avant && t.length > Math.max(avant.length * 2.5, 120)) {
       raisons.push(`${e.anchor} : texte ${Math.round(t.length / Math.max(avant.length, 1))}× plus long que l'actuel`)
     }
+  }
+  // Sous 200 k visiteurs/mois, seul un gros écart se détecte (docs/brain.html, « ordres de
+  // grandeur ») : trois mots retouchés dans un titre occuperaient le trafic des semaines pour
+  // ne rien conclure. Un déplacement, un retrait, une duplication sont gros par nature.
+  if (g.ampleurMin !== undefined && edits.length && edits.every((e) => e.op === "set")) {
+    const max = Math.max(...edits.map((e) => ampleur(g.avant.get(e.anchor) ?? "", e.text ?? "")))
+    if (max < g.ampleurMin) raisons.push(`retouche trop fine pour ce volume (${Math.round(max * 100)} % du texte change, ${Math.round(g.ampleurMin * 100)} % au moins) : à ce trafic, seul un gros changement peut conclure`)
   }
   return raisons
 }

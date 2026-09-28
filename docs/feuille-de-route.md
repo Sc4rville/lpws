@@ -186,7 +186,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 - ✅ Hiérarchisation impact × preuve × pertinence ÷ risque, catégorie stratégique devant
 - ✅ Constats classés, chacun avec sa règle et ses sources ; les non évaluables listés avec ce qui manquait
 - ⬜ Les quatre points d'arrêt : pas de contexte → demander · illégal → refuser · cosmétique → rediriger · rien à dire → l'avouer
-- 🟡 Régime calculé (gros changements sous 200 k visiteurs/mois), pas encore répercuté sur l'ampleur des éditions
+- ✅ Régime calculé (gros changements sous 200 k visiteurs/mois) et répercuté : consigne d'ampleur au modèle, retouche de texte sous 50 % refusée par [`garde.ts`](../engine/variant/garde.ts)
 
 ## 2.6 · La génération de variantes
 - ✅ Contrat : pas d'hypothèse, de métrique, de risque et de diagnostic → pas de variante

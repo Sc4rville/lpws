@@ -85,7 +85,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   // 4. écrire
   if (opts.sansVariantes) return { d, variantes: [] }
   const langue = langueDe(await readFile(f.capture, "utf8"))
-  const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue))
+  const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime))
   // ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit
   const propositions = variantes.map((v) => {
     const k = d.tests.find((x) => x.id === v.regle)
