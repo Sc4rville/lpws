@@ -26,6 +26,8 @@
   qui publie** sur `lpws-app.vercel.app` ; en local, `LPWS_SANS_VERCEL=1`.
 - **Repo rangé le 2026-09-28** : racine = readme · CLAUDE · session ; docs en `recherche/` et
   `journal/` ; `npm run menage` (racine, noms, liens, code mort) tourne en CI.
+- **Vérif locale** : GitHub Actions est bloqué (facturation du compte) ; `npm run verif` rejoue
+  la CI en local (typecheck · menage · tests · interface · 2 clones de démo fidèles, hors `clients/`).
 
 ## À faire (dans l'ordre)
 0. **Le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées), corrige, puis

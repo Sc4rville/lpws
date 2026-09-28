@@ -32,7 +32,8 @@
     "audit": "tsx engine/audit/audit.ts",
     "surveille": "tsx engine/surveille/surveille.ts",
     "couts": "tsx engine/compte/couts.ts",
-    "menage": "tsx scripts/menage.ts && knip"
+    "menage": "tsx scripts/menage.ts && knip",
+    "verif": "tsx scripts/verif.ts"
   },
   "dependencies": {
     "esbuild": "~0.28.2",
