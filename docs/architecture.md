@@ -18,6 +18,7 @@ lpws/
     recherche/            rapports et briefs de recherche (business model, media buyer, v1, v2)
     journal/              les journaux des contributeurs (kusaila, scarville)
   scripts/menage.ts       le garde-fou de rangement (npm run menage, en CI)
+  scripts/verif.ts        la CI en local (npm run verif) : à passer avant chaque merge
   clients/                LES SORTIES — data par client/campagne, gitignoré
   .claude/                skills (la réflexion) + hook du brief de session
 ```
