@@ -39,7 +39,9 @@ const SCOPE = "surveille"
 export type Releve = {
   quand: string
   url: string
+  /** 0 = la page n'a pas répondu (voir `erreur`) */
   statut: number
+  erreur?: string
   gclid: boolean
   balises: string[]
   lcpMs: number | null
@@ -85,12 +87,34 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
   const tests = await lireJson<Test[]>(f.tests, [])
   const enLigne = tests.some((t) => t.etat === "live")
 
-  const audit = await auditer(meta.source)
+  const precedents = await historique(campagneDir)
+  const avant = precedents.find((r) => r.statut > 0)
+  const nouvelles: Alerte[] = []
+  const quand = new Date().toISOString()
+  const alerte = (type: string, gravite: Alerte["gravite"], titre: string, detail: string) =>
+    nouvelles.push({ id: `${quand}-${type}`, type, quand, titre, detail, gravite })
+  const consigner = async (releve: Releve) => {
+    await ecrireJson(f.releve(releve.quand.replace(/[:.]/g, "-")), releve)
+    if (nouvelles.length) await ecrireJson(f.alertes, [...nouvelles, ...await lireJson<Alerte[]>(f.alertes, [])].slice(0, 200))
+    return { releve, nouvelles }
+  }
+
+  const audit = await auditer(meta.source).catch((e: Error) => e)
+  if (audit instanceof Error) {
+    const releve: Releve = {
+      quand, url: meta.source, statut: 0, erreur: audit.message, gclid: false, balises: [], lcpMs: null,
+      auditResume: { grave: 0, attention: 0, aVerifier: 0, ok: 0 }, hautDePage: { titre: "", sousTitre: "", boutons: [] }, empreinte: "",
+      annonce: null, concordance: null, express: null,
+    }
+    if (!precedents[0] || precedents[0].statut > 0 && precedents[0].statut < 400)
+      alerte("page-hs", "grave", "La page ne répond plus", `${meta.source} : ${audit.message}. Chaque clic payé arrive dans le vide : coupez la campagne ou rétablissez la page.`)
+    return consigner(releve)
+  }
   await ecrireJson(f.audit, audit)
   const { haut, express } = await lireHautDePage(meta.source, enLigne)
   const texteHaut = [haut.titre, haut.sousTitre, ...haut.boutons].join(" · ")
   const releve: Releve = {
-    quand: new Date().toISOString(), url: meta.source, statut: audit.statut,
+    quand, url: meta.source, statut: audit.statut,
     gclid: audit.constats.some((k) => k.id === "gclid" && k.niveau === "ok"), balises: audit.balises, lcpMs: audit.lcpMs,
     auditResume: audit.resume, hautDePage: haut, empreinte: hash(texteHaut),
     annonce: ctx?.annonce ? hash(JSON.stringify(ctx.annonce)) : null,
@@ -98,17 +122,10 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
     express,
   }
 
-  const precedents = await historique(campagneDir)
-  const avant = precedents[0]
-  await ecrireJson(f.releve(releve.quand.replace(/[:.]/g, "-")), releve)
-
-  const nouvelles: Alerte[] = []
-  const alerte = (type: string, gravite: Alerte["gravite"], titre: string, detail: string) =>
-    nouvelles.push({ id: `${releve.quand}-${type}`, type, quand: releve.quand, titre, detail, gravite })
   // une alerte par CHANGEMENT : on ne répète pas celle du passage précédent
   const etaitOk = (cond: (r: Releve) => boolean) => !avant || cond(avant)
 
-  if (releve.statut >= 400 && etaitOk((r) => r.statut < 400)) alerte("page-hs", "grave", `La page répond ${releve.statut}`, `${releve.url} : chaque clic payé arrive sur une erreur. Coupez la campagne ou corrigez la page.`)
+  if (releve.statut >= 400 && (!precedents[0] || precedents[0].statut > 0 && precedents[0].statut < 400)) alerte("page-hs", "grave", `La page répond ${releve.statut}`, `${releve.url} : chaque clic payé arrive sur une erreur. Coupez la campagne ou corrigez la page.`)
   if (!releve.gclid && etaitOk((r) => r.gclid)) alerte("gclid-perdu", "grave", "Le gclid ne survit plus jusqu'à la page", audit.constats.find((k) => k.id === "gclid")?.detail ?? "")
   if (avant) for (const b of avant.balises.filter((x) => !releve.balises.includes(x)))
     alerte("balise-perdue", "grave", `${b} a disparu de la page`, `Présente au relevé du ${avant.quand.slice(0, 10)}, absente aujourd'hui : les conversions ne remontent peut-être plus.`)
@@ -123,11 +140,7 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
     alerte("annonce-page", "attention", `L'annonce et la page ne se parlent plus (concordance ${Math.round(c.score * 100)} %)`,
       `${avant && avant.annonce !== releve.annonce ? "L'annonce a changé depuis le dernier relevé. " : ""}Absents du haut de page : ${[...c.motsClesAbsents, ...c.motsTitreAbsents].slice(0, 6).join(", ") || "—"}. Un test de titre qui reprend l'annonce est le premier à lancer.`)
 
-  if (nouvelles.length) {
-    const toutes = await lireJson<Alerte[]>(f.alertes, [])
-    await ecrireJson(f.alertes, [...nouvelles, ...toutes].slice(0, 200))
-  }
-  return { releve, nouvelles }
+  return consigner(releve)
 }
 
 /** Les relevés d'une campagne, du plus récent au plus ancien. */
