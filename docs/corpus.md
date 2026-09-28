@@ -12,15 +12,14 @@ différent de la machine. Toute évolution de `engine/clone` doit repasser ce co
 | Atlassian — Jira | https://www.atlassian.com/software/jira | grosse LP produit, design system dense |
 
 ```bash
-# repasser tout le corpus :
-for u in \
-  https://www.hubspot.com/products/marketing \
-  https://www.salesforce.com/crm/ \
-  https://asana.com/uses/project-management \
-  https://monday.com/work-management \
-  https://www.atlassian.com/software/jira \
-; do npm run clone -- "$u" --client corpus; done
+npm run corpus                  # re-juge les baselines déjà capturées (hors ligne, rapide)
+npm run corpus -- --recapturer  # refait tout le clone de chaque page (réseau, lent)
+npm run corpus -- <url>…        # une autre liste
 ```
+
+Le tableau (verdict de page, diff desktop/mobile, diff recalé, sections fidèles, sections à
+revoir) sort sur stdout et dans `clients/corpus.json`. « décalage seul » = la page échoue mais
+chaque section recalée est fidèle : un bloc a changé de hauteur, rien n'est cassé.
 
 Les résultats vivent sous `clients/<marque>/` (gitignoré) — `atlassian/`, `asana/`, `hubspot/`, `monday/` — seuls les verdicts comptent,
 notés dans la conversation/les sessions, pas versionnés.
