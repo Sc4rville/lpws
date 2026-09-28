@@ -1,8 +1,8 @@
 # scarville.md — le plan d'action, tenu par Yann
 
 > Le pendant de [kusaila.md](kusaila.md) : ce que Yann décide et pilote, mis à jour **avant chaque
-> étape importante**. L'état de la machine reste dans [session.md](session.md), l'arbre complet
-> dans [docs/feuille-de-route.md](docs/feuille-de-route.md).
+> étape importante**. L'état de la machine reste dans [session.md](../../session.md), l'arbre complet
+> dans [docs/feuille-de-route.md](../feuille-de-route.md).
 
 ---
 

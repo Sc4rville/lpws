@@ -165,7 +165,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 ## 2.3 · La knowledge base
 - ✅ 30 règles rédigées, 28 sources avec leurs biais assumés
 - 🟡 Issues de la recherche v1, orientée B2B : la famille e-commerce est mince
-- 🔴 **Lancer la recherche v2** — le brief est prêt ([docs/recherche-v2-brief.md](recherche-v2-brief.md)), livrable : 80 à 120 règles rééquilibrées
+- 🔴 **Lancer la recherche v2** — le brief est prêt ([docs/recherche/v2-brief.md](recherche/v2-brief.md)), livrable : 80 à 120 règles rééquilibrées
 - 🟡 KB extraite de la page HTML vers [`regles.ts`](../engine/variant/regles.ts) : exécutable, typée, pas encore un fichier de données pur
 - 🟡 Trois sorties distinctes dans le moteur : test / conseil / méthode ; les refus et garde-fous restent à brancher
 - ⬜ Ajouter la famille e-commerce : revenu par visiteur, retours, remise contre marge, guide des tailles, frais de port, achat invité, paiement fractionné, contenu client
@@ -252,7 +252,7 @@ reste un outil de développement, pas un produit.
 - ✅ Les deux : web sur la box de kabylesystem (seule instance qui publie), local avec `LPWS_SANS_VERCEL=1`
 
 ## 3.5 · Le modèle commercial
-> Recherche marché et grille proposée : [business-model-rapport.md](business-model-rapport.md)
+> Recherche marché et grille proposée : [recherche/business-model.md](recherche/business-model.md)
 - 🟡 Unité de facturation : le client actif / mois, codé comme hypothèse ([`paliers.ts`](../engine/compte/paliers.ts)) ; appliqué seulement avec `LPWS_FACTURATION=1`, à confirmer par les entretiens
 - 🟡 Ce qui est inclus : la grille Atelier · Solo · Agence · Régime est codée ; Stripe (abonnement + webhook signé) s'active avec les clés `STRIPE_*`, non configurées
 - ✅ Coût réel d'un diagnostic journalisé (`clients/couts.jsonl`, `npm run couts`) : la base du plafond de diagnostics

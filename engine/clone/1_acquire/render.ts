@@ -391,10 +391,10 @@ async function posterizeVideos(page: Page, dir: string, state: string): Promise<
 }
 
 /** Délai maximal d'attente des octets d'une réponse déjà reçue (en-têtes arrivés, corps qui traîne). */
-export const DELAI_OCTETS = 20_000
+const DELAI_OCTETS = 20_000
 
 /** Les octets d'une réponse, ou null passé le délai : un corps qui ne finit jamais ne bloque pas la capture. */
-export function attendreOctets<T>(pending: Promise<T>, delai: number): Promise<T | null> {
+function attendreOctets<T>(pending: Promise<T>, delai: number): Promise<T | null> {
   return new Promise((res) => {
     const t = setTimeout(() => res(null), delai)
     pending.then((v) => { clearTimeout(t); res(v) }, () => { clearTimeout(t); res(null) })

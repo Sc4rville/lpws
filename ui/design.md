@@ -97,7 +97,7 @@ réduit à une rangée de pilules défilante et le rail reste collé en haut.
 
 ## Copie
 
-Le vocabulaire du buyer (scarville.md). Phrases courtes, une idée par ligne, pas de tiret
+Le vocabulaire du buyer ([scarville.md](../docs/journal/scarville.md)). Phrases courtes, une idée par ligne, pas de tiret
 cadratin (`—` interdit : deux-points ou point). Un écran répond toujours à « et maintenant ? ».
 
 ## Motion

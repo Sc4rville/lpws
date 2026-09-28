@@ -2,7 +2,7 @@
 
 Ce que voit le media buyer : ses clients, la page, les tests, les résultats, et la connexion
 (Express · Intégral · Natif). Le vocabulaire est le sien, pas celui de la machine
-([scarville.md](../scarville.md)).
+([scarville.md](../docs/journal/scarville.md)).
 
 ```bash
 npm run ui:serve     # la v1 branchée sur la machine → http://localhost:4700

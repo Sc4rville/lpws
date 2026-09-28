@@ -12,7 +12,7 @@ const SRC = join(resolve(import.meta.dirname, ".."), "engine", "measure", "stats
 const MARQUEUR = "/*STATS*/"
 let cache: Promise<string> | null = null
 
-export function statsNavigateur(): Promise<string> {
+function statsNavigateur(): Promise<string> {
   cache ??= build({ entryPoints: [SRC], bundle: true, format: "iife", globalName: "STATS", write: false, target: "es2020", minify: true })
     .then((r) => r.outputFiles[0].text.replaceAll("</script", "<\\/script"))
   return cache

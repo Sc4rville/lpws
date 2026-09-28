@@ -1,12 +1,11 @@
 /**
  * compte.ts — LE COMPTE DU BUYER : son palier, son essai, son code partenaire, sa marque (pour
- * le rapport en marque blanche) et ses MANDATS (docs/business-model-rapport.md §4–7 ;
+ * le rapport en marque blanche) et ses MANDATS (docs/recherche/business-model.md §4–7 ;
  * feuille de route 3.4, 3.5, 3.6).
  *
  * Une instance LPWS = un compte buyer (clients/compte.json). Le multi-utilisateur (plusieurs
- * buyers d'une agence, des droits par personne) est une décision d'hébergement encore ouverte
- * (ETAT.md) : ce module en pose le contrat — ce qu'un compte a le droit de faire — sans
- * l'inventer.
+ * buyers d'une agence, des droits par personne) est une décision d'hébergement encore ouverte :
+ * ce module en pose le contrat — ce qu'un compte a le droit de faire — sans l'inventer.
  *
  * LE MANDAT n'est pas une option : un buyer ne met rien en ligne sur la page d'un client qui ne
  * l'a pas mandaté (§7 : c'est ce qui distingue l'Atelier d'un outil de scraping). Il le déclare
@@ -45,7 +44,7 @@ export const Compte = z.object({
 })
 export type Compte = z.infer<typeof Compte>
 
-export const FICHIER_COMPTE = join(CLIENTS_ROOT, "compte.json")
+const FICHIER_COMPTE = join(CLIENTS_ROOT, "compte.json")
 export const VERSION_CONDITIONS = "2026-09"
 export const DECLARATION_MANDAT = (client: string, par: string) =>
   `Je déclare être mandaté par ${client} (mandat donné par ${par}) pour tester des versions de ses pages, installer la balise LPWS sur son site et lire les données de performance nécessaires à la mesure. Je m'engage à retirer la balise à la fin du mandat.`
@@ -117,5 +116,3 @@ export function factureDuMois(c: Compte, actifs: number): { total: number | null
   const total = base + enPlus * (p.parClientEnPlus ?? 0)
   return { total, detail: `${p.nom} ${base} $${enPlus ? ` + ${enPlus} client(s) × ${p.parClientEnPlus} $` : ""} · ${actifs} client(s) actif(s) ce mois-ci` }
 }
-
-export type { IdPalier }

@@ -5,7 +5,7 @@
 > sur les pages officielles sauf mention « secondaire ». **Tout prix est à reconfirmer avant
 > une décision** : ces pages changent souvent.
 >
-> Relié à la [feuille de route](feuille-de-route.md) : chaque proposition cite la ou les
+> Relié à la [feuille de route](../feuille-de-route.md) : chaque proposition cite la ou les
 > micro-tâches qu'elle mobilise (`3.5`, `4.2`…). Décide surtout **3.5 · Le modèle commercial**.
 
 ---
@@ -172,7 +172,7 @@ Augmentic). Elle attaque directement le churn mensuel SMB.
   taux de la newsletter.
 - **Ce qu'on met dans la newsletter** : pas « essayez LPWS », mais **l'audit gratuit** —
   « collez l'URL de votre LP, on vous dit si votre gclid survit ». La sonde existe déjà
-  (redirection monday.com qui perd les paramètres, `kusaila.md`).
+  (redirection monday.com qui perd les paramètres, `docs/journal/kusaila.md`).
 - **La vente founder-led d'AgentMark est à copier** : « apportez une annonce, 20 minutes,
   repartez avec la variante ». Chez nous : l'Atelier en visio, sur la page de son client.
 - **La boucle virale** : le rapport « À transmettre au client » marqué LPWS en Solo arrive

@@ -26,7 +26,7 @@
 
 export type Branche = { n: number; c: number }
 
-export const REGLES = {
+const REGLES = {
   alpha: 0.05,
   puissance: 0.8,
   /** |z| au-delà duquel on peut s'arrêter avant l'horizon (≈ p < 0,003) */

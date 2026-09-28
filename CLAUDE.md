@@ -15,7 +15,8 @@ décisions actées), [engine/readme.md](engine/readme.md) (carte de la machine).
    (c'est lui l'historique : `session.md` n'accumule jamais, il se réécrit).
 2. **Propreté permanente** : rien ne traîne au root ; kebab-case partout ; fichiers temp →
    scratchpad, jamais dans le repo ; `clients/` (la donnée) jamais commité ; un dossier
-   n'existe que quand il a du contenu. Ranger AVANT de committer.
+   n'existe que quand il a du contenu. Ranger AVANT de committer : `npm run menage` (racine,
+   noms, liens des .md, longueur de `session.md`, code mort via knip) — il tourne aussi en CI.
 3. **Corpus** : toute évolution de `engine/clone` repasse le corpus ([docs/corpus.md](docs/corpus.md))
    et se juge aux verdicts, pas à l'impression.
 

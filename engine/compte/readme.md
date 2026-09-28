@@ -3,7 +3,7 @@
 **Contrat :** `clients/compte.json` (validé zod) + les règles qui en découlent.
 
 - [`paliers.ts`](paliers.ts) : Atelier · Solo · Agence · Régime, tirés de
-  [docs/business-model-rapport.md](../../docs/business-model-rapport.md). **Hypothèses**, pas des
+  [docs/recherche/business-model.md](../../docs/recherche/business-model.md). **Hypothèses**, pas des
   prix confirmés. Unité : le client actif du mois (au moins un test en ligne).
 - [`compte.ts`](compte.ts) : palier en vigueur (essai de 14 jours), clients actifs, facture
   indicative, `peutLancer` (mandat toujours exigé ; paliers appliqués avec `LPWS_FACTURATION=1`).

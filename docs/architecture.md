@@ -7,17 +7,19 @@
 
 ```
 lpws/
-  readme.md            vision produit + démarrage rapide
-  docs/                ce dossier — décisions & carte du repo
-  engine/              LA MACHINE — code exécutable, par familles (voir engine/readme.md)
-    shared/            socle transverse : chemins, disposition d'une campagne, logs, args,
-                       json validé, modèle, navigateur + origine synthétique, http statique
-    clone/             famille 1 : url → baseline fidèle          ← en cours
-    apply/             famille 2 : hypothèse → variante prouvée   ← en cours
-    audit/ surveille/  audit tracking gratuit · relevés et alertes de la vraie page
-    compte/ rapport/   paliers, mandats, paiement, coûts · rapport client HTML
-  clients/             LES SORTIES — data par client/campagne, gitignoré
-  .claude/skills/      LA RÉFLEXION — les moments de jugement, pilotés par Claude
+  readme.md · CLAUDE.md   vision produit + démarrage · rituels de travail
+  session.md              où on en est, à faire (court, réécrit à chaque session)
+  engine/                 LA MACHINE — code exécutable, par familles (carte : engine/readme.md)
+  ui/                     l'interface du media buyer (serveur, écran, démo) + design.md
+  docs/                   ce dossier
+    architecture.md       conventions & décisions actées
+    feuille-de-route.md   l'arbre des tâches et leur état
+    corpus.md · brain.html  le corpus de pages de référence · la carte du marketing brain
+    recherche/            rapports et briefs de recherche (business model, media buyer, v1, v2)
+    journal/              les journaux des contributeurs (kusaila, scarville)
+  scripts/menage.ts       le garde-fou de rangement (npm run menage, en CI)
+  clients/                LES SORTIES — data par client/campagne, gitignoré
+  .claude/                skills (la réflexion) + hook du brief de session
 ```
 
 Trois plans, trois responsabilités :
@@ -43,11 +45,12 @@ media buyer donne l'url de la LP du client
 └───────────────────────────────────────────────────┘
    │  baseline/ fidèle, marquée, jugée
    ▼
-┌ variant ┐ → ┌ apply ┐ → ┌ deploy ─────────────┐
-│ diagnos.│   │ édits │   │ gclid relayé, pixels │
-│ → édits │   │ ancrés│   │ noindex, juge mesure │
-└─────────┘   └───────┘   └──────────────────────┘
-     🔜            ✅         🟡 (hébergement 🔜)
+┌ variant ┐ → ┌ apply ┐ → ┌ deploy ─────────────────┐ → ┌ measure ┐
+│ brain : │   │ édits │   │ Express (tag GTM)   ✅  │   │ GA4 →   │
+│ diagnos.│   │ ancrés│   │ Intégral (DNS)      🔜  │   │ verdict │
+│ → 3 var.│   │       │   │ Natif (Shopify)     🔜  │   │         │
+└─────────┘   └───────┘   └─────────────────────────┘   └─────────┘
+     ✅            ✅                                         ✅
 ```
 
 ## Conventions (les tenir, c'est ça qui garde le repo lisible)
@@ -77,6 +80,8 @@ media buyer donne l'url de la LP du client
 | Ancres `data-lpws` posées à la capture | round-trip déterministe ; jamais de réécriture libre du HTML |
 | Diff visuel vs live comme critère de « fini » | mesurable, pas discutable |
 | Réflexion via skills, zéro clé API | Claude fait le typage/les plans ; sortie validée par schéma |
+| Capteur / raisonnement séparés | le modèle constate un fait, la règle explique pourquoi il compte. Chaque signal est une **question indépendante au type de sortie déclaré** (booléen / choix / échelle) + confiance : testable seule, jugeable contre un corpus, extracteur interchangeable |
+| Vérifier le juge avant d'accuser le code | sur les sept corrections du tag (9/9), quatre étaient dans le juge : un instrument non vérifié ment avec autorité |
 
 ## Étendre la machine (checklist)
 

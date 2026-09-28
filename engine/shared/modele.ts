@@ -15,7 +15,7 @@ import { premierEcart } from "./json.ts"
 /**
  * CE QUE COÛTE UN APPEL : `claude -p --output-format json` rapporte sa durée et son coût. Chaque
  * appel s'ajoute à clients/couts.jsonl, pour répondre à la question qui conditionne la grille
- * tarifaire (docs/business-model-rapport.md §8, décision 2) : combien coûte un diagnostic ?
+ * tarifaire (docs/recherche/business-model.md §8, décision 2) : combien coûte un diagnostic ?
  * Lecture : `npm run couts`.
  */
 export const JOURNAL_COUTS = join("clients", "couts.jsonl")
@@ -32,7 +32,7 @@ async function noterCout(scope: string, brut: Record<string, unknown>): Promise<
 }
 
 /** Le texte brut répondu par `claude -p`. Modèle : LPWS_MODELE, sinon sonnet. */
-export function demander(prompt: string, scope = "modele"): Promise<string> {
+function demander(prompt: string, scope = "modele"): Promise<string> {
   return new Promise((ok, ko) => {
     const p = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.LPWS_MODELE ?? "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
     let out = "", err = ""
@@ -51,7 +51,7 @@ export function demander(prompt: string, scope = "modele"): Promise<string> {
 }
 
 /** Le JSON contenu dans une réponse, du premier ouvrant au dernier fermant. */
-export function extraireJson(t: string, forme: "objet" | "liste"): string {
+function extraireJson(t: string, forme: "objet" | "liste"): string {
   const [o, f] = forme === "objet" ? ["{", "}"] : ["[", "]"]
   const i = t.indexOf(o), j = t.lastIndexOf(f)
   return i >= 0 && j > i ? t.slice(i, j + 1) : t
