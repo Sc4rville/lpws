@@ -70,7 +70,12 @@ export type DiffSections = {
   ratioAligne: number | null
   /** sections hors de la preuve (screenshot tronqué, bande hors image) */
   nonJugees: string[]
+  /** là où le décalage saute : du contenu en plus (delta > 0 : dans le live) ou en moins, hors des
+   *  sections jugées ou dans une section cassée ; `avant` null = sous la dernière section */
+  ruptures: Array<{ avant: string | null; titre: string; delta: number }>
 }
+
+const TOLERANCE_RUPTURE = 4
 
 const COLONNES = 16
 
@@ -119,7 +124,7 @@ export async function diffParSection(livePath: string, clonePath: string, bandes
   const clone = PNG.sync.read(await readFile(clonePath))
   const width = Math.min(live.width, clone.width)
   const sl = signature(crop(live, width, live.height)), sc = signature(crop(clone, width, clone.height))
-  const sections: DiffSection[] = [], nonJugees: string[] = []
+  const sections: DiffSection[] = [], nonJugees: string[] = [], ruptures: DiffSections["ruptures"] = []
   let centre = 0, px = 0, diff = 0
   for (const b of [...bandes].sort((x, y) => x.y - y.y)) {
     const y0 = Math.max(0, b.y), y1 = Math.min(clone.height, b.y + b.h)
@@ -135,9 +140,12 @@ export async function diffParSection(livePath: string, clonePath: string, bandes
       // la part de la bande sans vis-à-vis dans le live compte comme différente
       ratio = (pixelmatch(pa.data, pb.data, undefined, width, h, { threshold: 0.1 }) + (y1 - y0 - h) * width) / ((y1 - y0) * width)
     }
+    if (Math.abs(d - centre) > TOLERANCE_RUPTURE) ruptures.push({ avant: b.anchor, titre: b.titre, delta: d - centre })
     sections.push({ ...b, decalage: d, ratio, fidele: ratio <= seuil })
     px += (y1 - y0) * width; diff += ratio * (y1 - y0) * width
     centre = d
   }
-  return { sections, ratioAligne: px ? diff / px : null, nonJugees }
+  const fin = live.height - clone.height - centre
+  if (sections.length && Math.abs(fin) > TOLERANCE_RUPTURE) ruptures.push({ avant: null, titre: "bas de page", delta: fin })
+  return { sections, ratioAligne: px ? diff / px : null, nonJugees, ruptures }
 }
