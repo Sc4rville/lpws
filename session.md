@@ -15,6 +15,13 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
+## Fait le 2026-09-28 (alignement recherche ↔ design ↔ écran)
+- Plus aucune « certitude » à l'écran ni dans le rapport copié : les tests en ligne montrent
+  hausse, jours/visiteurs restants avant l'horizon et fourchette ; cartes et tableaux, le
+  verdict en deux mots. Le calculateur de Résultats passe par `STATS.planifier` (semaine
+  pleine, plafond de huit semaines) comme le lancement. Nombres en espace insécable lisible,
+  pluriels du compte, bascule Mensuel/Annuel en segment, offres absentes marquées « − ».
+
 ## Fait le 2026-09-28 (journal des expériences)
 - Chaque test arrêté laisse une ligne dans `experiences.json` (`engine/measure/experience.ts`) :
   échantillon, fourchette, conclusion, non-concluants compris. Feuille de route 4.1 cochée

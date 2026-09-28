@@ -296,6 +296,13 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 .live .row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;margin-top:18px}
 .live .n{font-size:52px;font-weight:780;font-stretch:88%;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1}
 .live .n small{font-size:14px;color:var(--muted);font-weight:500;letter-spacing:0;margin-left:6px}
+.seg{display:inline-flex;padding:3px;border-radius:999px;background:var(--paper-2);box-shadow:inset 0 0 0 1px var(--hair)}
+.seg button{border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink-2);padding:8px 14px;border-radius:999px;cursor:pointer}
+.seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 0 0 1px var(--hair-2),0 1px 2px rgba(0,0,0,.08)}
+.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.live .av .n{font-size:34px}
+.live .al{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:6px}
+.live .fxw{margin-top:16px;max-width:420px}
 .live .say{font-size:15.5px;color:var(--ink-2);margin-top:14px;max-width:60ch}
 .live .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
 
@@ -534,6 +541,10 @@ const DEMO = [
       natif: { etat: 'na', label: 'Pas une boutique Shopify' },
     },
     ads: { compte: '493-217-0068', campagne: 'Jira · Search · FR', conversion: 'Inscription', cpc: 2.4, clics: 900 },
+    experiences: [
+      { test: 'preuve-logos', titre: 'Logos clients au-dessus de la ligne de flottaison', conclusion: 'perdant', verdict: 'L’original gagne. La variante fait −9 % : on n’en reproposera pas l’idée', arreteLe: '2026-08-29' },
+      { test: 'cta-essai', titre: '« Essai gratuit » à la place de « Commencer »', conclusion: 'non concluant', verdict: 'Pas de différence mesurable : l’écart, s’il existe, est sous 15 %', arreteLe: '2026-07-18' },
+    ],
     tests: [
       { id: 'message-match', titre: 'Le titre reprend la promesse de l’annonce', etat: 'live', part: 50, jours: 7, potentiel: 'Fort',
         teste: 'Un titre qui dit exactement ce que l’annonce promet : « −60 % de temps de sprint planning » : à la place d’une formule générique.',
@@ -687,9 +698,10 @@ function changerTheme(t, depuis) {
 
 /* ---------- utilitaires ---------- */
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const fr = n => Math.round(n).toLocaleString('fr-FR');
-const eur = n => Math.round(n).toLocaleString('fr-FR') + ' €';
-const pct = (x, d = 1) => (x * 100).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' %';
+const nb = t => t.replace(/\u202f/g, '\u00a0');
+const fr = n => nb(Math.round(n).toLocaleString('fr-FR'));
+const eur = n => fr(n) + ' €';
+const pct = (x, d = 1) => nb((x * 100).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })) + ' %';
 const signed = (x, d = 0) => (x >= 0 ? '+' : '−') + pct(Math.abs(x), d);
 const img = k => (typeof IMG !== 'undefined' && IMG[k]) || null;
 const imgOf = c => c.imgUrl || img(c.img);
@@ -712,7 +724,6 @@ const GO = (label, extra = '') => `<button class="go" ${extra}><span class="halo
 
 /* statistiques : engine/measure/stats.ts, embarqué ici (global STATS) : l'écran et le serveur rendent le même verdict */
 /*STATS*/
-const nParBranche = (p, mde) => STATS.nParBranche(p, mde).controle;
 const stats = r => STATS.comparer(r.o, r.v);
 const fourchette = r => STATS.comparer(r.o, r.v).ic;
 function vueFourchette(r, { mini = false } = {}) {
@@ -728,8 +739,11 @@ function phraseFourchette(r) {
   const f = fourchette(r);
   return `La vraie hausse se situe probablement entre <b>${signed(f.lo)}</b> et <b>${signed(f.hi)}</b>.${f.lo < 0 && f.hi > 0 ? ' Zéro est dans la fourchette : on ne peut pas encore trancher.' : f.lo > 0 ? ' Toute la fourchette est au-dessus de l’original.' : ' Toute la fourchette est sous l’original.'}`;
 }
+const phrase = t => /[.!?…]$/.test(t) ? t : t + '.';
 const JALONS = [['duree', 'Une semaine pleine'], ['conv', 'Assez de conversions'], ['vol', 'Assez de visiteurs'], ['net', 'Écart net']];
 const jalons = v => v.prog ? `<ol class="jal" aria-label="Avancement du test">${JALONS.map(([k, l]) => `<li class="${v.prog[k] ? 'done' : ''}"><span class="k">${v.prog[k] ? I.check(10) : ''}</span>${l}</li>`).join('')}</ol>` : '';
+/** le verdict en deux mots, pour les cartes et les tableaux */
+const LU = { run: 'pas encore concluant', win: 'gagnant', lose: 'perdant', nul: 'sans différence', never: 'ne conclura pas', srm: 'répartition faussée' };
 const K_UI = { attente: 'wait', collecte: 'run', gagnant: 'win', perdant: 'lose', nul: 'nul', jamais: 'never', srm: 'srm' };
 /** ce que le buyer a dit de la campagne et l'horizon fixé au lancement → l'entrée du verdict */
 function entreeVerdict(c, t) {
@@ -746,7 +760,7 @@ function verdict(c, t) {
   const R = o => ({ ...o, s2, prog: s2 ? j.jalons : null, j });
   // un test réel n'a pas encore de résultats : ils se lisent dans GA4 (dimension lpws_variante)
   if (!t.res) return R({ k: 'wait', b: 'En ligne, en attente des premières données', s: `${t.part} % des visiteurs voient la variante : les conversions se lisent dans GA4 (dimension lpws_variante) et le verdict s’affichera ici dès qu’elles remontent${j.plan.jours ? `. Horizon prévu : ~${fr(j.plan.jours)} jours` : ''}` });
-  if (t.etat === 'gagnant') return R({ k: 'win', b: `Gagnant : la variante, ${signed(s2.lift)} de conversions`, s: `${j.k === 'gagnant' ? 'Conclu à l’horizon' : 'Déployé avant d’avoir le droit de conclure'} · sur 100 % du trafic${t.fin ? ' depuis le ' + t.fin : ''}` });
+  if (t.etat === 'gagnant') return R({ k: 'win', b: `Gagnant : la variante, ${signed(s2.lift)} de conversions`, s: `${j.k === 'gagnant' ? (j.anticipe ? 'Conclu avant l’horizon : écart écrasant' : 'Conclu à l’horizon') : 'Déployé avant d’avoir le droit de conclure'} · sur 100 % du trafic${t.fin ? ' depuis le ' + t.fin : ''}` });
   return R({ k: K_UI[j.k], b: j.titre, s: j.detail });
 }
 /** avant de lancer : combien de temps, et si ce test peut conclure */
@@ -845,6 +859,14 @@ function renderPanel() {
 }
 
 /* ---------- morceaux réutilisés ---------- */
+/** où en est le test par rapport à l'horizon fixé : des visiteurs et des jours, jamais une certitude qui monte */
+function avancement(v, t) {
+  const j = v.j, pr = Math.round(j.progression * 100);
+  const fini = j.jalons.vol && j.jalons.duree;
+  const n = fini || v.k === 'win' ? 'Horizon atteint' : j.joursRestants > 0 ? `~${fr(j.joursRestants)} j` : `${pr} %`;
+  const l = fini || v.k === 'win' ? '' : j.joursRestants > 0 ? 'avant l’horizon' : 'de l’échantillon';
+  return `<div class="av"><div class="n">${n}${l ? `<small>${l}</small>` : ''}</div><div class="bar" style="width:180px"><i class="${fini || v.k === 'win' ? 'ok' : ''}" style="width:${v.k === 'win' ? 100 : pr}%"></i></div><div class="al">${fr(t.res.o.n + t.res.v.n)} / ${fr(j.plan.controle + j.plan.variante)} visiteurs prévus</div></div>`;
+}
 function liveCard(c, t, { compact = false } = {}) {
   const v = verdict(c, t); const s = v.s2;
   return `<div class="live ${v.k === 'win' ? 'win' : ''} ${v.k === 'wait' ? 'calm' : ''}">
@@ -853,12 +875,12 @@ function liveCard(c, t, { compact = false } = {}) {
     <div class="who">${esc(c.marque)} · ${esc(c.url)}</div>
     ${s ? `<div class="row">
       <div><div class="n">${signed(s.lift)}<small>de conversions</small></div></div>
-      <div><div class="n">${pct(s.conf, 0)}<small>de certitude</small></div><div class="bar" style="width:180px"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div></div>
-    </div>${jalons(v)}` : `<div class="row">
+      ${avancement(v, t)}
+    </div>${compact ? '' : `<div class="fxw">${vueFourchette(t.res)}</div>`}${jalons(v)}` : `<div class="row">
       <div><div class="n">${t.part} %<small>des visiteurs voient la variante</small></div></div>
       <div><div class="n"><small>conversions : en attente de GA4</small></div></div>
     </div>`}
-    <div class="say" ${v.k === 'srm' || v.k === 'never' ? 'style="color:var(--bad)"' : ''}><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
+    <div class="say" ${v.k === 'srm' || v.k === 'never' ? 'style="color:var(--bad)"' : ''}><b>${esc(phrase(v.b))}</b> ${esc(phrase(v.s))}</div>
     ${t.etat === 'live' && c.live && c.connexion.express.etat !== 'ok' ? `<div class="say" style="color:var(--bad)"><b>Personne ne voit encore la variante.</b> La balise Express n’a pas été trouvée sur la page : installez-la, publiez dans GTM, puis vérifiez.</div>` : ''}
     <div class="act">
       <button class="btn" data-go="ctx:${c.id};test:${t.id}">Voir le test ${I.arrow(15)}</button>
@@ -879,12 +901,12 @@ function guards(c, t) {
   </div>`;
 }
 function testCard(c, t, { withClient = false } = {}) {
-  const r = t.res ? stats(t.res) : null;
+  const r = t.res ? stats(t.res) : null; const v = r ? verdict(c, t) : null;
   return `<button class="tc" data-go="ctx:${c.id};test:${t.id}">
     <div style="display:flex;gap:6px;flex-wrap:wrap">${chipEtat(t)}${withClient ? `<span class="chip">${esc(c.nom)}</span>` : ''}</div>
     <div class="t">${esc(t.titre)}</div>
     <div class="d">${esc(t.teste)}</div>
-    <div class="f">${r ? `<span class="chip ${r.lift > 0 ? 'ok' : ''}">${signed(r.lift)} · ${pct(r.conf, 0)}</span>` : chipPot(t)}<span class="r">${I.chevr(16)}</span></div>
+    <div class="f">${r ? `<span class="chip ${v.k === 'win' ? 'ok' : v.k === 'lose' || v.k === 'srm' ? 'bad' : ''}">${signed(r.lift)} · ${LU[v.k] || 'en cours'}</span>` : chipPot(t)}<span class="r">${I.chevr(16)}</span></div>
   </button>`;
 }
 
@@ -1107,7 +1129,7 @@ function vResultats(c) {
     <div class="sec"><h3>Par test</h3>
       <div class="tbl" style="--cols:minmax(200px,2fr) minmax(130px,1fr) 80px 60px 70px 110px minmax(120px,1fr) 18px">
         <div class="tr h"><span>Test</span><span>Statut</span><span class="num">Visiteurs</span><span class="num">Conv.</span><span class="num">Taux</span><span class="num">vs original</span><span>Fourchette</span><span></span></div>
-        ${tests.map(t => { const s = stats(t.res); return `<button class="tr r" data-go="test:${t.id}"><span class="t ell">${esc(t.titre)}</span><span>${chipEtat(t)}</span><span class="num">${fr(t.res.v.n)}</span><span class="num">${t.res.v.c}</span><span class="num">${pct(s.p2, 1)}</span><span class="num" style="color:${s.lift >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${signed(s.lift)} · ${pct(s.conf, 0)}</span>${vueFourchette(t.res, { mini: true })}<span class="muted">${I.chevr(16)}</span></button>`; }).join('')}
+        ${tests.map(t => { const s = stats(t.res); return `<button class="tr r" data-go="test:${t.id}"><span class="t ell">${esc(t.titre)}</span><span>${chipEtat(t)}</span><span class="num">${fr(t.res.v.n)}</span><span class="num">${t.res.v.c}</span><span class="num">${pct(s.p2, 1)}</span><span class="num" style="color:${s.lift >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${signed(s.lift)}</span>${vueFourchette(t.res, { mini: true })}<span class="muted">${I.chevr(16)}</span></button>`; }).join('')}
       </div>
     </div>
     <div class="grid g2 sec">
@@ -1338,7 +1360,7 @@ const FAMILLES_BRAIN = { mm: 'Promesse tenue', vp: 'Ce que la page promet', pr: 
 const nomRegle = id => FAMILLES_BRAIN[String(id).split('-')[0]] || id;
 function rapportTest(c, t) {
   const l = [`Test « ${t.titre} » · ${c.marque} (${c.url})`, '', `Ce qu’on teste : ${t.teste}`, `Pourquoi : ${t.pourquoi}`, `État : ${(ETATS[t.etat] || [])[1] || t.etat}${t.etat === 'live' ? ` · ${t.part} % du trafic` : ''}`];
-  if (t.res) { const s = stats(t.res); const v = verdict(c, t); l.push('', `Visiteurs : ${fr(t.res.v.n)} (original ${fr(t.res.o.n)})`, `Conversions : ${t.res.v.c} (original ${t.res.o.c})`, `Taux : ${pct(s.p2, 2)} contre ${pct(s.p1, 2)} (${signed(s.lift)})`, `Certitude : ${pct(s.conf, 0)}`, '', `${v.b}. ${v.s}.`); }
+  if (t.res) { const s = stats(t.res); const v = verdict(c, t); l.push('', `Visiteurs : ${fr(t.res.v.n)} (original ${fr(t.res.o.n)})`, `Conversions : ${t.res.v.c} (original ${t.res.o.c})`, `Taux : ${pct(s.p2, 2)} contre ${pct(s.p1, 2)} (${signed(s.lift)})`, `Hausse probable : entre ${signed(s.ic.lo)} et ${signed(s.ic.hi)}`, '', `${phrase(v.b)} ${phrase(v.s)}`); }
   else l.push('', 'Résultats : pas encore de données (GA4, dimension lpws_variante).');
   return l.join('\n');
 }
@@ -1449,14 +1471,14 @@ function vCompte() {
       <h3>${esc(k.facture.detail)}</h3>
       <div class="say">${p.enEssai ? `Encore ${p.joursEssai} jour${p.joursEssai > 1 ? 's' : ''} d’essai ${esc(p.nom)}.` : p.id === 'atelier' ? 'L’Atelier copie, audite et diagnostique. Pour mettre un test en ligne, l’essai de ' + k.essaiJours + ' jours s’ouvre sans carte.' : ''}</div>
       <div class="act">${p.id === 'atelier' && !k.essai ? GO(I.play(16) + `Démarrer l’essai de ${k.essaiJours} jours`, 'data-act="essai"') : ''}
-        <button class="btn ${!an ? 'pri' : ''}" data-act="facturation" data-v="mensuelle">Mensuel</button><button class="btn ${an ? 'pri' : ''}" data-act="facturation" data-v="annuelle">Annuel · −20 %</button></div></div>
+        <span class="seg" role="group" aria-label="Facturation"><button class="${!an ? 'on' : ''}" aria-pressed="${!an}" data-act="facturation" data-v="mensuelle">Mensuel</button><button class="${an ? 'on' : ''}" aria-pressed="${an}" data-act="facturation" data-v="annuelle">Annuel · −20 %</button></span></div></div>
     <div class="sec"><h3>Les offres</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
       ${k.paliers.map(x => `<div class="card" style="${x.id === k.palier ? 'outline:2px solid var(--ink)' : ''}"><h3>${esc(x.nom)}</h3><div class="stat" style="padding:0;background:none"><div class="v">${prix(x)}</div></div>
         <div class="ck"><span class="i">${I.check(12)}</span><div>${x.clientsActifs === null ? 'Clients illimités' : x.clientsActifs === 0 ? '1 page, pas de mise en ligne' : x.clientsActifs + ' clients actifs' + (x.parClientEnPlus ? `, puis ${x.parClientEnPlus} $ / client` : '')}</div></div>
         <div class="ck"><span class="i">${I.check(12)}</span><div>Copie, diagnostic, audit tracking</div></div>
-        <div class="ck ${x.surveillanceH ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>${x.surveillanceH ? `Surveillance ${surv(x.surveillanceH)}${x.alertes ? ' + alertes' : ''}` : 'Pas de surveillance'}</div></div>
-        <div class="ck ${x.marqueBlanche ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>Rapport ${x.marqueBlanche ? 'à votre marque' : 'marqué LPWS'}</div></div>
-        <div class="ck ${x.intention ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>Intentions de recherche</div></div>
+        <div class="ck ${x.surveillanceH ? '' : 'off'}"><span class="i">${x.surveillanceH ? I.check(12) : I.minus(12)}</span><div>${x.surveillanceH ? `Surveillance ${surv(x.surveillanceH)}${x.alertes ? ' + alertes' : ''}` : 'Pas de surveillance'}</div></div>
+        <div class="ck ${x.marqueBlanche ? '' : 'off'}"><span class="i">${x.marqueBlanche ? I.check(12) : I.minus(12)}</span><div>Rapport ${x.marqueBlanche ? 'à votre marque' : 'marqué LPWS'}</div></div>
+        <div class="ck ${x.intention ? '' : 'off'}"><span class="i">${x.intention ? I.check(12) : I.minus(12)}</span><div>Intentions de recherche</div></div>
         <div style="margin-top:14px">${x.id === k.palier ? '<span class="chip ok"><span class="dot"></span>Votre palier</span>' : `<button class="btn sm ${x.id === 'agence' ? 'glow' : ''}" data-act="palier" data-palier="${x.id}">${x.id === 'regime' ? 'Demander un devis' : 'Choisir ' + esc(x.nom)}</button>`}</div></div>`).join('')}
     </div>${k.facturationActive && !k.paiementOuvert ? '<p class="muted" style="margin-top:10px">Le paiement en ligne n’est pas encore ouvert sur cette instance.</p>' : ''}</div>
     <div class="grid g2 sec">
@@ -1539,8 +1561,10 @@ function calcSS() {
   const p = num('ss-p') / 100, mde = num('ss-mde') / 100, clics = num('ss-clics'); const out = document.getElementById('ss-out');
   if (!out) return;
   if (!(p > 0 && mde > 0 && clics > 0)) { out.textContent = ''; return; }
-  const n = nParBranche(p, mde); const j = Math.ceil(2 * n / clics);
-  out.innerHTML = `Avec <b>${fr(clics)} clics par jour</b> et <b>${pct(p, 1)}</b> de conversion aujourd’hui, un test détecte une hausse de <b>${pct(mde, 0)}</b> en <b>~${fr(j)} jours</b> à 50 / 50 : soit environ ${fr(n)} visiteurs par version.`;
+  const pl = STATS.planifier({ tauxBase: p, mde, part: .5, visiteursJour: clics });
+  const base = `Avec <b>${fr(clics)} clics par jour</b> et <b>${pct(p, 1)}</b> de conversion aujourd’hui, voir une hausse de <b>${pct(mde, 0)}</b> demande ~${fr(pl.controle)} visiteurs par version`;
+  out.innerHTML = pl.faisable ? `${base} : <b>~${fr(pl.jours)} jours</b> à 50 / 50${pl.jours === STATS.REGLES.joursMin ? ' (une semaine pleine au minimum, pour lisser les jours creux)' : ''}.`
+    : `${base} : ~${fr(Math.round(pl.jours / 7))} semaines, au-delà des huit qu’un test peut durer.${pl.mdeEnHuitSemaines ? ` En huit semaines, seule une hausse d’au moins <b>${pct(pl.mdeEnHuitSemaines, 0)}</b> se voit : testez un changement plus franc.` : ''}`;
 }
 function render() { renderRail(); renderPanel(); renderMain(); save(); synchroniserUrl(); }
 

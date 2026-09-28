@@ -22,7 +22,11 @@ moments d'accueil. Une seule idée décorative : la trame d'impression. Rien d'a
 - **Statsig Pulse / Eppo** (2026-09-28) : un résultat se lit comme une fourchette autour de
   zéro, verte si elle est toute au-dessus, rouge si elle est toute en dessous, grise sinon ;
   et un test avance par jalons cochés plutôt que par un pourcentage abstrait. On en garde :
-  la fourchette et les trois jalons.
+  la fourchette et les quatre jalons (semaine pleine, conversions, visiteurs, écart net).
+  Aucun écran n'affiche de « certitude » (1 − p) : c'est le chiffre qu'on regarde monter et
+  qui fabrique des faux gagnants. Un test en cours montre sa hausse, les jours et visiteurs
+  restants avant l'horizon figé au lancement, puis la fourchette ; les cartes et tableaux
+  disent le verdict en deux mots (« pas encore concluant », « gagnant »…).
 - **Linear** (2026-09-28) : clavier d'abord (palette ⌘K), annuler plutôt que confirmer. On
   en garde : la palette et l'annulation dans le toast.
 

@@ -110,12 +110,13 @@ export async function peutLancer(c: Compte, client: string, racine = CLIENTS_ROO
 /** Ce que coûte le mois, à ce jour : l'abonnement + les clients en plus. `null` = sur devis. */
 export function factureDuMois(c: Compte, actifs: number): { total: number | null; detail: string } {
   const p = palierEnVigueur(c)
-  if (p.enEssai) return { total: 0, detail: `Essai ${p.nom} : encore ${p.joursEssai} jour(s), sans carte.` }
+  const pl = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`
+  if (p.enEssai) return { total: 0, detail: `Essai ${p.nom} : encore ${pl(p.joursEssai ?? 0, "jour")}, sans carte.` }
   const base = c.facturation === "annuelle" ? p.prixAnnuelMois : p.prixMois
   if (base === null) return { total: null, detail: `${p.nom} : sur devis.` }
   const enPlus = p.clientsActifs !== null && p.parClientEnPlus !== null ? Math.max(0, actifs - p.clientsActifs) : 0
   const total = base + enPlus * (p.parClientEnPlus ?? 0)
-  return { total, detail: `${p.nom} ${base} $${enPlus ? ` + ${enPlus} client(s) × ${p.parClientEnPlus} $` : ""} · ${actifs} client(s) actif(s) ce mois-ci` }
+  return { total, detail: `${p.nom} ${base} $${enPlus ? ` + ${pl(enPlus, "client")} × ${p.parClientEnPlus} $` : ""} · ${pl(actifs, "client")} ${actifs > 1 ? "actifs" : "actif"} ce mois-ci` }
 }
 
 export type { IdPalier }
