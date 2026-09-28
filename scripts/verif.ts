@@ -1,7 +1,7 @@
 /**
  * verif.ts — la CI, en local (npm run verif) : les mêmes étapes que .github/workflows/ci.yml.
  *
- * typecheck · menage · tests · build de l'interface · clone des deux pages de démo (fidèles).
+ * lockfile synchrone · typecheck · menage · tests · build de l'interface · clone des deux pages de démo (fidèles).
  * Les clones se font dans un dossier temporaire : clients/ n'est jamais touché.
  * S'arrête à la première étape en échec, en la nommant ; code de sortie ≠ 0.
  */
@@ -42,11 +42,10 @@ async function clones() {
       res.writeHead(404).end()
     }
   })
-  await new Promise<void>((ok) => serveur.listen(0, "127.0.0.1", ok))
-  const port = (serveur.address() as AddressInfo).port
   const bac = mkdtempSync(join(tmpdir(), "lpws-verif-"))
-
   try {
+    await new Promise<void>((ok) => serveur.listen(0, "127.0.0.1", ok))
+    const port = (serveur.address() as AddressInfo).port
     for (const [page, client] of [["demo/", "relay"], ["demo/boutique/", "halden"]]) {
       // le tsx du dépôt, en chemin absolu : depuis le bac, npx irait le chercher sur le registre
       const sortie = await etape(`clone de ${page} (fidèle)`, join(ROOT, "node_modules/.bin/tsx"),
@@ -61,6 +60,7 @@ async function clones() {
 }
 
 try {
+  await etape("lockfile (npm ci en dry-run)", "npm", ["ci", "--dry-run", "--ignore-scripts", "--silent"])
   await etape("typecheck", "npm", ["run", "-s", "typecheck"])
   await etape("menage", "npm", ["run", "-s", "menage"])
   await etape("tests", "npm", ["test", "--silent"])
