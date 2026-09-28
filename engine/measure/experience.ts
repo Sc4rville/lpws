@@ -99,8 +99,9 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
       lanceLe: t.lanceLe, arreteLe: fin, controle: o, variante: v,
       luLe: res?.luLe ?? null, source: res ? res.source ?? "ga4" : null,
       hausse: hausse(o, v), conclusion: CONCLUSION[verdict.k],
-      // la règle archivée est celle du lancement : une spec régénérée depuis n'y touche pas
-      regle: (i >= 0 ? journal[i].regle : undefined) ?? spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle ?? t.regle,
+      // la règle d'une expérience se fixe à sa première écriture ; celle du test (figée à sa
+      // création) passe avant la spec, qu'une nouvelle génération peut réécrire
+      regle: i >= 0 ? journal[i].regle : t.regle ?? spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle,
       plan: t.plan, verdict: `${verdict.titre}. ${verdict.detail}.`,
       // remettre l'original après un déploiement ne réécrit pas l'histoire : il a été déployé
       deploye: t.etat === "gagnant" || (i >= 0 && journal[i].deploye === true),
