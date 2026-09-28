@@ -1516,7 +1516,9 @@ document.addEventListener('change', e => {
   if (e.target.id !== 'part') return;
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
   if (!t || t.etat !== 'live') return;
-  if (c.live) publier(c, t, 'live', t.part, false); else toast(`${t.part} % des visiteurs voient maintenant la variante`);
+  if (c.live) { publier(c, t, 'live', t.part, false); return; }
+  const m = document.getElementById('main'), y = m.scrollTop;
+  toast(`${t.part} % des visiteurs voient maintenant la variante`); render(); m.scrollTop = y;
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
