@@ -39,6 +39,7 @@ export type Entree = {
   pourquoi: string
   y?: number            // position verticale finale dans la page rendue (px)
   section?: string      // la bande de haut niveau qui contient l'élément
+  dans?: string         // retrait : l'ancre la plus proche qui contenait l'élément (lui a disparu)
 }
 
 export type ApplyReport = {
@@ -194,6 +195,10 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
       ligne.y = Math.round(el.getBoundingClientRect().y + window.scrollY)
       const bande = el.closest('[data-lpws^="s"]')?.getAttribute("data-lpws")
       if (bande) ligne.section = bande
+      for (let p = parentDe(el); p; p = parentDe(p)) {
+        const a = p.getAttribute("data-lpws")
+        if (a) { ligne.dans = a; break }
+      }
       ligne.ou = "retiré de la page"
       journal.push(ligne)
       el.remove()
