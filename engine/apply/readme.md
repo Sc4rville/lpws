@@ -5,7 +5,13 @@ Le jugement (quoi changer et pourquoi) a lieu ailleurs ; ici, tout est détermin
 
 ```bash
 npm run apply -- <dossier-baseline> <spec.json>
+npm run aller-retour -- <dossier-baseline>   # zéro édition → pixel identique, sinon la mécanique fait du bruit
 ```
+
+Le delta se lit **section par section** ([`delta.ts`](delta.ts)) : chaque section de la variante est
+recalée sur la baseline, et une section changée qui ne contient aucune édition est un
+**débordement**. `variant.json` porte `sections.<vue>.{changees, touchees, debordements}` et
+`propre` (aucun débordement ; `null` sans baseline pour le dire).
 
 ## Contrat
 

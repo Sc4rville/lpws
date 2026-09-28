@@ -23,6 +23,7 @@ import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import type { Edit } from "./spec.ts"
 import { harvestDesign, type DesignSystem, type Role } from "./design.ts"
+import { bandesDuRendu } from "../clone/1_acquire/mark.ts"
 import { step, fail } from "../shared/log.ts"
 
 const SCOPE = "apply"
@@ -39,6 +40,7 @@ export type Entree = {
   pourquoi: string
   y?: number            // position verticale finale dans la page rendue (px)
   section?: string      // la bande de haut niveau qui contient l'élément
+  dans?: string         // retrait : l'ancre la plus proche qui contenait l'élément (lui a disparu)
 }
 
 export type ApplyReport = {
@@ -55,9 +57,17 @@ export type ApplyReport = {
  * finale dans la page. C'est lui qu'on affiche : relire la spec ne dit pas ce qui s'est
  * passé, seulement ce qui était demandé.
  */
-function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
+function applyInPage(arg: { edits: Edit[]; ds: DesignSystem; bandes: string[] }):
   { manquantes: string[]; desaccords: string[]; journal: Entree[] } {
-  const { edits, ds } = arg
+  const { edits, ds, bandes } = arg
+  /** la bande de haut niveau qui contient `el` : `s<n>` posée par la géométrie, ou balise sémantique `e<n>` */
+  const bandeDe = (el: Element): string | undefined => {
+    for (let n: Element | null = el; n; n = n.parentElement) {
+      const a = n.getAttribute("data-lpws")
+      if (a && (/^s\d/.test(a) || bandes.includes(a))) return a
+    }
+    return undefined
+  }
   const manquantes: string[] = []
   /** l'ancre existe mais ne désigne plus ce que la spec visait — cf. Attendu dans spec.ts */
   const desaccords: string[] = []
@@ -192,8 +202,12 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
       ligne.avant = court(lire(el)) || `(${ligne.quoi} sans texte)`
       // la position se relève AVANT le retrait : après, l'élément n'est plus mesurable
       ligne.y = Math.round(el.getBoundingClientRect().y + window.scrollY)
-      const bande = el.closest('[data-lpws^="s"]')?.getAttribute("data-lpws")
+      const bande = bandeDe(el)
       if (bande) ligne.section = bande
+      for (let p = parentDe(el); p; p = parentDe(p)) {
+        const a = p.getAttribute("data-lpws")
+        if (a) { ligne.dans = a; break }
+      }
       ligne.ou = "retiré de la page"
       journal.push(ligne)
       el.remove()
@@ -274,8 +288,7 @@ function applyInPage(arg: { edits: Edit[]; ds: DesignSystem }):
     const el = get(l.anchor)
     if (!el) continue
     l.y = Math.round(el.getBoundingClientRect().y + window.scrollY)
-    const bande = el.closest('[data-lpws^="s"]') ?? (/^s/.test(l.anchor) ? el : null)
-    const a = bande?.getAttribute("data-lpws")
+    const a = bandeDe(el)
     if (a) l.section = a
   }
   return { manquantes, desaccords, journal }
@@ -304,8 +317,9 @@ export async function applyEdits(
 
       // le design system se récolte sur CE document : la grille du mobile n'est pas celle
       // du desktop, les classes diffèrent
-      const ds = await page.evaluate(harvestDesign)
-      const { manquantes, desaccords, journal } = await page.evaluate(applyInPage, { edits, ds })
+      const bandes = (await page.evaluate(bandesDuRendu)).map((b) => b.anchor)
+      const ds = await page.evaluate(harvestDesign, bandes)
+      const { manquantes, desaccords, journal } = await page.evaluate(applyInPage, { edits, ds, bandes })
       if (desaccords.length > 0)
         fail(SCOPE,
           `l'ancre ne désigne plus la même chose dans ${source} :\n  ` + desaccords.join("\n  ") +

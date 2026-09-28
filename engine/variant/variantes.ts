@@ -22,6 +22,7 @@ import type { Constat } from "./diagnostic.ts"
 import type { SignauxMecaniques } from "./signaux.ts"
 import type { Contexte } from "./contexte.ts"
 import { slugify } from "../shared/paths.ts"
+import { controler, nomDeSpec, texteDuHtml, type Portee } from "./garde.ts"
 import { step } from "../shared/log.ts"
 import { demanderValide } from "../shared/modele.ts"
 import { ecrireJson, premierEcart } from "../shared/json.ts"
@@ -46,13 +47,15 @@ const Proposition = z.object({
     pourquoi: z.string().min(3),
   })).min(1).max(2),
 })
-const Propositions = z.array(Proposition).min(1).max(4)
+/* la liste se valide élément par élément : une proposition hors contrat ne doit pas emporter
+ * les deux autres (constaté : un « pourquoi » trop court faisait tomber les trois variantes) */
+const Propositions = z.array(z.unknown()).min(1).max(4)
 
 function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string): string {
   const ancres = [
     m.hero.titreAnchor && `${m.hero.titreAnchor} = TITRE « ${m.hero.titre} »`,
     m.hero.sousTitreAnchor && `${m.hero.sousTitreAnchor} = SOUS-TITRE « ${m.hero.sousTitre.slice(0, 120)} »`,
-    ...m.ctas.slice(0, 4).map((x) => `${x.anchor} = BOUTON « ${x.texte} »${x.auDessusDuPli ? " (au-dessus du pli)" : ""}`),
+    ...boutonsProposes(m).map((x) => `${x.anchor} = BOUTON « ${x.texte} »${x.auDessusDuPli ? " (au-dessus du pli)" : ""}`),
     m.nav.anchor && `${m.nav.anchor} = NAVIGATION (${m.nav.liens} liens)`,
     ...m.sections.slice(0, 10).map((s) => `${s.anchor} = SECTION « ${s.titre || "(sans titre)"} » à ${s.y}px`),
   ].filter(Boolean).join("\n")
@@ -60,7 +63,7 @@ function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: s
   return `Tu écris des variantes de page d'atterrissage pour un media buyer. Tu ne conseilles pas, tu produis des éditions précises, dans un cadre fermé.
 
 RÈGLES ABSOLUES
-- N'écris que ce que la page affirme déjà. Aucun chiffre, aucune garantie, aucun nom de client, aucune promesse que la page ne contient pas. ${c.limites ? "Interdit par le client : " + c.limites + "." : ""}
+- N'écris que ce que la page ou l'annonce affirment déjà. Aucun chiffre, aucune garantie, aucun nom de client, aucune promesse qui ne figure ni sur la page ni dans l'annonce. ${c.limites ? "Interdit par le client : " + c.limites + "." : ""}
 - Une variante = UNE hypothèse = 1 ou 2 éditions. Pas une nouvelle page.
 - Langue de la page : ${langue}. Ton de la page. Pas de superlatif, pas de point d'exclamation.
 - Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose.
@@ -80,6 +83,26 @@ ${constats.map((k, i) => `${i + 1}. [${k.id}] ${k.signal}\n   Action : ${k.actio
 Réponds UNIQUEMENT par un tableau JSON, sans texte autour, sans balises :
 [{"regle": "<id du constat>", "titre": "...", "hypothese": "Si ... alors ... parce que ...", "metrique": "...", "risque": "...", "edits": [{"anchor": "e123", "op": "set", "text": "...", "pourquoi": "..."}]}]`
 }
+
+/** Les boutons offerts au modèle : un par libellé (les « Start free » d'une grille tarifaire ne sont qu'un), les premiers de la page d'abord. */
+function boutonsProposes(m: SignauxMecaniques): SignauxMecaniques["ctas"] {
+  const vus = new Set<string>()
+  return m.ctas.filter((x) => { const k = x.texte.toLowerCase(); if (vus.has(k)) return false; vus.add(k); return true }).slice(0, 6)
+}
+
+/** Les ancres qu'une règle a le droit de viser, d'après sa cible ; null = pas de restriction mesurable. */
+function porteeDe(k: Constat, m: SignauxMecaniques): Portee {
+  const t = k.test!
+  const s = (xs: Array<string | undefined>) => new Set(xs.filter((x): x is string => !!x))
+  const ancres = t.cible === "titre" || t.cible === "sous-titre" ? s([m.hero.titreAnchor, m.hero.sousTitreAnchor])
+    : t.cible === "cta" ? s([...m.ctas.map((x) => x.anchor), m.hero.titreAnchor, m.hero.sousTitreAnchor])
+    : t.cible === "nav" ? s([m.nav.anchor])
+    : t.cible === "section" ? s([...m.sections.map((x) => x.anchor), m.hero.titreAnchor, m.hero.sousTitreAnchor])
+    : null
+  return { verbes: t.verbes, ancres: ancres && ancres.size ? ancres : null }
+}
+
+export type Refus = { regle: string; titre: string; raisons: string[]; edits: unknown[]; le: string }
 
 export type VarianteProduite = { nom: string; regle: string; fichier: string; titre: string; teste: string }
 
@@ -109,19 +132,44 @@ export async function ecrireVariantes(
   // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
   // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
   // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
-  const props = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
-  if (!props) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
+  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
+  if (!brutes) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
+  const texteAvant = (a: string): string =>
+    a === m.hero.titreAnchor ? m.hero.titre : a === m.hero.sousTitreAnchor ? m.hero.sousTitre
+      : m.ctas.find((x) => x.anchor === a)?.texte ?? parAncre.get(a)?.text ?? ""
+  const garde = {
+    page: texteDuHtml(await readFile(f.capture, "utf8")),
+    annonce: `${c.annonce.titre} ${c.annonce.description ?? ""}`,
+    avant: new Map(empreintes.map((e) => [e.a, texteAvant(e.a)])),
+    boutons: new Set(m.ctas.map((x) => x.anchor)),
+  }
+  const refus: Refus[] = []
+  const refuser = (p: z.infer<typeof Proposition>, raisons: string[]) => {
+    refus.push({ regle: p.regle, titre: p.titre, raisons, edits: p.edits, le: new Date().toISOString() })
+    step(SCOPE, `« ${p.titre} » refusée :\n    ${raisons.join("\n    ")}`)
+  }
+  const props: Array<z.infer<typeof Proposition>> = []
+  for (const b of brutes) {
+    const r = Proposition.safeParse(b)
+    if (r.success) { props.push(r.data); continue }
+    const o = (b ?? {}) as { regle?: unknown; titre?: unknown; edits?: unknown }
+    refus.push({ regle: String(o.regle ?? "?"), titre: String(o.titre ?? "(sans titre)"), raisons: [`hors contrat : ${premierEcart(r.error)}`], edits: Array.isArray(o.edits) ? o.edits : [], le: new Date().toISOString() })
+    step(SCOPE, `proposition hors contrat (${premierEcart(r.error)}) : refusée, les autres continuent`)
+  }
+  const pris = new Set<string>()
   const sorties: VarianteProduite[] = []
   for (const p of props) {
     const k = choisis.find((x) => x.id === p.regle)
     if (!k) { step(SCOPE, `proposition pour une règle inconnue (${p.regle}) : ignorée`); continue }
     // chaque ancre doit exister : une édition dans le vide n'est pas une variante
     const inconnue = p.edits.flatMap((e) => [e.anchor, e.before, e.after, e.with]).filter((a): a is string => !!a).find((a) => !parAncre.has(a))
-    if (inconnue) { step(SCOPE, `« ${p.titre} » vise l'ancre ${inconnue} qui n'existe pas : refusée`); continue }
+    if (inconnue) { refuser(p, [`vise l'ancre ${inconnue} qui n'existe pas`]); continue }
+    // le prompt demande ; le script vérifie
+    const raisons = controler(p.edits, garde, porteeDe(k, m))
+    if (raisons.length) { refuser(p, raisons); continue }
 
-    // un nom de dossier lisible : coupé à un mot entier, jamais au milieu d'un mot
-    const nom = slugify(p.titre).slice(0, 44).replace(/-[^-]*$/, "")
+    const nom = nomDeSpec(p.titre, pris, slugify)
     const spec = {
       nom, hypothese: p.hypothese, metrique: p.metrique, risque: p.risque,
       diagnostic: { regle: k.id, signal: k.signal, priorite: k.score >= 60 ? "HIGH" : k.score >= 35 ? "MEDIUM" : "LOW", confiance: "Medium", preuve: k.sources.join(", ") },
@@ -131,7 +179,7 @@ export async function ecrireVariantes(
       }),
     }
     const v = VariantSpec.safeParse(spec)
-    if (!v.success) { step(SCOPE, `« ${p.titre} » hors contrat : ${premierEcart(v.error)}`); continue }
+    if (!v.success) { refuser(p, [`hors contrat : ${premierEcart(v.error)}`]); continue }
     const fichier = f.spec(nom)
     await ecrireJson(fichier, v.data)
     // ce que le buyer lit : des mots, pas des ancres. Le texte d'origine vient des signaux (casse
@@ -153,5 +201,7 @@ export async function ecrireVariantes(
     sorties.push({ nom, regle: k.id, fichier, titre: p.titre, teste })
     step(SCOPE, `✓ ${p.titre} → ${fichier}`)
   }
+  // le relevé des défauts d'écriture : ce que le modèle a tenté et pourquoi c'est tombé
+  await ecrireJson(f.refusees, refus)
   return sorties
 }

@@ -24,6 +24,7 @@ npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sa
 | [`jugement.ts`](jugement.ts) | **modèle** | ce qu'on ne peut pas compter : 8 **questions typées indépendantes** (vrai/faux, choix), chacune avec une confiance, validées par schéma. Le modèle constate, il n'explique jamais |
 | [`diagnostic.ts`](diagnostic.ts) | **script** | la jointure : chaque règle évaluée une fois → déclenchée, calme, ou **non évaluable** (un signal manquait, jamais une supposition). Classement calculé : impact × preuve × pertinence ÷ risque, les règles stratégiques devant |
 | [`variantes.ts`](variantes.ts) | **modèle** | l'écriture, dans un cadre fermé : n'affirmer que ce que la page affirme déjà, une hypothèse par variante, une ancre existante ou rien. Sortie validée par `apply/spec.ts` |
+| [`garde.ts`](garde.ts) | script | les garde-fous d'écriture, vérifiés et non demandés : chiffre absent de la page et de l'annonce, superlatif, « ! », texte inchangé, libellé de bouton trop long, verbe ou ancre hors de la règle. Refus gardés dans `variantes-refusees.json` |
 
 Les deux temps « modèle » tournent sur les crédits du plan (`claude -p`), pas sur l'API.
 
