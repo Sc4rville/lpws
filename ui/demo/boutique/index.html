@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halden Linen Overshirt — Halden</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #1d1d1b; background: #fbfaf7; line-height: 1.5; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  header { border-bottom: 1px solid #e7e3da; background: #fff; }
+  nav { display: flex; align-items: center; gap: 24px; height: 64px; }
+  nav a { color: inherit; text-decoration: none; font-size: 15px; }
+  nav .brand { font-weight: 700; letter-spacing: .08em; margin-right: auto; }
+  .promo { background: #1d1d1b; color: #fff; text-align: center; font-size: 13px; padding: 8px; }
+  .produit { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; padding: 40px 0 64px; }
+  .galerie { display: grid; gap: 12px; }
+  .galerie .photo { background: #e8e2d6; border-radius: 6px; aspect-ratio: 4 / 5; display: grid; place-items: center; color: #8a8375; }
+  .galerie .photo.petite { aspect-ratio: 16 / 9; }
+  h1 { font-size: 34px; line-height: 1.15; margin: 0 0 8px; }
+  .note { color: #6b665c; font-size: 14px; margin: 0 0 16px; }
+  .prix { font-size: 24px; margin: 0 0 20px; }
+  .prix del { color: #8a8375; font-size: 18px; margin-left: 8px; }
+  .intro { font-size: 17px; margin: 0 0 24px; }
+  fieldset { border: 0; padding: 0; margin: 0 0 20px; }
+  legend { font-weight: 600; margin-bottom: 8px; }
+  .tailles { display: flex; gap: 8px; }
+  .tailles label { border: 1px solid #cfc9bd; border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+  .tailles input { display: none; }
+  .btn { display: block; width: 100%; text-align: center; background: #1d1d1b; color: #fff; border: 0; border-radius: 4px; padding: 16px; font-size: 16px; cursor: pointer; }
+  section { padding: 56px 0; border-top: 1px solid #e7e3da; }
+  h2 { font-size: 26px; margin: 0 0 20px; }
+  .details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .avis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  blockquote { margin: 0; background: #fff; border: 1px solid #e7e3da; border-radius: 6px; padding: 20px; }
+  blockquote footer { color: #6b665c; font-size: 14px; margin-top: 12px; }
+  footer.site { color: #8a8375; font-size: 13px; padding: 32px 0; border-top: 1px solid #e7e3da; }
+  @media (max-width: 760px) {
+    .produit, .details, .avis { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="promo">New season linen is here</div>
+<header><div class="wrap"><nav>
+  <a class="brand" href="#">HALDEN</a>
+  <a href="#">Men</a><a href="#">Women</a><a href="#">Journal</a><a href="#">Account</a><a href="#">Bag (0)</a>
+</nav></div></header>
+
+<main class="wrap">
+  <section class="produit">
+    <div class="galerie">
+      <div class="photo">Overshirt, front</div>
+      <div class="photo petite">Detail: horn buttons</div>
+    </div>
+    <div>
+      <h1>Linen overshirt</h1>
+      <p class="note">4.7 / 5 · 212 reviews</p>
+      <p class="prix">€89 <del>€119</del></p>
+      <p class="intro">Washed European linen, cut loose enough to wear over a T-shirt and sharp enough to wear alone. Softer with every wash.</p>
+      <fieldset class="tailles">
+        <legend>Size</legend>
+        <div class="tailles">
+          <label><input type="radio" name="size" value="S">S</label>
+          <label><input type="radio" name="size" value="M">M</label>
+          <label><input type="radio" name="size" value="L">L</label>
+          <label><input type="radio" name="size" value="XL">XL</label>
+        </div>
+      </fieldset>
+      <button class="btn" type="button">Add to cart</button>
+    </div>
+  </section>
+
+  <section id="details">
+    <h2>Made to last</h2>
+    <div class="details">
+      <div><h3>European flax</h3><p>Grown in Normandy and Flanders, spun and woven in Portugal.</p></div>
+      <div><h3>Garment washed</h3><p>Washed after sewing, so it will not shrink at home.</p></div>
+      <div><h3>Horn buttons</h3><p>Real horn, sewn with a shank so they sit flat.</p></div>
+    </div>
+  </section>
+
+  <section id="avis">
+    <h2>What customers say</h2>
+    <div class="avis">
+      <blockquote>“I bought one in May and went back for a second colour in June.”<footer>Jonas W.</footer></blockquote>
+      <blockquote>“Heavier than I expected, in a good way. It has held up to a whole summer.”<footer>Priya S.</footer></blockquote>
+      <blockquote>“The fit is relaxed without being shapeless.”<footer>Marc D.</footer></blockquote>
+    </div>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">Halden is a demonstration product page used by LPWS to test its own tooling. The brand, product and reviews are fictional.</div></footer>
+</body>
+</html>

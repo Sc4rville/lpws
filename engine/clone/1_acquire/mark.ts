@@ -115,19 +115,28 @@ export function markDom(): { elements: number; sections: number } {
 export function bandesDuRendu(): Array<{ anchor: string; y: number; h: number; titre: string }> {
   const MIN_H = 120, LARGEUR_MIN = 0.8
   let c: Element = document.querySelector("main") ?? document.body
+  const parcours: Element[] = [c]
   for (let i = 0; i < 10; i++) {
     const hauts = [...c.children].map((k) => ({ el: k, h: k.getBoundingClientRect().height })).filter((k) => k.h > MIN_H).sort((a, b) => b.h - a.h)
     if (hauts.length === 0) break
-    if (hauts.length === 1) { c = hauts[0].el; continue }
+    if (hauts.length === 1) { c = hauts[0].el; parcours.push(c); continue }
     const total = c.getBoundingClientRect().height || 1
     if (!(hauts[0].h > total * 0.6 && hauts[0].h > hauts[1].h * 2)) break
     c = hauts[0].el
+    parcours.push(c)
   }
-  const largeurRef = c.getBoundingClientRect().width || window.innerWidth
-  return [...c.children]
-    .filter((b) => b.hasAttribute("data-lpws"))
-    .map((b) => ({ b, r: b.getBoundingClientRect() }))
-    .filter(({ r }) => r.height >= MIN_H && r.width >= largeurRef * LARGEUR_MIN)
+  const bandesDe = (k: Element) => {
+    const largeurRef = k.getBoundingClientRect().width || window.innerWidth
+    return [...k.children]
+      .filter((b) => b.hasAttribute("data-lpws"))
+      .map((b) => ({ b, r: b.getBoundingClientRect() }))
+      .filter(({ r }) => r.height >= MIN_H && r.width >= largeurRef * LARGEUR_MIN)
+  }
+  // la descente a pu s'arrêter DANS une bande dominante (une fiche produit haute, en deux
+  // colonnes) : aucune bande pleine largeur en dessous. On remonte au dernier niveau qui en a.
+  let bandes = bandesDe(c)
+  for (let i = parcours.length - 2; bandes.length === 0 && i >= 0; i--) bandes = bandesDe(parcours[i])
+  return bandes
     .map(({ b, r }) => {
       const t = b.querySelector("h1,h2,h3")?.textContent || b.textContent || ""
       return { anchor: b.getAttribute("data-lpws")!, y: Math.round(r.top + scrollY), h: Math.round(r.height), titre: t.trim().replace(/\s+/g, " ").slice(0, 48) }

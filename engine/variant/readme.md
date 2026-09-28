@@ -39,7 +39,12 @@ Les deux temps « modèle » tournent sur les crédits du plan (`claude -p`), pa
 
 Les 30 règles de [docs/brain.html](../../docs/brain.html), plus 4 propres à la recherche
 payante (mot-clé dans le titre, bouton visible sans défiler sur mobile, bouton générique,
-trop de boutons), portées en **données exécutables**. Chaque règle :
+trop de boutons), et 7 pour la page produit et l'essai (livraison, retours, paiement
+fractionné, guide des tailles, prix barré sans référence 30 jours, bouton d'achat sous le pli
+mobile, « sans carte » caché), portées en **données exécutables**. Une règle d'achat sur une
+page sans bouton d'achat est **calme**, pas non évaluable : elle ne concerne pas la page.
+Les règles sont testées sur des signaux construits à la main (`regles.test.ts`) ; la page
+produit de démonstration est `ui/demo/boutique/`. Chaque règle :
 - nomme les signaux qu'elle consomme (`quand`), et répond vrai / faux / **null** ;
 - dit si elle produit un **TEST** (nos verbes savent le faire), un **CONSEIL** (à transmettre
   au client : avis, achat invité, formulaire, mesure) ou une règle de **MÉTHODE** ;

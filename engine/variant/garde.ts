@@ -9,10 +9,11 @@
  * Fonctions pures : testables sans modèle, sans navigateur.
  */
 
-/** Le texte visible d'un document HTML capturé, sans scripts ni styles. */
+/** Le texte visible d'un document HTML capturé, sans scripts ni styles. Les <template> restent :
+ * les racines fantômes capturées (déclaratives) y vivent, avec leur texte. */
 export function texteDuHtml(html: string): string {
   return html
-    .replace(/<(script|style|noscript|template)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(script|style|noscript)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, "\"")
     .replace(/\s+/g, " ").trim()
@@ -47,6 +48,19 @@ const SUPERLATIFS = [
   "meilleur", "meilleure", "n°1", "numéro 1", "leader", "ultime", "révolutionnaire", "imbattable", "garanti", "garantie", "parfait", "incroyable", "le plus rapide", "moins cher",
 ]
 
+/** Urgence ou rareté : jamais fabriquée, seulement reprise si la page ou l'annonce l'affiche. */
+const URGENCE = [
+  /plus que \d+/, /derni[eè]re?s? (chance|places?|pi[eè]ces?|jours?|heures?)/, /d[ée]p[eê]chez/, /(offre|promo\w*) (expire|limit[ée]e?)/,
+  /aujourd'hui seulement/, /(se termine|fin) (ce soir|demain|bient[oô]t)/, /stock limit[ée]/, /temps limit[ée]/, /quantit[ée]s? limit[ée]es?/,
+  /only \d+ left/, /last chance/, /hurry/, /limited (time|stock|offer|spots?)/, /(ends|expires) (tonight|today|soon|tomorrow)/, /while (stocks?|supplies) last/, /act now/,
+]
+
+/** Personnalisation simulée : un gabarit ou un « pour vous » que rien ne justifie. */
+const PERSONNALISATION = [/\{[^}]*\}/, /\[(entreprise|company|pr[ée]nom|name|ville|city)\]/, /con[çc]ue? (sp[ée]cialement )?pour vous/, /(made|built|designed) (especially |just )?for you/]
+
+/** Une citation : entre guillemets, assez longue pour être un témoignage. */
+const CITATION = /[«“"]\s*([^«»“”"]{12,}?)\s*[»”"]/g
+
 export type EditPropose = {
   anchor: string; op: "set" | "remove" | "move" | "swap" | "duplicate"
   text?: string; before?: string; after?: string; with?: string; as?: string
@@ -66,7 +80,7 @@ export type CadreGarde = {
   boutons: Set<string>
 }
 
-const norme = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase()
+const norme = (s: string) => s.normalize("NFKC").replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim().toLowerCase()
 
 /** Les raisons de refuser une proposition ; liste vide = elle passe. */
 export function controler(edits: EditPropose[], g: CadreGarde, portee?: Portee): string[] {
@@ -96,6 +110,13 @@ export function controler(edits: EditPropose[], g: CadreGarde, portee?: Portee):
     if (t.includes("!") && !avant.includes("!")) raisons.push(`${e.anchor} : point d'exclamation`)
     const sup = SUPERLATIFS.filter((s) => new RegExp(`(^|[^\\p{L}])${s.replace(/[.]/g, "\\.")}($|[^\\p{L}])`, "iu").test(t) && !page.includes(s))
     if (sup.length) raisons.push(`${e.anchor} : allégation que la page ne porte pas (${sup.join(", ")})`)
+    const tn = norme(t)
+    const urgence = URGENCE.map((r) => tn.match(r)?.[0]).find((m) => m && !source.includes(m))
+    if (urgence) raisons.push(`${e.anchor} : urgence ou rareté que la page n'affiche pas (« ${urgence} »)`)
+    const citation = [...tn.matchAll(CITATION)].map((q) => q[1].trim()).find((q) => !page.includes(q))
+    if (citation) raisons.push(`${e.anchor} : citation absente de la page, faux témoignage (« ${citation.slice(0, 50)} »)`)
+    const perso = PERSONNALISATION.map((r) => tn.match(r)?.[0]).find((m) => m && !page.includes(m))
+    if (perso) raisons.push(`${e.anchor} : personnalisation simulée (« ${perso} »)`)
     if (g.boutons.has(e.anchor)) {
       if (t.length > 40) raisons.push(`${e.anchor} : libellé de bouton de ${t.length} caractères (40 au plus)`)
     } else if (avant && t.length > Math.max(avant.length * 2.5, 120)) {

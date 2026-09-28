@@ -46,6 +46,16 @@ export const SignauxMecaniques = z.object({
   fonctionnalitesListees: z.number(),
   personnalisationIdentite: z.boolean(),
   sections: z.array(z.object({ anchor: z.string(), y: z.number(), h: z.number(), titre: z.string() })),
+  /** ce qu'un acheteur cherche avant de payer (Baymard) ; et l'essai sans carte côté SaaS */
+  commerce: z.object({
+    ajoutPanier: z.object({ present: z.boolean(), anchor: z.string().optional(), texte: z.string(), y: z.number().nullable(), auDessusDuPliMobile: z.boolean() }),
+    livraison: z.object({ mentionnee: z.boolean(), gratuite: z.boolean(), extrait: z.string() }),
+    retours: z.object({ mentionnes: z.boolean(), extrait: z.string() }),
+    paiementFractionne: z.array(z.string()),
+    prixBarre: z.object({ present: z.boolean(), referenceMentionnee: z.boolean() }),
+    tailles: z.object({ selecteur: z.boolean(), guide: z.boolean() }),
+    sansCarte: z.object({ mentionne: z.boolean(), auDessusDuPli: z.boolean(), extrait: z.string() }),
+  }),
   /** marqueurs de confiance de paiement lus sur la page (texte, alt, aria) */
   paiement: z.object({ marqueurs: z.array(z.string()) }),
   /** ce que la page charge pour mesurer : sans aucun tag, aucune conversion ne peut remonter */
@@ -104,16 +114,54 @@ function lirePage(hauteurPli: number) {
   const avisTexte = corps.match(/(\d[\d.,]*)\s*(avis|reviews?|ratings?|évaluations?)/i)
   const noteTexte = corps.match(/(\d[.,]\d)\s*(\/\s*5|★|étoiles|stars|sur 5)/i)
   const avisPresents = !!avisTexte || !!noteTexte || !!document.querySelector('[class*="review" i],[class*="rating" i],[class*="trustpilot" i],[aria-label*="star" i]')
-  const temoignages = [...document.querySelectorAll("blockquote,q,[class*='testimonial' i],[class*='quote' i]")].filter(visible)
-  const tNom = temoignages.filter((t) => /[A-Z][a-zé]+ [A-Z][a-zé]+/.test(norme(t.parentElement?.textContent || t.textContent || ""))).length
+  // un conteneur (.quotes, .testimonials) n'est pas un témoignage : seuls comptent les plus profonds
+  const temoignagesTous = [...document.querySelectorAll("blockquote,q,[class*='testimonial' i],[class*='quote' i]")].filter(visible)
+  const temoignages = temoignagesTous.filter((t) => !temoignagesTous.some((u) => u !== t && t.contains(u)))
+  // « Jonas W. » est un nom : les avis e-commerce signent prénom + initiale
+  const tNom = temoignages.filter((t) => /\p{Lu}\p{Ll}+ \p{Lu}(\p{Ll}+|\.)/u.test(norme(t.parentElement?.textContent || t.textContent || ""))).length
   const tFonction = temoignages.filter((t) => /(CEO|CTO|CMO|founder|fondat|director|directeur|manager|head of|responsable|VP)/i.test(norme(t.parentElement?.textContent || ""))).length
   const tChiffre = temoignages.filter((t) => /\d+\s?(%|x|€|\$)/.test(norme(t.textContent || ""))).length
-  const logos = [...document.querySelectorAll('[class*="logo" i] img, [class*="customer" i] img, [class*="trusted" i] img, [class*="client" i] img')].filter(visible).length
+  const logosImg = [...document.querySelectorAll('[class*="logo" i] img, [class*="customer" i] img, [class*="trusted" i] img, [class*="client" i] img')].filter(visible).length
+  // une bande de logos en texte (wordmarks en <span>) : au moins trois noms courts côte à côte
+  const logosTexte = [...document.querySelectorAll('[class*="logos" i],[class*="customers" i],[class*="trusted" i]')]
+    .filter((b) => visible(b) && !b.closest("nav,header,footer"))
+    .map((b) => [...b.children].filter((k) => visible(k) && !k.querySelector("img,svg") && norme(k.textContent || "").length > 1 && norme(k.textContent || "").length <= 30).length)
+    .filter((n) => n >= 3).reduce((a, n) => a + n, 0)
+  const logos = logosImg + logosTexte
   const compteurZero = /\b0\s*(avis|reviews?|partages?|shares?|commentaires?|comments?)\b/i.test(corps)
 
   const prixValeurs = corps.match(/(€\s?\d[\d\s.,]*|\d[\d\s.,]*\s?€|\$\s?\d[\d.,]*|\d[\d.,]*\s?\$)(\s?\/\s?(mois|mo|month|an|year|user|utilisateur))?/gi)?.slice(0, 8) ?? []
   const garantieM = corps.match(/[^.]{0,60}(garantie|satisfait ou remboursé|money[- ]back|remboursement|guarantee|refund|retour gratuit|free returns)[^.]{0,60}/i)
   const objections = /\b(FAQ|questions fréquentes|frequently asked|objections?|pourquoi nous|why us|vous hésitez|still unsure)\b/i.test(corps) || !!document.querySelector('[class*="faq" i],[id*="faq" i]')
+
+  /* ——— commerce : ce qu'un acheteur cherche avant de payer ——— */
+  const extrait = (re: RegExp) => norme(corps.match(new RegExp(`[^.!?]{0,60}(?:${re.source})[^.!?]{0,60}`, "i"))?.[0] || "").slice(0, 120)
+  const achat = /^(add to (cart|bag|basket)|buy( it)? now|ajouter au panier|acheter( maintenant)?|commander|je commande|in den warenkorb|añadir al carrito)/i
+  const boutonAchat = [...document.querySelectorAll("a[data-lpws],button[data-lpws],input[type=submit][data-lpws]")]
+    .filter((e) => visible(e) && !e.closest("nav,header,footer"))
+    .find((e) => achat.test(norme(e.textContent || (e as HTMLInputElement).value || "")))
+  const reLivraison = /livraison|expédition|shipping|delivery|delivered|livré/
+  const reGratuite = /livraison (offerte|gratuite)|free (shipping|delivery)|frais de port offerts/
+  const reRetours = /retours?( gratuits?| offerts?| sous \d+| possibles?)|return(s| policy| within)|satisfait ou remboursé|money[- ]back|échange gratuit|free exchanges?/
+  const fractionne = [...new Set((corps.match(/klarna|alma|afterpay|clearpay|affirm|scalapay|oney|sezzle|pay in [34]|en [34] ?(x|fois)|[34] ?x sans frais|paiement en plusieurs fois|installments?/gi) ?? []).map((x) => x.toLowerCase()))].slice(0, 6)
+  const barres = [...document.querySelectorAll('del, s, strike, [class*="compare" i], [class*="strike" i], [class*="was-price" i], [class*="old-price" i], [class*="regular-price" i]')]
+    .filter((e) => visible(e) && /\d/.test(e.textContent || ""))
+  const reference = /(prix|price)[^.]{0,40}(30|trente|thirty) (derniers )?(jours|days)|lowest price|prix le plus bas|prix de référence|reference price/i.test(corps)
+  const selecteurTaille = [...document.querySelectorAll("select, fieldset, [role=radiogroup], [class*='size' i], [class*='taille' i]")]
+    .some((e) => visible(e) && /\b(taille|size|pointure)\b/i.test(norme(e.textContent || "") + " " + (e.getAttribute("name") || "") + " " + (e.getAttribute("aria-label") || "")) && /\b(XS|S|M|L|XL|3[4-9]|4[0-6])\b/.test(norme(e.textContent || "")))
+  const guideTailles = /guide des tailles|size (guide|chart)|tableau des tailles|guía de tallas/i.test(corps)
+  const reSansCarte = /no (credit )?card( required| needed)?|without a (credit )?card|sans (carte( bancaire)?|cb)|aucune carte/i
+  const sansCarteEl = [...document.querySelectorAll("p,li,span,small,div")]
+    .filter((e) => visible(e) && e.children.length <= 2 && reSansCarte.test(norme(e.textContent || "")) && norme(e.textContent || "").length < 200)
+  const commerce = {
+    ajoutPanier: { present: !!boutonAchat, anchor: boutonAchat?.getAttribute("data-lpws") || undefined, texte: norme(boutonAchat?.textContent || ""), y: boutonAchat ? y(boutonAchat) : null, auDessusDuPliMobile: false },
+    livraison: { mentionnee: reLivraison.test(corps.toLowerCase()), gratuite: reGratuite.test(corps.toLowerCase()), extrait: extrait(reLivraison) },
+    retours: { mentionnes: reRetours.test(corps.toLowerCase()), extrait: extrait(reRetours) },
+    paiementFractionne: fractionne,
+    prixBarre: { present: barres.length > 0, referenceMentionnee: reference },
+    tailles: { selecteur: selecteurTaille, guide: guideTailles },
+    sansCarte: { mentionne: sansCarteEl.length > 0 || reSansCarte.test(corps), auDessusDuPli: sansCarteEl.some((e) => y(e) < hauteurPli), extrait: norme(sansCarteEl[0]?.textContent || "").slice(0, 120) },
+  }
 
   const phrases = corps.split(/[.!?]+\s/).filter((p) => p.trim().length > 0)
   const mots = corps.split(/\s+/).filter(Boolean)
@@ -142,6 +190,7 @@ function lirePage(hauteurPli: number) {
     fonctionnalitesListees: fonctionnalites,
     personnalisationIdentite: perso,
     paiement: { marqueurs: paiementMarqueurs },
+    commerce,
   }
 }
 
@@ -172,6 +221,12 @@ export async function extraireSignaux(baseline: string): Promise<SignauxMecaniqu
       ...d,
       ctaAuDessusDuPliDesktop: d.ctas.some((c) => c.auDessusDuPli),
       ctaAuDessusDuPliMobile: m.ctas.some((c) => c.auDessusDuPli),
+      // le pli qui compte pour l'achat et pour « sans carte » est celui du téléphone
+      commerce: {
+        ...d.commerce,
+        ajoutPanier: { ...d.commerce.ajoutPanier, auDessusDuPliMobile: m.commerce.ajoutPanier.y !== null && m.commerce.ajoutPanier.y < 844 },
+        sansCarte: { ...d.commerce.sansCarte, auDessusDuPli: m.commerce.sansCarte.auDessusDuPli },
+      },
       mesure, vitesse,
     })
   } finally { await browser.close() }
