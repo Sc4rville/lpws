@@ -7,6 +7,7 @@ import { marque, slugify } from "../../engine/shared/paths.ts"
 import { Contexte } from "../../engine/variant/contexte.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
+import { enregistrerExperiences } from "../../engine/measure/experience.ts"
 import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
 import { type Job, nouveauJob, dire, finir, lancer } from "./jobs.ts"
 import { construireTag, appliquerParts, publierTag, sonderBalise } from "./tag.ts"
@@ -190,6 +191,10 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
       if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)
+    if (code === 0) {
+      const arretes = all.filter((o) => o.etat === "stop" && avant.some(([oid, oetat]) => oid === o.id && oetat === "live"))
+      for (const x of await enregistrerExperiences(d, arretes)) dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
+    }
     if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()
