@@ -13,6 +13,9 @@
  *   · la langue de la page, le ton de la page, pas de superlatif ;
  *   · une ancre existante, sinon rien.
  *
+ * Puis chaque texte proposé repasse par les refus (garde.ts) : chiffre, urgence, citation ou
+ * personnalisation que le client n'affirme pas lui-même → la variante n'est pas écrite.
+ *
  * Tourne sur les crédits du plan (`claude -p`), comme le jugement.
  */
 import { readFile } from "node:fs/promises"
@@ -26,6 +29,7 @@ import { step } from "../shared/log.ts"
 import { demanderValide } from "../shared/modele.ts"
 import { ecrireJson, premierEcart } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
+import { refusDe, sourcesDe } from "./garde.ts"
 
 const SCOPE = "variant/variantes"
 
@@ -112,6 +116,7 @@ export async function ecrireVariantes(
   const props = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
   if (!props) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
+  const sources = sourcesDe(await readFile(f.capture, "utf8"), c)
   const sorties: VarianteProduite[] = []
   for (const p of props) {
     const k = choisis.find((x) => x.id === p.regle)
@@ -119,6 +124,8 @@ export async function ecrireVariantes(
     // chaque ancre doit exister : une édition dans le vide n'est pas une variante
     const inconnue = p.edits.flatMap((e) => [e.anchor, e.before, e.after, e.with]).filter((a): a is string => !!a).find((a) => !parAncre.has(a))
     if (inconnue) { step(SCOPE, `« ${p.titre} » vise l'ancre ${inconnue} qui n'existe pas : refusée`); continue }
+    const refus = p.edits.flatMap((e) => e.text ? refusDe(e.text, sources) : [])
+    if (refus.length) { step(SCOPE, `« ${p.titre} » refusée : ${refus.join(" · ")}`); continue }
 
     // un nom de dossier lisible : coupé à un mot entier, jamais au milieu d'un mot
     const nom = slugify(p.titre).slice(0, 44).replace(/-[^-]*$/, "")
