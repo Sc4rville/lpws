@@ -83,3 +83,22 @@ test("controler : en régime gros changements, une retouche fine est refusée, u
   assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "Pay now, start later" }], bouton), [], "la promesse réordonnée")
   assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "Customer support software for tiny teams" }], g()), [], "hors régime, la retouche passe")
 })
+
+test("controler : urgence fabriquée, faux témoignage, fausse personnalisation", () => {
+  const un = (text: string) => controler([{ anchor: "e11", op: "set", text }], g())
+  assert.ok(un("Limited time: shared inbox for small teams").some((x) => x.includes("urgence")))
+  assert.ok(un("Hurry, small teams reply faster").some((x) => x.includes("urgence")))
+  assert.ok(un("“The inbox our small team always needed”").some((x) => x.includes("faux témoignage")))
+  assert.ok(un("Built for you, {Company}").some((x) => x.includes("personnalisation")))
+  assert.ok(controler([{ anchor: "e11", op: "set", text: "Plus que 3 places pour les petites équipes" }], g({ page: "Support pour petites équipes" })).some((x) => x.includes("urgence")))
+})
+
+test("controler : une urgence ou une citation que la page porte déjà n'est pas une invention", () => {
+  const page = "Limited time offer. “Relay cut our reply time in half” — Ana, Acme. Customer support software for small teams"
+  assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "Limited time offer for small teams" }], g({ page })), [])
+  assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "“Relay cut our reply time in half”" }], g({ page })), [])
+})
+
+test("texteDuHtml : le texte des racines fantômes capturées (template) compte", () => {
+  assert.equal(texteDuHtml('<div><template shadowrootmode="open"><p>Call 1-800-664-9073</p></template></div>'), "Call 1-800-664-9073")
+})
