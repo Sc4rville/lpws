@@ -64,11 +64,15 @@ export async function tourDeSurveillance(scope: string) {
     for (const camp of await readdir(cdir)) {
       const d = join(cdir, camp)
       if (!existsSync(fichiersDe(d).meta)) continue
-      const dernier = (await historique(d))[0]
-      if (dernier && Date.now() - Date.parse(dernier.quand) < h * 3_600_000) continue
-      if ([...jobs.values()].some((j) => j.type === "surveillance" && j.etat === "en cours" && j.campagne === d)) continue
-      // le tour programmé attend son créneau au lieu d'échouer
+      const aJour = async () => {
+        const dernier = (await historique(d))[0]
+        return (dernier && Date.now() - Date.parse(dernier.quand) < h * 3_600_000)
+          || [...jobs.values()].some((j) => j.type === "surveillance" && j.etat === "en cours" && j.campagne === d)
+      }
+      if (await aJour()) continue
+      // le tour programmé attend son créneau au lieu d'échouer ; un relevé manuel passé entre-temps le dispense
       while (!creneauLibre()) await new Promise((r) => setTimeout(r, 5_000))
+      if (await aJour()) continue
       const job = lancerSurveillance(d)
       while (job.etat === "en cours") await new Promise((r) => setTimeout(r, 2_000))
       step(scope, `surveillance ${c}/${camp} : ${job.lignes.at(-1) ?? ""}`)
