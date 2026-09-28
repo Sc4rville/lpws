@@ -13,12 +13,15 @@ import { ROOT } from "./config.ts"
 import { type Job, jobs, nouveauJob, dire, finir } from "./jobs.ts"
 import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
 
-/** Un audit ouvre un Chromium : au-delà, la requête attend son tour côté buyer. */
-const AUDITS_SIMULTANES = 2
+/** Audits et relevés ouvrent chacun un Chromium : pas plus de deux à la fois sur le serveur. */
+const CHROMIUM_SIMULTANES = 2
+const creneauLibre = () => [...jobs.values()].filter((j) => (j.type === "audit" || j.type === "surveillance") && j.etat === "en cours").length < CHROMIUM_SIMULTANES
+function reserverCreneau() {
+  if (!creneauLibre()) throw Object.assign(new Error("Deux relevés tournent déjà : réessayez dans une minute."), { code: 429 })
+}
 
 export function lancerAudit(url: string, cible: string): Job {
-  if ([...jobs.values()].filter((j) => (j.type === "audit" || j.type === "surveillance") && j.etat === "en cours").length >= AUDITS_SIMULTANES)
-    throw Object.assign(new Error("Deux relevés tournent déjà : réessayez dans une minute."), { code: 429 })
+  reserverCreneau()
   const job = nouveauJob("audit")
   ;(async () => {
     try {
@@ -32,7 +35,9 @@ export function lancerAudit(url: string, cible: string): Job {
   return job
 }
 
-export function lancerSurveillance(d: string, job = nouveauJob("surveillance")): Job {
+export function lancerSurveillance(d: string): Job {
+  reserverCreneau()
+  const job = nouveauJob("surveillance")
   job.campagne = d
   ;(async () => {
     try {
@@ -62,6 +67,8 @@ export async function tourDeSurveillance(scope: string) {
       const dernier = (await historique(d))[0]
       if (dernier && Date.now() - Date.parse(dernier.quand) < h * 3_600_000) continue
       if ([...jobs.values()].some((j) => j.type === "surveillance" && j.etat === "en cours" && j.campagne === d)) continue
+      // le tour programmé attend son créneau au lieu d'échouer
+      while (!creneauLibre()) await new Promise((r) => setTimeout(r, 5_000))
       const job = lancerSurveillance(d)
       while (job.etat === "en cours") await new Promise((r) => setTimeout(r, 2_000))
       step(scope, `surveillance ${c}/${camp} : ${job.lignes.at(-1) ?? ""}`)
