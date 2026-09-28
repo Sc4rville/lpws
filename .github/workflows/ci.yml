@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx playwright install --with-deps chromium
+      - run: npm run ui
+      - name: smoke — clone de la démo (fidèle, diff 0/0)
+        run: |
+          (cd ui && python3 -m http.server 8811 >/dev/null 2>&1 &)
+          sleep 1
+          npm run clone -- http://localhost:8811/demo/ --client relay --campaign demo | tee clone.out
+          node -e 'const t=require("fs").readFileSync("clone.out","utf8");const j=JSON.parse(t.slice(t.lastIndexOf("\n{")+1));if(!j.fidele)process.exit(1)'

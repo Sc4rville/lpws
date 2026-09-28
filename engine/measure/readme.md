@@ -19,6 +19,14 @@ npm run measure -- clients/<client>/<campagne> --exemple    # rejoue une répons
 `n` = sessions, `c` = conversions (« key events » dans GA4). L'interface calcule le reste :
 taux, écart, certitude, « encore ~N jours ».
 
+## Le journal des expériences
+
+Quand un test s'arrête (bouton Arrêter, ou un autre test lancé à sa place), `experience.ts`
+ajoute une ligne à `experiences.json` : éditions, dates, part de trafic, échantillon lu dans
+`resultats.json`, fourchette à 95 % de la hausse et conclusion — `gagnant`, `perdant`,
+`non concluant`, `trop tôt` (moins de 25 conversions sur la version la moins vue) ou
+`sans données`. Les non-concluants restent : c'est ce qu'on apprendra de plus utile.
+
 ## Ce que le buyer fait, une fois par client (3 minutes)
 
 1. **Ajouter notre compte de service en lecteur** sur la propriété GA4 du client : Admin →

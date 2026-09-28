@@ -15,6 +15,11 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
+## Fait le 2026-09-28 (journal des expériences)
+- Chaque test arrêté laisse une ligne dans `experiences.json` (`engine/measure/experience.ts`) :
+  échantillon, fourchette, conclusion, non-concluants compris. Feuille de route 4.1 cochée
+  (reste : les variantes refusées et pourquoi).
+
 ## Fait le 2026-09-28 (ui)
 - Interface « décider d'abord » : fourchette + jalons sur chaque résultat, trois chiffres
   d'accueil, palette ⌘K, Annuler au lieu de confirmer, une adresse par écran, panneau
@@ -29,6 +34,10 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   offres, Suivi. Scripts : `audit`, `conclure`, `memoire`, `surveille`, `couts`.
 - Non branché faute d'accès : Stripe (clés `STRIPE_*`), annonces Google Ads/AI Max, Shopify, Intégral.
   Paliers appliqués seulement avec `LPWS_FACTURATION=1` ; surveillance auto avec `LPWS_SURVEILLANCE=1`.
+
+## Fait le 2026-09-28 (refonte visuelle)
+- Couleurs en OKLCH + `light-dark()`, thème sombre et apparence Auto/Clair/Sombre, accueil en
+  bento, View Transitions entre écrans, ressort `linear()`. Détail dans design.md.
 
 ## Fait le 2026-09-28 (business model)
 - Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
@@ -167,5 +176,8 @@ le juge avant d'accuser le code.
   remplacé par `loader.ts`) retiré ; `npm run typecheck` couvre aussi `ui/` ; `esbuild` déclaré.
 - Vérifié identique avant/après : clone démo 0 %/0 %, variant.json, `/api/etat`, relink 68/68,
   measure --exemple, tag:check (même refus sur la démo statique).
-- Reste : découper `ui/server.ts` (jobs · état · pipeline de test · tag · routes) sur ce socle.
+- `ui/server.ts` découpé : il ne garde que les routes et le mot de passe ; `ui/server/` porte
+  `config` · `jobs` · `etat` · `pipeline` (capture, textes, tests, brain) · `tag` (construire,
+  publier, sonder). Vérifié identique : `/api/etat` et `/textes` octet pour octet, test créé →
+  variante → balise (68/68 ancres), live / stop / vérifier.
 

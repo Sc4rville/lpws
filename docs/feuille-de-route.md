@@ -278,9 +278,9 @@ maintenant et qui coûteront très cher à rattraper.
 ## 4.1 · Enregistrer ce qui s'est passé
 - ✅ Chaque variante porte déjà son hypothèse, sa métrique, son risque et son diagnostic
 - ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique
-- ✅ Un objet « expérience » durable par client (`clients/<client>/experiences.json`, [`memoire.ts`](../engine/measure/memoire.ts))
-- ✅ Enregistrer aussi les tests **non concluants** et ceux arrêtés sans mesure
-- ✅ Enregistrer les variantes refusées par le buyer et pourquoi
+- ✅ Un objet « expérience » durable : contrôle, variante, dates, échantillon, résultat, verdict *(`experiences.json` de la campagne, écrit à chaque arrêt ; mémoire du client toutes campagnes : `clients/<client>/memoire.json`, [`memoire.ts`](../engine/measure/memoire.ts))*
+- ✅ Enregistrer aussi les tests **non concluants** et ceux arrêtés sans mesure *(sinon on n'apprend que des gagnants)*
+- ✅ Enregistrer les variantes refusées par le buyer et pourquoi *(signal très précieux sur nos diagnostics)*
 
 ## 4.2 · Savoir si on a le droit de conclure
 - ✅ Calculer l'échantillon nécessaire **avant** de lancer ([`puissance.ts`](../engine/measure/puissance.ts), écran « Peut-on conclure ? », plan fixé au lancement)

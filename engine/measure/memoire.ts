@@ -4,7 +4,7 @@
  *
  * Aujourd'hui, un test arrêté disparaît dans tests.json d'une page. Or « on a déjà testé ça en
  * mars » est ce qu'un buyer perd le plus souvent quand il change de client, de campagne ou de
- * freelance. La mémoire est donc au niveau du CLIENT (clients/<client>/experiences.json), toutes
+ * freelance. La mémoire est donc au niveau du CLIENT (clients/<client>/memoire.json), toutes
  * pages confondues, et elle sert à deux choses :
  *
  *   1. le brain ne re-propose pas une hypothèse déjà perdue ou déjà refusée (`ecarter`) ;
@@ -57,7 +57,7 @@ export const Experience = z.object({
 export type Experience = z.infer<typeof Experience>
 
 export async function lireMemoire(campagneDir: string): Promise<Experience[]> {
-  const brut = await lireJson<unknown[]>(fichiersDe(campagneDir).experiences, [])
+  const brut = await lireJson<unknown[]>(fichiersDe(campagneDir).memoire, [])
   return brut.flatMap((x) => { const r = Experience.safeParse(x); return r.success ? [r.data] : [] })
 }
 
@@ -102,7 +102,7 @@ export async function consigner(campagneDir: string): Promise<Experience[]> {
     })
   }
   const tout = [...memoire.values()].sort((a, b) => (b.finLe ?? b.consigneLe).localeCompare(a.finLe ?? a.consigneLe))
-  await ecrireJson(f.experiences, tout)
+  await ecrireJson(f.memoire, tout)
   return tout
 }
 
