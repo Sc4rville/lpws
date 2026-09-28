@@ -21,6 +21,10 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   compact sur mobile, curseur de trafic qui s'applique vraiment à un test en ligne.
   Détail dans design.md (composants, navigation).
 
+## Fait le 2026-09-28 (business model)
+- Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
+  actif / mois », grille Atelier · Solo · Agence · Régime, modules reliés aux tâches, décisions `3.5`).
+
 ## Fait récemment (2026-09-17)
 - `apply` : cinq verbes (set · remove · move · swap · duplicate), ancres de section `s<n>` posées
   par géométrie, journal avant/après de chaque changement. Variantes Jira + HubSpot rendues dans
