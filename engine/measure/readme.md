@@ -19,8 +19,10 @@ npm run measure -- clients/<client>/<campagne> --exemple    # rejoue une répons
 `n` = sessions, `c` = sessions qui ont converti (`sessions × sessionKeyEventRate`, jamais plus que
 `n`). `parTest` compte l'original sur la fenêtre de chaque test (lancement → arrêt) : des tests
 successifs ne partagent pas le même contrôle, et le verdict et le journal lisent cette fenêtre.
-Un test arrêté est ré-archivé à chaque mesure tant que sa lecture précède l'arrêt + 48 h
-(le délai de GA4).
+Un lancement terminé est ré-archivé à chaque mesure tant que sa lecture précède l'arrêt + 48 h
+(le délai de GA4) : aussi s'il n'a jamais été écrit (écriture ratée à l'arrêt), et s'il a été
+remplacé par une relance (sa fenêtre est relue dans `archives["<test>@<lanceLe>"]`). `--exemple`
+ne touche jamais au journal.
 
 ## Le droit de conclure — `stats.ts`
 

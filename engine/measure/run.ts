@@ -31,13 +31,21 @@ export type Resultats = {
   source: "ga4" | "exemple"
   versions: Record<string, { n: number; c: number }>
   /** par test, l'original et la variante comptés sur SA fenêtre (lancement → arrêt) */
-  parTest?: Record<string, { depuis: string; jusqua: string; controle: { n: number; c: number } | null; variante: { n: number; c: number } | null }>
+  parTest?: Record<string, Fenetre>
+  /** les lancements déjà remplacés (test relancé) dont GA4 n'a pas fini de compter, par `id@lanceLe` */
+  archives?: Record<string, Fenetre>
 }
+
+type Fenetre = { depuis: string; jusqua: string; controle: { n: number; c: number } | null; variante: { n: number; c: number } | null }
+type Lecteur = (depuis: string, jusqua: string) => Promise<LigneVersion[]>
+
+export const cleLancement = (id: string, lanceLe: string) => `${id}@${lanceLe}`
 
 /** Le délai de GA4 : un test arrêté n'a ses chiffres définitifs qu'ensuite. */
 export const DELAI_GA4_MS = 48 * 3_600_000
 
-export async function mesurer(campagne: string, exemple = false): Promise<Resultats> {
+/** `lireGa4` remplace la lecture de la propriété GA4 (tests) ; la réponse d'exemple, elle, ne touche jamais au journal. */
+export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecteur): Promise<Resultats> {
   const f = fichiersDe(campagne)
   const tests = await lireJson<Test[]>(f.tests, [])
   const vivants = tests.filter((t) => t.etat === "live" || t.etat === "stop" || t.etat === "gagnant")
@@ -46,8 +54,11 @@ export async function mesurer(campagne: string, exemple = false): Promise<Result
     ?? new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
 
   let lignes: LigneVersion[]
-  let lire: (depuis: string, jusqua: string) => Promise<LigneVersion[]>
-  if (exemple) {
+  let lire: Lecteur
+  if (lireGa4) {
+    lire = lireGa4
+    lignes = await lire(depuis, "today")
+  } else if (exemple) {
     lignes = lireRapport(JSON.parse(await readFile(new URL("./exemple-reponse.json", import.meta.url), "utf8")))
     lire = async () => lignes
     step(SCOPE, `réponse GA4 d'exemple rejouée (${lignes.length} versions)`)
@@ -69,24 +80,34 @@ export async function mesurer(campagne: string, exemple = false): Promise<Result
    * le même contrôle cumulé, et un test relancé repart de son nouveau lancement. GA4 compte au
    * jour : le jour d'une bascule compte pour les deux tests qui se touchent. */
   const parTest: NonNullable<Resultats["parTest"]> = {}
+  const archives: NonNullable<Resultats["archives"]> = {}
   const fenetres = new Map<string, Promise<LigneVersion[]>>()
-  for (const t of vivants) {
-    if (!t.lanceLe) continue
-    const d = t.lanceLe.slice(0, 10), j = t.finLe?.slice(0, 10) ?? "today"
+  const fenetre = async (id: string, lanceLe: string, finLe: string | undefined): Promise<Fenetre> => {
+    const d = lanceLe.slice(0, 10), j = finLe?.slice(0, 10) ?? "today"
     if (!fenetres.has(`${d}/${j}`)) fenetres.set(`${d}/${j}`, lire(d, j))
     const ls = await fenetres.get(`${d}/${j}`)!
     const de = (v: string) => { const l = ls.find((x) => x.version === v); return l ? { n: l.sessions, c: l.conversions } : null }
-    parTest[t.id] = { depuis: d, jusqua: j, controle: de("controle"), variante: de(t.id) }
+    return { depuis: d, jusqua: j, controle: de("controle"), variante: de(id) }
   }
-  const res: Resultats = { luLe: new Date().toISOString(), depuis, source: exemple ? "exemple" : "ga4", versions, parTest }
-  await ecrireJson(f.resultats, res)
+  for (const t of vivants) if (t.lanceLe) parTest[t.id] = await fenetre(t.id, t.lanceLe, t.finLe)
   /* Un test arrêté a été archivé avec ce que GA4 savait à l'arrêt ; ses dernières conversions
-   * arrivent jusqu'à 48 h plus tard. Tant que la lecture archivée précède ce délai, on le
-   * ré-archive (même lancement : la ligne est mise à jour, pas dupliquée). */
-  const journal = await lireJson<Experience[]>(f.experiences, [])
-  const aRelire = vivants.filter((t) => t.etat !== "live" && t.lanceLe && t.finLe && journal.some((e) =>
-    e.test === t.id && e.lanceLe === t.lanceLe && (!e.luLe || new Date(e.luLe).getTime() < new Date(t.finLe!).getTime() + DELAI_GA4_MS)))
-  for (const e of await enregistrerExperiences(campagne, aRelire))
+   * arrivent jusqu'à 48 h plus tard. On ré-archive donc (même lancement : la ligne est mise à
+   * jour, pas dupliquée) tout lancement terminé dont la lecture précède ce délai — y compris
+   * celui dont l'écriture a échoué à l'arrêt, et celui qu'une relance a remplacé dans tests.json. */
+  const journal = exemple ? [] : await lireJson<Experience[]>(f.experiences, [])
+  const enAttente = (luLe: string | null, fin: string) => !luLe || new Date(luLe).getTime() < new Date(fin).getTime() + DELAI_GA4_MS
+  const courants = new Set(vivants.filter((t) => t.lanceLe).map((t) => cleLancement(t.id, t.lanceLe!)))
+  const aRelire = exemple ? [] : vivants.filter((t) => t.etat !== "live" && t.lanceLe && t.finLe && (() => {
+    const e = journal.find((x) => x.test === t.id && x.lanceLe === t.lanceLe)
+    return !e || enAttente(e.luLe, t.finLe!)
+  })())
+  const orphelins: Test[] = journal.filter((e) => e.lanceLe && !courants.has(cleLancement(e.test, e.lanceLe)) && enAttente(e.luLe, e.arreteLe))
+    .map((e) => ({ id: e.test, titre: e.titre, teste: e.teste, pourquoi: e.pourquoi, edits: e.edits, part: e.part, etat: "stop",
+      creeLe: e.lanceLe!, lanceLe: e.lanceLe, finLe: e.arreteLe, plan: e.plan, regle: e.regle }))
+  for (const t of orphelins) archives[cleLancement(t.id, t.lanceLe!)] = await fenetre(t.id, t.lanceLe!, t.finLe)
+  const res: Resultats = { luLe: new Date().toISOString(), depuis, source: exemple ? "exemple" : "ga4", versions, parTest, ...(orphelins.length ? { archives } : {}) }
+  await ecrireJson(f.resultats, res)
+  for (const e of await enregistrerExperiences(campagne, [...aRelire, ...orphelins]))
     step(SCOPE, `  journal relu : « ${e.titre} » — ${e.conclusion}`)
   for (const [v, x] of Object.entries(versions))
     step(SCOPE, `  ${v.padEnd(28)} ${String(x.n).padStart(6)} sessions  ${String(x.c).padStart(5)} conversions`)
