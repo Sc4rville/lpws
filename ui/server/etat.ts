@@ -7,7 +7,8 @@ import { lireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { ROOT, BASE_TAGS } from "./config.ts"
 import { jobs } from "./jobs.ts"
-import { historique } from "../../engine/measure/experience.ts"
+import { historique, comptes } from "../../engine/measure/experience.ts"
+import type { Resultats } from "../../engine/measure/run.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -72,9 +73,9 @@ export async function etat() {
       const brainEnCours = !!brainJob
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
-      const resultats = await lireJson<{ luLe: string; source?: string; versions: Record<string, { n: number; c: number }> } | null>(fichiersDe(d).resultats, null)
+      const resultats = await lireJson<Resultats | null>(fichiersDe(d).resultats, null)
       const resDe = (id: string) => {
-        const o = resultats?.versions?.controle, v = resultats?.versions?.[id]
+        const { o, v } = comptes(resultats, id)
         return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
       }
       const url = (meta?.source ?? encours?.url ?? "").replace(/^https?:\/\//, "")

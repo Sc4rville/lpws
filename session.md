@@ -137,7 +137,7 @@ référence ; la liste courte ci-dessous n'en garde que le haut.
 0. **Le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées) et corrige ce qu'il
    conteste, puis `npm run brain:eval` ; puis il lit les 3 propositions Relay dans l'interface.
 1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
-   une vraie propriété GA4 pour confirmer `customUser:lpws_variante` et `keyEvents`, et trancher la
+   une vraie propriété GA4 pour confirmer `customUser:lpws_variante` et `sessionKeyEventRate`, et trancher la
    langue de l'interface (FR aujourd'hui).
 2. **Nourrir** (bloc 4) : enregistrer chaque test, savoir quand on a le droit de conclure (4.2, à
    remonter), apprendre des refus de propositions (déjà stockés).
