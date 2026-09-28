@@ -250,6 +250,7 @@ reste un outil de développement, pas un produit.
 - ✅ Les deux : web sur la box de kabylesystem (seule instance qui publie), local avec `LPWS_SANS_VERCEL=1`
 
 ## 3.5 · Le modèle commercial
+> Recherche marché et grille proposée : [business-model-rapport.md](business-model-rapport.md)
 - ⬜ Trancher l'unité de facturation *(par compte et par mois — facturer à la variante invite l'objection « ce n'est qu'un titre »)*
 - ⬜ Définir ce qui est inclus
 - ⬜ Onboarding en libre-service ou accompagné

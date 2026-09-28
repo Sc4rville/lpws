@@ -15,6 +15,10 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
+## Fait récemment (2026-09-28)
+- Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
+  actif / mois », grille Atelier · Solo · Agence · Régime, modules reliés aux tâches, décisions `3.5`).
+
 ## Fait récemment (2026-09-17)
 - `apply` : cinq verbes (set · remove · move · swap · duplicate), ancres de section `s<n>` posées
   par géométrie, journal avant/après de chaque changement. Variantes Jira + HubSpot rendues dans
