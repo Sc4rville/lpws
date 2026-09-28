@@ -85,7 +85,13 @@ export async function auditer(url: string): Promise<Audit> {
     const requetes: string[] = []
     page.on("request", (r) => requetes.push(r.url()))
 
-    const rep = await page.goto(depart.href, { waitUntil: "load", timeout: 60_000 }).catch((e: Error) => { throw new PageInjoignable(`la page ne répond pas : ${e.message}`) })
+    let plante = false
+    page.on("crash", () => { plante = true })
+    const rep = await page.goto(depart.href, { waitUntil: "load", timeout: 60_000 }).catch((e: Error) => {
+      // navigateur, onglet ou moteur de rendu perdu : c'est LPWS qui est en panne, pas la page
+      if (plante || page.isClosed() || !browser.isConnected()) throw e
+      throw new PageInjoignable(`la page ne répond pas : ${e.message}`)
+    })
     if (!rep) throw new PageInjoignable("la page n'a rien renvoyé")
     await page.waitForTimeout(4_000)
 
