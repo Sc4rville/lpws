@@ -1426,7 +1426,7 @@ function go(spec) {
   }
 }
 /** un double-clic ne doit pas arrêter puis relancer : le bouton suivant apparaît sous le pointeur */
-const ACTES_ETAT = ['launch', 'stop', 'deploy', 'restore']; let dernierActe = -Infinity;
+const ACTES_ETAT = ['launch', 'stop', 'deploy', 'restore']; const dernierActe = {};
 document.addEventListener('click', e => {
   if (e.target.id === 'cmdk') { fermerK(); return; }
   const kk = e.target.closest('[data-k]');
@@ -1443,7 +1443,11 @@ document.addEventListener('click', e => {
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
   if (!act) return;
-  if (ACTES_ETAT.includes(act.dataset.act)) { if (e.timeStamp - dernierActe < 600) return; dernierActe = e.timeStamp; }
+  if (ACTES_ETAT.includes(act.dataset.act)) {
+    const cle = `${act.dataset.client || S.ctx}/${act.dataset.test || S.test}`;
+    if (e.timeStamp - (dernierActe[cle] ?? -Infinity) < 600) return;
+    dernierActe[cle] = e.timeStamp;
+  }
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
   const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
   switch (act.dataset.act) {
@@ -1520,8 +1524,9 @@ document.addEventListener('change', e => {
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
   if (!t || t.etat !== 'live') return;
   if (c.live) { publier(c, t, 'live', t.part, false); return; }
-  const m = document.getElementById('main'), y = m.scrollTop;
+  const m = document.getElementById('main'), y = m.scrollTop, focus = document.activeElement === e.target;
   toast(`${t.part} % des visiteurs voient maintenant la variante`); render(); m.scrollTop = y;
+  if (focus) document.getElementById('part').focus({ preventScroll: true });
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
