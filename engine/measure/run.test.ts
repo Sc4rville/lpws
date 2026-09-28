@@ -88,3 +88,31 @@ test("mesurer --exemple : la réponse rejouée ne touche pas au journal", async 
   assert.deepEqual(await lireJson<Experience[]>(f.experiences, []), avant)
   await rm(dir, { recursive: true })
 })
+
+test("mesurer : un arrêt jamais archivé puis relancé garde sa fenêtre dans tests.json et entre au journal", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const ancien = T()
+  await ecrireJson(f.tests, [T({ etat: "live", lanceLe: "2026-09-21T09:00:00Z", finLe: undefined,
+    anciens: [{ lanceLe: ancien.lanceLe!, finLe: ancien.finLe!, part: 50 }] })])
+  await mesurer(dir, false, ga4((d) => d === "2026-09-02" ? 45 : 5))
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  assert.equal(journal.length, 1)
+  assert.equal(journal[0].lanceLe, ancien.lanceLe)
+  assert.equal(journal[0].arreteLe, ancien.finLe)
+  assert.deepEqual(journal[0].variante, { n: 1_000, c: 45 })
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : la relecture garde la règle archivée même si la spec a été régénérée", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const t = T()
+  await ecrireJson(f.tests, [t])
+  await ecrireJson(f.spec(t.id), { diagnostic: { regle: "prix" } })
+  await enregistrerExperiences(dir, [t])
+  await ecrireJson(f.spec(t.id), { diagnostic: { regle: "preuve" } })
+  await mesurer(dir, false, ga4(() => 45))
+  assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].regle, "prix")
+  await rm(dir, { recursive: true })
+})
