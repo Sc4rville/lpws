@@ -68,6 +68,7 @@ test("ampleur : mêmes mots 0, aucun mot commun 1", () => {
   assert.equal(ampleur("Get a demo", "get a DEMO"), 0)
   assert.equal(ampleur("Get a demo", "Start free"), 1)
   assert.ok(ampleur("Customer support software for small teams", "Customer support software for growing teams") < 0.5)
+  assert.ok(ampleur("Start now, pay later", "Pay now, start later") >= 0.5, "l'ordre compte : la promesse s'inverse")
 })
 
 test("controler : en régime gros changements, une retouche fine est refusée, une réécriture ou un déplacement passent", () => {
@@ -75,5 +76,10 @@ test("controler : en régime gros changements, une retouche fine est refusée, u
   assert.ok(controler([{ anchor: "e11", op: "set", text: "Customer support software for tiny teams" }], gros).some((x) => x.includes("trop fine")))
   assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "A shared inbox that helps you reply 2x faster" }], gros), [])
   assert.deepEqual(controler([{ anchor: "e13", op: "move", before: "e11" }], gros), [])
+  const bouton = g({ ampleurMin: 0.5, avant: new Map([["e13", "Submit"], ["e11", "Start now, pay later"]]) })
+  assert.ok(controler([{ anchor: "e13", op: "set", text: "Submit now" }], bouton).some((x) => x.includes("trop fine")), "un mot ajouté à un libellé court")
+  assert.ok(controler([{ anchor: "e13", op: "set", text: "Now" }], g({ ampleurMin: 0.5, avant: new Map([["e13", "Submit now"]]) })).some((x) => x.includes("trop fine")), "un mot retiré")
+  assert.deepEqual(controler([{ anchor: "e13", op: "set", text: "Get a demo" }], bouton), [], "un autre libellé")
+  assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "Pay now, start later" }], bouton), [], "la promesse réordonnée")
   assert.deepEqual(controler([{ anchor: "e11", op: "set", text: "Customer support software for tiny teams" }], g()), [], "hors régime, la retouche passe")
 })

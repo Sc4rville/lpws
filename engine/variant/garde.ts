@@ -68,14 +68,35 @@ export type CadreGarde = {
   ampleurMin?: number
 }
 
-const mots = (s: string) => new Set(s.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]{2,}/gu) ?? [])
+const mots = (s: string) => s.toLowerCase().normalize("NFKC").match(/[\p{L}\p{N}]{2,}/gu) ?? []
 
-/** Ce qui change d'un texte à l'autre, de 0 (mêmes mots) à 1 (aucun mot commun) : distance de Jaccard. */
+/** La plus longue suite de mots commune aux deux textes, dans l'ordre. */
+function communs(a: string[], b: string[]): number {
+  let prec = new Array<number>(b.length + 1).fill(0)
+  for (const x of a) {
+    const cour = [0]
+    for (let j = 0; j < b.length; j++) cour.push(x === b[j] ? prec[j] + 1 : Math.max(prec[j + 1], cour[j]))
+    prec = cour
+  }
+  return prec[b.length]
+}
+
+/** Ce qui change d'un texte à l'autre, de 0 (mêmes mots, même ordre) à 1 (aucun mot commun) : le
+ * plus grand de l'écart de vocabulaire (Jaccard) et de l'écart d'ordre (mots hors de la suite commune). */
 export function ampleur(avant: string, apres: string): number {
   const a = mots(avant), b = mots(apres)
-  const union = new Set([...a, ...b]).size
-  if (!union) return 0
-  return 1 - [...a].filter((m) => b.has(m)).length / union
+  if (!a.length && !b.length) return 0
+  const sa = new Set(a), sb = new Set(b)
+  const jaccard = 1 - [...sa].filter((m) => sb.has(m)).length / new Set([...a, ...b]).size
+  return Math.max(jaccard, 1 - communs(a, b) / Math.max(a.length, b.length))
+}
+
+/** Une retouche : trop peu de texte change, ou un libellé court n'a fait que gagner ou perdre des mots
+ * (« Submit » → « Submit now »), ce qu'aucun seuil proportionnel ne voit sur un ou deux mots. */
+export function retoucheFine(avant: string, apres: string, min: number): boolean {
+  if (ampleur(avant, apres) < min) return true
+  const a = mots(avant), b = mots(apres)
+  return a.length <= 3 && a.length !== b.length && communs(a, b) === Math.min(a.length, b.length)
 }
 
 const norme = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase()
@@ -118,8 +139,9 @@ export function controler(edits: EditPropose[], g: CadreGarde, portee?: Portee):
   // grandeur ») : trois mots retouchés dans un titre occuperaient le trafic des semaines pour
   // ne rien conclure. Un déplacement, un retrait, une duplication sont gros par nature.
   if (g.ampleurMin !== undefined && edits.length && edits.every((e) => e.op === "set")) {
+    const min = g.ampleurMin
     const max = Math.max(...edits.map((e) => ampleur(g.avant.get(e.anchor) ?? "", e.text ?? "")))
-    if (max < g.ampleurMin) raisons.push(`retouche trop fine pour ce volume (${Math.round(max * 100)} % du texte change, ${Math.round(g.ampleurMin * 100)} % au moins) : à ce trafic, seul un gros changement peut conclure`)
+    if (edits.every((e) => retoucheFine(g.avant.get(e.anchor) ?? "", e.text ?? "", min))) raisons.push(`retouche trop fine pour ce volume (${Math.round(max * 100)} % du texte change, ${Math.round(g.ampleurMin * 100)} % au moins) : à ce trafic, seul un gros changement peut conclure`)
   }
   return raisons
 }
