@@ -105,7 +105,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   // 4. écrire
   if (opts.sansVariantes) return { d, variantes: [] }
   const langue = langueDe(await readFile(f.capture, "utf8"))
-  const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue))
+  const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime))
   const propositions = versPropositions(variantes, d.tests)
   // les refus du buyer restent : ils sont la mémoire de ce qu'il ne veut pas (feuille de route 4.1)
   const refusees = (await lireJson<Proposition[]>(f.propositions, [])).filter((p) => p.refusee && !propositions.some((n) => n.nom === p.nom))
@@ -138,7 +138,7 @@ export async function decliner(campagne: string, source: string, opts: { n?: num
   step(SCOPE, `décliner « ${p.titre} » : ${n} variante(s) sur ${k.id}${consigne ? ` · consigne : ${consigne}` : ""} · ${deja.length} écriture(s) déjà proposée(s)`)
 
   const langue = langueDe(await readFile(f.capture, "utf8"))
-  const variantes = await timed(SCOPE, "écriture des déclinaisons (sur le plan)", () => ecrireVariantes(campagne, [k], m, ctx, langue, { n, consigne, deja }))
+  const variantes = await timed(SCOPE, "écriture des déclinaisons (sur le plan)", () => ecrireVariantes(campagne, [k], m, ctx, langue, d.regime, { n, consigne, deja }))
   const nouvelles = versPropositions(variantes, d.tests, { declineDe: source, ...(consigne ? { consigne } : {}) })
   // relues juste avant d'écrire : le buyer a pu refuser ou lancer une proposition pendant l'écriture
   const maintenant = await lireJson<Proposition[]>(f.propositions, [])
