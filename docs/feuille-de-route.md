@@ -302,7 +302,7 @@ maintenant et qui coûteront très cher à rattraper.
 
 ## 4.5 · Faire vivre la knowledge base
 - ✅ Tracer quelle règle a produit quelle variante et quel résultat *(`regle` dans chaque expérience)*
-- ⬜ Une règle qui perd plusieurs fois perd de la confiance ; une règle qui gagne en gagne
+- ✅ Une règle qui perd plusieurs fois perd de la confiance ; une règle qui gagne en gagne *(`bilanRegles` : comptes seulement, tous clients ; score × (gagnés+1)/(perdus+1) borné à [½, 1,5], à partir de deux tests tranchés)*
 - ⬜ Relire la KB à chaque nouvelle recherche
 
 ---

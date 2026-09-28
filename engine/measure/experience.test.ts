@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ecrireJson, lireJson } from "../shared/json.ts"
 import { campagne, type Experience, type Test } from "../shared/campagne.ts"
-import { aEviter, enregistrerExperiences, historique, marquerDeploye, planAuLancement, retirerExperience } from "./experience.ts"
+import { aEviter, bilanRegles, enregistrerExperiences, historique, marquerDeploye, planAuLancement, retirerExperience } from "./experience.ts"
 
 async function client() {
   const racine = await mkdtemp(join(tmpdir(), "lpws-exp-"))
@@ -80,5 +80,25 @@ test("journal : déployer un test déjà arrêté ne relit pas les chiffres ; an
   assert.equal(e.controle!.n, 15_000, "les chiffres de l'arrêt restent")
   await retirerExperience(dir, t)
   assert.deepEqual(await lireJson<Experience[]>(f.experiences, []), [])
+  await rm(racine, { recursive: true })
+})
+
+test("bilanRegles : des comptes par règle, tous clients, seules les conclusions tranchées pèsent", async () => {
+  const racine = await mkdtemp(join(tmpdir(), "lpws-bilan-"))
+  const ligne = (regle: string, conclusion: Experience["conclusion"], n: number): Experience => ({
+    test: `t${n}`, titre: "t", teste: "t", pourquoi: "p", edits: [], part: 50, lanceLe: `2026-09-0${n}T00:00:00Z`, arreteLe: "2026-09-28T00:00:00Z",
+    controle: null, variante: null, luLe: null, source: null, hausse: null, conclusion, regle, verdict: "v", deploye: false,
+  })
+  for (const [client, lignes] of [
+    ["acme", [ligne("mm-titre", "perdant", 1), ligne("mm-titre", "trop tôt", 2), ligne("cta", "gagnant", 3)]],
+    ["globex", [ligne("mm-titre", "perdant", 4), ligne("mm-titre", "non concluant", 5)]],
+  ] as const) {
+    const dir = join(racine, client, "search")
+    await mkdir(dir, { recursive: true })
+    await ecrireJson(campagne(dir).experiences, lignes)
+  }
+  const b = await bilanRegles(racine)
+  assert.deepEqual(b.get("mm-titre"), { gagnes: 0, perdus: 2, nuls: 1, clients: 2 })
+  assert.deepEqual(b.get("cta"), { gagnes: 1, perdus: 0, nuls: 0, clients: 1 })
   await rm(racine, { recursive: true })
 })
