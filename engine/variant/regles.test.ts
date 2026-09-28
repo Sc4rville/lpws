@@ -1,6 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { diagnostiquer } from "./diagnostic.ts"
+import { chargerRegles, QUAND, REGLES } from "./regles.ts"
 import { Contexte } from "./contexte.ts"
 import type { SignauxMecaniques } from "./signaux.ts"
 
@@ -87,4 +89,29 @@ test("bouton générique : un « Submit » en bas de page suffit, pas seulement 
   const m = base()
   m.ctas = [{ anchor: "e13", texte: "Get a demo", href: "#", y: 400, auDessusDuPli: true }, { anchor: "e67", texte: "Submit", href: "", y: 2800, auDessusDuPli: false }]
   assert.ok(ids(diagnostiquer({ m, j: null }, saas)).tests.includes("sea-cta-generique"))
+})
+
+const brutes = (): Array<Record<string, unknown>> => JSON.parse(readFileSync(new URL("./regles.json", import.meta.url), "utf8"))
+
+test("regles.json : chaque faute de la base arrête le chargement, en nommant la règle", () => {
+  const casse = (f: (rs: Array<Record<string, unknown>>) => void, attendu: RegExp, quand = QUAND) => {
+    const rs = brutes(); f(rs)
+    assert.throws(() => chargerRegles(rs, quand), attendu)
+  }
+  casse((rs) => { rs[0].impact = 7 }, /mm-promesse-titre impact/)
+  casse((rs) => { delete rs[0].test }, /mm-promesse-titre test un test, et seulement un test/)
+  casse((rs) => { (rs[0].test as { verbes: string[] }).verbes = ["rewrite"] }, /mm-promesse-titre test\.verbes\.0/)
+  casse((rs) => { rs[0].famille = "vp" }, /mm-promesse-titre id l'id commence par sa famille/)
+  casse((rs) => { rs[0].sourcse = ["cxl"] }, /mm-promesse-titre/)
+  casse((rs) => { rs.push({ ...rs[0] }) }, /mm-promesse-titre en double/)
+  casse((rs) => { rs.push({ ...rs[0], id: "mm-nouvelle" }) }, /mm-nouvelle sans déclencheur/)
+  casse(() => {}, /déclencheur mm-fantome sans règle/, { ...QUAND, "mm-fantome": () => null })
+  assert.equal(chargerRegles(brutes()).length, REGLES.length)
+})
+
+test("regles.json : chaque source citée au buyer est décrite dans docs/brain.html", () => {
+  const html = readFileSync(new URL("../../docs/brain.html", import.meta.url), "utf8")
+  const connues = new Set([...html.matchAll(/^\s*"([a-z0-9-]+)":\{nom:/gm)].map((x) => x[1]))
+  const inconnues = REGLES.flatMap((r) => r.sources.filter((x) => !connues.has(x)).map((x) => `${r.id} : ${x}`))
+  assert.deepEqual(inconnues, [])
 })
