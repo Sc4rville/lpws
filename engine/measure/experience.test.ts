@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { ecrireJson, lireJson } from "../shared/json.ts"
 import { campagne, type Experience, type Test } from "../shared/campagne.ts"
-import { aEviter, enregistrerExperiences, historique, planAuLancement } from "./experience.ts"
+import { aEviter, enregistrerExperiences, historique, marquerDeploye, planAuLancement, retirerExperience } from "./experience.ts"
 
 async function client() {
   const racine = await mkdtemp(join(tmpdir(), "lpws-exp-"))
@@ -64,5 +64,21 @@ test("journal : un gagnant déployé reste « déployé » quand l'original est 
   const [r] = await enregistrerExperiences(dir, [test_({ ...lance, etat: "stop", part: 0 })])
   assert.equal(r.deploye, true)
   assert.equal((await lireJson<Experience[]>(f.experiences, [])).length, 1)
+  await rm(racine, { recursive: true })
+})
+
+test("journal : déployer un test déjà arrêté ne relit pas les chiffres ; annuler un arrêt retire la ligne", async () => {
+  const { racine, dir, f } = await client()
+  await ecrireJson(f.resultats, { luLe: "2026-09-28T00:00:00Z", versions: { controle: { n: 15_000, c: 450 }, "titre-annonce": { n: 15_000, c: 545 } } })
+  const t = test_({ lanceLe: "2026-09-01T00:00:00Z", finLe: "2026-09-28T00:00:00Z" })
+  await enregistrerExperiences(dir, [t])
+  // une mesure plus tard (d'un autre test) change le snapshot
+  await ecrireJson(f.resultats, { luLe: "2026-10-05T00:00:00Z", versions: { controle: { n: 30_000, c: 900 }, "titre-annonce": { n: 15_000, c: 545 } } })
+  assert.ok(await marquerDeploye(dir, { ...t, etat: "gagnant" }))
+  const [e] = await lireJson<Experience[]>(f.experiences, [])
+  assert.equal(e.deploye, true)
+  assert.equal(e.controle!.n, 15_000, "les chiffres de l'arrêt restent")
+  await retirerExperience(dir, t)
+  assert.deepEqual(await lireJson<Experience[]>(f.experiences, []), [])
   await rm(racine, { recursive: true })
 })

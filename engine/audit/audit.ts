@@ -1,6 +1,6 @@
 /**
  * audit.ts — L'AUDIT TRACKING GRATUIT : la vraie page, ouverte comme un clic Google Ads l'ouvre
- * (docs/business-model-rapport.md §6, module 1 ; feuille de route 3.2).
+ * (docs/recherche/business-model.md §6, module 1 ; feuille de route 3.2).
  *
  * C'est l'entrée du palier gratuit : il sert AVANT tout test, ne demande aucun accès, et trouve
  * presque toujours quelque chose (Bamboo : la redirection http → https perdait le gclid). On

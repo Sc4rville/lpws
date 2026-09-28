@@ -116,7 +116,7 @@ createServer(async (req, res) => {
     if (p === "/api/compte/essai" && req.method === "POST") { await ecrireCompte(demarrerEssai(await lireCompte(FICHIER_COMPTE)), FICHIER_COMPTE); return json(res, 200, await resumeCompte()) }
     if (p === "/api/compte/abonnement" && req.method === "POST") {
       const b = await body(req)
-      const retour = String(req.headers.origin ?? `http://${req.headers.host}`)
+      const retour = process.env.LPWS_URL_PUBLIQUE ?? `http://${req.headers.host}`
       const c0 = await lireCompte(FICHIER_COMPTE)
       const s = await sessionPaiement(c0, b.palier, retour)
       await ecrireCompte({ ...c0, stripe: { ...c0.stripe, session: s.id } }, FICHIER_COMPTE)
@@ -148,7 +148,7 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
         const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50)
+        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50, b.reprise === true)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })

@@ -75,3 +75,15 @@ test("diffParSection : une section hors de la preuve n'est pas jugée", async ()
   assert.deepEqual(r.nonJugees, ["s2"])
   await rm(dir, { recursive: true })
 })
+
+test("diffParSection : une section absente du clone laisse une rupture, pas un simple décalage", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-diff-"))
+  const live = join(dir, "live.png"), clone = join(dir, "clone.png")
+  await writeFile(live, PNG.sync.write(page([{ h: 300, graine: 1 }, { h: 300, graine: 2 }, { h: 300, graine: 3 }])))
+  // B manque : A et C, chacune recalée, passent
+  await writeFile(clone, PNG.sync.write(page([{ h: 300, graine: 1 }, { h: 300, graine: 3 }])))
+  const r = await diffParSection(live, clone, bandesDe([300, 300]), 0.03)
+  assert.ok(r.sections.every((s) => s.fidele), JSON.stringify(r.sections.map((s) => [s.anchor, s.decalage, s.ratio])))
+  assert.deepEqual(r.ruptures.map((x) => [x.avant, x.delta]), [["s2", 300]])
+  await rm(dir, { recursive: true })
+})

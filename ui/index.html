@@ -752,7 +752,8 @@ function entreeVerdict(c, t) {
   return { o: t.res && t.res.o, v: t.res && t.res.v, jours: t.jours || 0,
     part: plan ? plan.part : (t.part > 0 && t.part < 100 ? t.part / 100 : .5),
     tauxBase: plan && !plan.tauxSuppose ? plan.tauxBase : ctx.tauxConversion ? ctx.tauxConversion / 100 : null,
-    mde: plan ? plan.mde : STATS.mdePour(vm), visiteursJour: vm ? vm / 30.4 : null };
+    mde: plan ? plan.mde : STATS.mdePour(vm), visiteursJour: vm ? vm / 30.4 : null,
+    cible: plan ? { controle: plan.controle, variante: plan.variante } : null };
 }
 /** le verdict, dans ses mots : un horizon fixé d'avance, pas une certitude qu'on regarde monter */
 function verdict(c, t) {
@@ -1024,7 +1025,7 @@ function vTest(c) {
   const url = previewUrl(c, t);
   const o = imgOf(c), v = imgTest(c, t);
   const ex = c.connexion.express;
-  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="0" max="100" step="5" value="${t.part}" aria-label="Part du trafic"><span class="v" id="partv">${t.part} %</span></label>` : '';
+  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="5" max="95" step="5" value="${t.part}" aria-label="Part du trafic"${live && c.live ? ' disabled title="La part d’un test en cours ne change pas : arrêtez-le puis relancez-le"' : ''}><span class="v" id="partv">${t.part} %</span></label>` : '';
   const principal = t.etat === 'prep' ? `<button class="btn lg" disabled>${I.clock(16)}En préparation</button>`
     : t.etat === 'echec' ? `<button class="btn lg" data-go="view:nouveau">${I.sparkle(16)}Refaire un test</button>`
     : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}" title="Annulable pendant quelques secondes">${I.stop(16)}Arrêter : l’original reprend 100 %</button>`
@@ -1522,7 +1523,7 @@ function vSuivi(c) {
       <div class="card"><h3>Mandat <span class="r">${c.mandat ? '<span class="chip ok"><span class="dot"></span>Déclaré</span>' : '<span class="chip warn"><span class="dot"></span>À déclarer</span>'}</span></h3>${mandat}</div>
       <div class="card"><h3>Surveillance <span class="r">${s ? `<span class="chip">${s.releves} relevé${s.releves > 1 ? 's' : ''}</span>` : '<span class="chip">aucun relevé</span>'}</span></h3>
         ${s ? `<dl class="kv"><dt>Dernier relevé</dt><dd>${esc(new Date(s.dernier).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</dd><dt>LCP mobile</dt><dd>${s.lcpMs ? (s.lcpMs / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' s' : '—'}</dd><dt>Annonce ↔ page</dt><dd>${s.concordance === null ? 'décrivez la campagne pour la mesurer' : pct(s.concordance, 0)}</dd></dl>
-          <div class="tbl" style="--cols:minmax(100px,1fr) 56px 92px 44px;margin-top:14px"><div class="tr h"><span>Relevé</span><span class="num">LCP</span><span class="num">Concordance</span><span>gclid</span></div>${s.serie.slice().reverse().map(r => `<div class="tr"><span>${esc(new Date(r.quand).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</span><span class="num">${r.lcpMs ? (r.lcpMs / 1000).toFixed(1) + ' s' : '—'}</span><span class="num">${r.concordance === null ? '—' : pct(r.concordance, 0)}</span><span>${r.gclid ? 'ok' : '<b style="color:var(--bad)">perdu</b>'}</span></div>`).join('')}</div>`
+          <div class="tbl" style="--cols:minmax(100px,1fr) 56px 92px 44px;margin-top:14px"><div class="tr h"><span>Relevé</span><span class="num">LCP</span><span class="num">Concordance</span><span>gclid</span></div>${s.serie.slice().reverse().map(r => `<div class="tr"><span>${esc(new Date(r.quand).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</span><span class="num">${r.lcpMs ? (r.lcpMs / 1000).toFixed(1) + ' s' : '—'}</span><span class="num">${r.concordance === null ? '—' : pct(r.concordance, 0)}</span><span>${r.statut === 0 || r.statut >= 400 ? '<b style="color:var(--bad)">HS</b>' : r.gclid ? 'ok' : '<b style="color:var(--bad)">perdu</b>'}</span></div>`).join('')}</div>`
           : '<p>Le premier relevé fixe la référence : ensuite, chaque changement (balise disparue, gclid perdu, page ralentie, titre modifié, annonce qui ne colle plus) devient une alerte.</p>'}
       </div>
     </div>
@@ -1686,13 +1687,14 @@ const MSG_ETAT = {
   stop: ['Arrêt demandé : l’original reprend 100 %, ~15 s', () => 'Arrêté : l’original reprend 100 % du trafic', 'L’arrêt n’a pas été publié'],
   gagnant: ['Déploiement : la balise se met à jour, ~15 s', () => 'Gagnant déployé sur 100 % du trafic', 'Le déploiement n’a pas été publié'],
 };
-function publier(c, t, etat, part, annulable = true) {
+function publier(c, t, etat, part, annulable = true, reprise = false) {
   const cid = c.id, tid = t.id;
   // déployer ne s'annule pas en relançant le test (ce serait repartir de zéro) : « Remettre l'original » existe pour ça
   const inv = etat === 'gagnant' ? null : etat === 'stop' && t.etat === 'gagnant' ? 'gagnant' : etat === 'live' ? 'stop' : 'live';
-  const inverse = annulable && inv ? () => publier(byId(cid), byId(cid).tests.find(x => x.id === tid), inv, part, false) : null;
+  // annuler un arrêt reprend le même test (même lancement, même horizon)
+  const inverse = annulable && inv ? () => publier(byId(cid), byId(cid).tests.find(x => x.id === tid), inv, part, false, inv === 'live') : null;
   const [avant, ok, ko] = MSG_ETAT[etat];
-  api(`/api/clients/${cid}/tests/${tid}`, etat === 'live' ? { etat, part } : { etat }).then(async r => {
+  api(`/api/clients/${cid}/tests/${tid}`, etat === 'live' ? { etat, part, reprise } : { etat }).then(async r => {
     toast(avant, inverse);
     await chargerEtat(); render();
     suivreJob(r.job, async j => { toast(j.etat === 'ok' ? ok(part) : ko, j.etat === 'ok' ? inverse : null); await chargerEtat(); render(); });
@@ -1855,7 +1857,8 @@ document.addEventListener('change', e => {
   if (e.target.id !== 'part') return;
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
   if (!t || t.etat !== 'live') return;
-  if (c.live) { publier(c, t, 'live', t.part, false); return; }
+  // en ligne, la part d'un test en cours est figée (curseur désactivé) : le serveur refuserait
+  if (c.live) return;
   const m = document.getElementById('main'), y = m.scrollTop, focus = document.activeElement === e.target;
   toast(`${t.part} % des visiteurs voient maintenant la variante`); render(); m.scrollTop = y;
   if (focus) document.getElementById('part').focus({ preventScroll: true });

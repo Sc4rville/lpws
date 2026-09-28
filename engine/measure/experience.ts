@@ -29,7 +29,7 @@ type Ctx = { visiteursMois?: number; tauxConversion?: number } | null
 const Z95 = 1.96
 
 /** L'intervalle à 95 % de la hausse relative de la variante, ou null si l'original n'a rien converti. */
-export function hausse(o: Compte | null, v: Compte | null): Experience["hausse"] {
+function hausse(o: Compte | null, v: Compte | null): Experience["hausse"] {
   if (!o || !v || o.n <= 0 || v.n <= 0) return null
   const p1 = o.c / o.n, p2 = v.c / v.n
   if (p1 <= 0) return null
@@ -52,9 +52,9 @@ export async function planAuLancement(dir: string, part: number): Promise<NonNul
   return { tauxBase: p.tauxBase, tauxSuppose: p.tauxSuppose, mde: p.mde, part, controle: p.controle, variante: p.variante, jours: p.jours }
 }
 
-/** L'original et la variante d'un test, comptés sur sa fenêtre quand la mesure l'a fournie. */
-export function comptes(res: Resultats | null, id: string): { o: Compte | null; v: Compte | null } {
-  const p = res?.parTest?.[id]
+/** L'original et la variante d'un test, comptés sur la fenêtre de ce lancement quand la mesure l'a fournie. */
+export function comptes(res: Resultats | null, id: string, lanceLe?: string): { o: Compte | null; v: Compte | null } {
+  const p = (lanceLe ? res?.archives?.[`${id}@${lanceLe}`] : undefined) ?? res?.parTest?.[id]
   if (p) return { o: p.controle, v: p.variante }
   return { o: res?.versions?.controle ?? null, v: res?.versions?.[id] ?? null }
 }
@@ -64,7 +64,7 @@ export async function verdictDe(dir: string, t: Test, maintenant = new Date().to
   const f = fichiersDe(dir)
   const res = await lireJson<Resultats | null>(f.resultats, null)
   const ctx = await lireJson<Ctx>(f.contexte, null)
-  const { o, v } = comptes(res, t.id)
+  const { o, v } = comptes(res, t.id, t.lanceLe)
   const verdict = juger({
     o, v, jours: t.lanceLe ? joursEntre(t.lanceLe, t.finLe ?? maintenant) : 0,
     // la part pendant la collecte : celle du plan, pas les 100 % d'un gagnant déployé
@@ -72,6 +72,7 @@ export async function verdictDe(dir: string, t: Test, maintenant = new Date().to
     tauxBase: t.plan && !t.plan.tauxSuppose ? t.plan.tauxBase : ctx?.tauxConversion ? ctx.tauxConversion / 100 : null,
     mde: t.plan?.mde ?? mdePour(ctx?.visiteursMois),
     visiteursJour: visiteursJour(ctx),
+    cible: t.plan ? { controle: t.plan.controle, variante: t.plan.variante } : null,
   })
   return { verdict, o, v, res }
 }
@@ -94,7 +95,8 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
       lanceLe: t.lanceLe, arreteLe: fin, controle: o, variante: v,
       luLe: res?.luLe ?? null, source: res ? res.source ?? "ga4" : null,
       hausse: hausse(o, v), conclusion: CONCLUSION[verdict.k],
-      regle: spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle,
+      // la règle archivée est celle du lancement : une spec régénérée depuis n'y touche pas
+      regle: (i >= 0 ? journal[i].regle : undefined) ?? spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle ?? t.regle,
       plan: t.plan, verdict: `${verdict.titre}. ${verdict.detail}.`,
       // remettre l'original après un déploiement ne réécrit pas l'histoire : il a été déployé
       deploye: t.etat === "gagnant" || (i >= 0 && journal[i].deploye === true),
@@ -104,6 +106,25 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
   }
   await ecrireJson(f.experiences, journal)
   return nouvelles
+}
+
+/** Un test déjà arrêté puis déployé : seul le drapeau change, ses chiffres restent ceux de l'arrêt. */
+export async function marquerDeploye(dir: string, t: Test): Promise<boolean> {
+  const f = fichiersDe(dir)
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  const e = journal.find((x) => x.test === t.id && x.lanceLe === t.lanceLe)
+  if (!e) return false
+  e.deploye = true
+  await ecrireJson(f.experiences, journal)
+  return true
+}
+
+/** Un arrêt annulé : le test reprend, son expérience n'est pas finie. */
+export async function retirerExperience(dir: string, t: Test): Promise<void> {
+  const f = fichiersDe(dir)
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  const reste = journal.filter((x) => !(x.test === t.id && x.lanceLe === t.lanceLe))
+  if (reste.length !== journal.length) await ecrireJson(f.experiences, reste)
 }
 
 export type Refus = { regle: string; raison: string; le?: string }

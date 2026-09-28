@@ -63,3 +63,21 @@ attribution perdue ne se rattrape pas rétroactivement.
   rapprocher de `resources.json` avant toute mise en ligne.
 - Voie **Shopify** non concernée : là-bas la variante est un template natif du thème, la
   mesure et le panier restent ceux du client (cf. feuille de route 1.3).
+
+## Natif (Shopify) — à construire, le contrat est prêt
+
+Validé hors ligne sur le thème Dawn le 2026-09-17 (spike jetable) : une variante = un
+template JSON alternatif `product.<suffixe>.json`, ouvert par `?view=<suffixe>`. Panier,
+paiement, pixels et apps restent ceux du client. La spec est validée contre les
+`{% schema %}` du thème avant écriture (Theme Check ne détecte qu'une erreur sur quatre).
+
+| verbe | opération sur le template |
+|---|---|
+| `set` | `sections.<id>.settings.<clé>`, ou `.blocks.<bloc>.settings.<clé>` |
+| `remove` | retirer de `order` / `block_order` + supprimer l'entrée · refus si type `main-*` |
+| `move` · `swap` | réordonner `order` / `block_order` |
+| `duplicate` | copier l'entrée sous une nouvelle clé alphanumérique |
+| `add` | entrée `{type, settings, blocks, block_order}` — le type doit avoir un `presets` |
+
+Limites Shopify : 25 sections par template, 50 blocs par section, 1 000 templates par thème.
+Header/footer = groupes de sections du layout ; avis = blocs `@app`.

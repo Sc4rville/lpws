@@ -13,7 +13,12 @@ import { ROOT } from "./config.ts"
 import { type Job, jobs, nouveauJob, dire, finir } from "./jobs.ts"
 import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
 
+/** Un audit ouvre un Chromium : au-delà, la requête attend son tour côté buyer. */
+const AUDITS_SIMULTANES = 2
+
 export function lancerAudit(url: string, cible: string): Job {
+  if ([...jobs.values()].filter((j) => (j.type === "audit" || j.type === "surveillance") && j.etat === "en cours").length >= AUDITS_SIMULTANES)
+    throw Object.assign(new Error("Deux relevés tournent déjà : réessayez dans une minute."), { code: 429 })
   const job = nouveauJob("audit")
   ;(async () => {
     try {

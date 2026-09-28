@@ -96,7 +96,7 @@ npm run couts
 
 Variables optionnelles de l'interface : `LPWS_FACTURATION=1` (appliquer les paliers),
 `LPWS_SURVEILLANCE=1` (relevés automatiques), `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` ·
-`STRIPE_PRIX_*` (paiement ; sans elles, l'interface le dit).
+`STRIPE_PRIX_*` (paiement ; sans elles, l'interface le dit), `LPWS_URL_PUBLIQUE` (retour après paiement).
 
 État d'avancement du clonage : [engine/clone/readme.md](engine/clone/readme.md).
 

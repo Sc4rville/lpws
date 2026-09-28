@@ -58,7 +58,11 @@ export function campagne(dir: string) {
     alertes: join(dir, "surveillance", "alertes.json"),
   }
 }
-export type Campagne = ReturnType<typeof campagne>
+
+const Plan = z.object({
+  tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(),
+  controle: z.number(), variante: z.number(), jours: z.number().nullable(),
+})
 
 /** Un test du buyer : une variante, sa part de trafic, son cycle de vie. */
 export const Test = z.object({
@@ -73,10 +77,9 @@ export const Test = z.object({
   /** la fin de la collecte (arrêt ou déploiement) : le verdict archivé se lit à cette date */
   finLe: z.string().optional(),
   /** l'horizon fixé AU LANCEMENT (engine/measure/stats.ts) : on ne le recalcule pas en regardant */
-  plan: z.object({
-    tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(),
-    controle: z.number(), variante: z.number(), jours: z.number().nullable(),
-  }).optional(),
+  plan: Plan.optional(),
+  /** les lancements terminés qu'une relance a remplacés : leur fenêtre reste mesurable même sans ligne au journal */
+  anciens: z.array(z.object({ lanceLe: z.string(), finLe: z.string(), part: z.number(), plan: Plan.optional() })).optional(),
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),

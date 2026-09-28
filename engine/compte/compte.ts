@@ -1,12 +1,11 @@
 /**
  * compte.ts — LE COMPTE DU BUYER : son palier, son essai, son code partenaire, sa marque (pour
- * le rapport en marque blanche) et ses MANDATS (docs/business-model-rapport.md §4–7 ;
+ * le rapport en marque blanche) et ses MANDATS (docs/recherche/business-model.md §4–7 ;
  * feuille de route 3.4, 3.5, 3.6).
  *
  * Une instance LPWS = un compte buyer (clients/compte.json). Le multi-utilisateur (plusieurs
- * buyers d'une agence, des droits par personne) est une décision d'hébergement encore ouverte
- * (ETAT.md) : ce module en pose le contrat — ce qu'un compte a le droit de faire — sans
- * l'inventer.
+ * buyers d'une agence, des droits par personne) est une décision d'hébergement encore ouverte :
+ * ce module en pose le contrat — ce qu'un compte a le droit de faire — sans l'inventer.
  *
  * LE MANDAT n'est pas une option : un buyer ne met rien en ligne sur la page d'un client qui ne
  * l'a pas mandaté (§7 : c'est ce qui distingue l'Atelier d'un outil de scraping). Il le déclare
@@ -45,19 +44,26 @@ export const Compte = z.object({
 })
 export type Compte = z.infer<typeof Compte>
 
-export const FICHIER_COMPTE = join(CLIENTS_ROOT, "compte.json")
+const FICHIER_COMPTE = join(CLIENTS_ROOT, "compte.json")
 export const VERSION_CONDITIONS = "2026-09"
 export const DECLARATION_MANDAT = (client: string, par: string) =>
   `Je déclare être mandaté par ${client} (mandat donné par ${par}) pour tester des versions de ses pages, installer la balise LPWS sur son site et lire les données de performance nécessaires à la mesure. Je m'engage à retirer la balise à la fin du mandat.`
 
+/** Le compte, ou un compte neuf si le fichier n'existe pas. Un fichier existant mais invalide lève : on ne l'écrase pas. */
 export async function lireCompte(f = FICHIER_COMPTE): Promise<Compte> {
-  const r = Compte.safeParse(await lireJson<unknown>(f, {}))
-  return r.success ? r.data : Compte.parse({})
+  if (!existsSync(f)) return Compte.parse({})
+  const r = Compte.safeParse(await lireJson<unknown>(f, null))
+  if (!r.success) throw new Error(`${f} illisible, rien n'est écrit tant qu'il n'est pas corrigé : ${r.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ")}`)
+  return r.data
 }
 export async function ecrireCompte(c: Compte, f = FICHIER_COMPTE): Promise<void> { await ecrireJson(f, Compte.parse(c)) }
 
-/** Le palier en vigueur : l'essai en cours l'emporte sur l'Atelier, jamais sur un palier payé. */
-export function palierEnVigueur(c: Compte, maintenant = Date.now()): Palier & { enEssai: boolean; joursEssai: number | null } {
+/** Statuts d'abonnement Stripe qui ouvrent le palier payé ; `past_due` : Stripe relance encore le paiement. */
+const ABONNEMENT_OUVERT = ["active", "trialing", "past_due"]
+
+/** Le palier en vigueur : l'essai en cours l'emporte sur l'Atelier, jamais sur un palier payé. Un abonnement Stripe impayé ou suspendu ramène à l'Atelier. */
+export function palierEnVigueur(c0: Compte, maintenant = Date.now()): Palier & { enEssai: boolean; joursEssai: number | null } {
+  const c = c0.stripe?.statut && !ABONNEMENT_OUVERT.includes(c0.stripe.statut) ? { ...c0, palier: "atelier" as const } : c0
   const essai = c.essai && Date.parse(c.essai.fin) > maintenant
   const joursEssai = essai ? Math.ceil((Date.parse(c.essai!.fin) - maintenant) / 86_400_000) : null
   if (c.palier === "atelier" && essai) return { ...PALIERS[PALIER_ESSAI], enEssai: true, joursEssai }
@@ -118,5 +124,3 @@ export function factureDuMois(c: Compte, actifs: number): { total: number | null
   const total = base + enPlus * (p.parClientEnPlus ?? 0)
   return { total, detail: `${p.nom} ${base} $${enPlus ? ` + ${pl(enPlus, "client")} × ${p.parClientEnPlus} $` : ""} · ${pl(actifs, "client")} ${actifs > 1 ? "actifs" : "actif"} ce mois-ci` }
 }
-
-export type { IdPalier }

@@ -3,7 +3,7 @@
  *
  * « Ce titre nomme-t-il une catégorie ou un résultat ? », « la promesse de l'annonce est-elle
  * dans le titre ? » : ce sont des questions de sens, pas de comptage. On les pose à un modèle,
- * mais dans la forme décidée dès ETAT.md : une liste de QUESTIONS TYPÉES INDÉPENDANTES, chacune
+ * mais dans la forme actée (docs/architecture.md, « capteur / raisonnement ») : une liste de QUESTIONS TYPÉES INDÉPENDANTES, chacune
  * avec un type de sortie déclaré et une confiance. Pas de prose, pas d'explication demandée au
  * modèle : l'explication vient de la règle, jamais de lui.
  *

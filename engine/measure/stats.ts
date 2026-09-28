@@ -26,7 +26,7 @@
 
 export type Branche = { n: number; c: number }
 
-export const REGLES = {
+const REGLES = {
   alpha: 0.05,
   puissance: 0.8,
   /** |z| au-delà duquel on peut s'arrêter avant l'horizon (≈ p < 0,003) */
@@ -174,12 +174,18 @@ export type EntreeVerdict = {
   mde?: number | null
   /** trafic attendu avant d'avoir des données (visiteurs par mois / 30) */
   visiteursJour?: number | null
+  /** l'échantillon par version figé au lancement : s'il est là, c'est lui qui donne le volume */
+  cible?: { controle: number; variante: number } | null
 }
 
 export function juger(e: EntreeVerdict): Verdict {
   const part = e.part > 0 && e.part < 1 ? e.part : 0.5
   const { o, v } = e
-  const planInitial = planifier({ tauxBase: e.tauxBase, mde: e.mde, part, visiteursJour: e.visiteursJour })
+  // une cible nulle ou infinie (part de 0 ou 100 %, sérialisée en null) ne fige rien
+  const valide = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x > 0
+  const cible = e.cible && valide(e.cible.controle) && valide(e.cible.variante) ? e.cible : null
+  const fige = (p: Plan): Plan => cible ? { ...p, controle: cible.controle, variante: cible.variante } : p
+  const planInitial = fige(planifier({ tauxBase: e.tauxBase, mde: e.mde, part, visiteursJour: e.visiteursJour }))
   const vide = { jalons: { conv: false, vol: false, duree: false, net: false }, progression: 0, joursRestants: planInitial.jours, anticipe: false, stats: null, plan: planInitial, srm: null }
   if (!o || !v || o.n <= 0 || v.n <= 0)
     return { k: "attente", titre: "En attente des premières données", detail: "Les conversions arrivent de GA4, en général le lendemain", ...vide }
@@ -188,10 +194,10 @@ export function juger(e: EntreeVerdict): Verdict {
   const srm = repartition(o, v, part)
   const jours = Math.max(0, e.jours)
   const convTotal = o.c + v.c
-  // ré-estimation à l'aveugle : le taux global, jamais l'écart
-  const tauxBase = convTotal >= REGLES.convMin ? convTotal / (o.n + v.n) : e.tauxBase
+  // sans plan figé (test d'avant les plans) : ré-estimation à l'aveugle, le taux global, jamais l'écart
+  const tauxBase = !cible && convTotal >= REGLES.convMin ? convTotal / (o.n + v.n) : e.tauxBase
   const vjObs = jours >= 1 ? (o.n + v.n) / jours : e.visiteursJour ?? null
-  const plan = planifier({ tauxBase, mde: e.mde, part, visiteursJour: vjObs })
+  const plan = fige(planifier({ tauxBase, mde: e.mde, part, visiteursJour: vjObs }))
   const progression = Math.min(1, o.n / plan.controle, v.n / plan.variante)
   const conv = Math.min(o.c, v.c) >= REGLES.convMin
   const vol = progression >= 1

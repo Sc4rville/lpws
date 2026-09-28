@@ -24,19 +24,95 @@ test("comptes : la fenêtre du test d'abord, le cumul sinon", () => {
   assert.deepEqual(comptes(res, "a").o, { n: 10_000, c: 300 })
 })
 
+const T = (x: Partial<Test> = {}): Test => ({ id: "titre-oriente-benefice", titre: "Titre", teste: "t", pourquoi: "p", etat: "stop", part: 50,
+  creeLe: "2026-09-01T00:00:00Z", lanceLe: "2026-09-02T10:00:00Z", finLe: "2026-09-20T10:00:00Z", edits: [], ...x })
+
+/** Un faux GA4 : 1 000 sessions par branche, 30 et `c` conversions selon la fenêtre demandée. */
+const ga4 = (c: (depuis: string, jusqua: string) => number) => async (depuis: string, jusqua: string) => [
+  { version: "controle", sessions: 1_000, conversions: 30 },
+  { version: "titre-oriente-benefice", sessions: 1_000, conversions: c(depuis, jusqua) },
+]
+
 test("mesurer : fenêtre par test, et un test arrêté se relit tant que GA4 n'a pas fini de compter", async () => {
   const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
   const f = campagne(dir)
-  const t: Test = { id: "titre-oriente-benefice", titre: "Titre", teste: "t", pourquoi: "p", etat: "stop", part: 50,
-    creeLe: "2026-09-01T00:00:00Z", lanceLe: "2026-09-02T10:00:00Z", finLe: "2026-09-20T10:00:00Z", edits: [] }
+  const t = T()
   await ecrireJson(f.tests, [t])
   await enregistrerExperiences(dir, [t])
   assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].conclusion, "sans données")
-  const res = await mesurer(dir, true)
-  assert.deepEqual(res.parTest?.[t.id], { depuis: "2026-09-02", jusqua: "2026-09-20", controle: { n: 1240, c: 38 }, variante: { n: 1236, c: 51 } })
+  const res = await mesurer(dir, false, ga4(() => 51))
+  assert.deepEqual(res.parTest?.[t.id], { depuis: "2026-09-02", jusqua: "2026-09-20", controle: { n: 1_000, c: 30 }, variante: { n: 1_000, c: 51 } })
   const journal = await lireJson<Experience[]>(f.experiences, [])
   assert.equal(journal.length, 1)
-  assert.deepEqual(journal[0].variante, { n: 1236, c: 51 })
+  assert.deepEqual(journal[0].variante, { n: 1_000, c: 51 })
   assert.equal(journal[0].arreteLe, t.finLe)
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : un arrêt jamais archivé (écriture ratée) entre au journal à la mesure suivante", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  await ecrireJson(f.tests, [T()])
+  await mesurer(dir, false, ga4(() => 40))
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  assert.equal(journal.length, 1)
+  assert.deepEqual(journal[0].variante, { n: 1_000, c: 40 })
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : un lancement remplacé par une relance garde sa fenêtre et reçoit ses conversions tardives", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const ancien = T()
+  await ecrireJson(f.tests, [ancien])
+  await enregistrerExperiences(dir, [ancien])
+  await ecrireJson(f.tests, [T({ etat: "live", lanceLe: "2026-09-21T09:00:00Z", finLe: undefined })])
+  const res = await mesurer(dir, false, ga4((d) => d === "2026-09-02" ? 45 : 5))
+  assert.equal(res.archives?.[`${ancien.id}@${ancien.lanceLe}`]?.jusqua, "2026-09-20")
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  assert.equal(journal.length, 1)
+  assert.equal(journal[0].lanceLe, ancien.lanceLe)
+  assert.deepEqual(journal[0].variante, { n: 1_000, c: 45 })
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer --exemple : la réponse rejouée ne touche pas au journal", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const t = T()
+  await ecrireJson(f.tests, [t])
+  await enregistrerExperiences(dir, [t])
+  const avant = await lireJson<Experience[]>(f.experiences, [])
+  const res = await mesurer(dir, true)
+  assert.deepEqual(res.parTest?.[t.id]?.variante, { n: 1236, c: 51 })
+  assert.deepEqual(await lireJson<Experience[]>(f.experiences, []), avant)
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : un arrêt jamais archivé puis relancé garde sa fenêtre dans tests.json et entre au journal", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const ancien = T()
+  await ecrireJson(f.tests, [T({ etat: "live", lanceLe: "2026-09-21T09:00:00Z", finLe: undefined,
+    anciens: [{ lanceLe: ancien.lanceLe!, finLe: ancien.finLe!, part: 50 }] })])
+  await mesurer(dir, false, ga4((d) => d === "2026-09-02" ? 45 : 5))
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  assert.equal(journal.length, 1)
+  assert.equal(journal[0].lanceLe, ancien.lanceLe)
+  assert.equal(journal[0].arreteLe, ancien.finLe)
+  assert.deepEqual(journal[0].variante, { n: 1_000, c: 45 })
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : la relecture garde la règle archivée même si la spec a été régénérée", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const t = T()
+  await ecrireJson(f.tests, [t])
+  await ecrireJson(f.spec(t.id), { diagnostic: { regle: "prix" } })
+  await enregistrerExperiences(dir, [t])
+  await ecrireJson(f.spec(t.id), { diagnostic: { regle: "preuve" } })
+  await mesurer(dir, false, ga4(() => 45))
+  assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].regle, "prix")
   await rm(dir, { recursive: true })
 })

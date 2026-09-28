@@ -19,7 +19,10 @@ npm run corpus -- <url>…        # une autre liste
 
 Le tableau (verdict de page, diff desktop/mobile, diff recalé, sections fidèles, sections à
 revoir) sort sur stdout et dans `clients/corpus.json`. « décalage seul » = la page échoue mais
-chaque section recalée est fidèle : un bloc a changé de hauteur, rien n'est cassé.
+chaque section recalée est fidèle : le contenu en plus ou en moins est hors des sections jugées,
+et la colonne « à revoir » dit où (`+300 px avant s4` : 300 px du live absents du clone). Ce n'est
+pas un succès : une section entière manquante dans le clone donne exactement ça. Seul « fidèle »
+fait sortir la commande en 0.
 
 Les résultats vivent sous `clients/<marque>/` (gitignoré) — `atlassian/`, `asana/`, `hubspot/`, `monday/` — seuls les verdicts comptent,
 notés dans la conversation/les sessions, pas versionnés.

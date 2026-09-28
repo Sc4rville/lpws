@@ -14,7 +14,7 @@
 const VIDES = new Set(("a au aux avec ce ces dans de des du en et est la le les leur ou par pour sans sur un une vos votre "
   + "the and for with your you our are from that this into to of in on at by or an is be get").split(" "))
 
-export const mots = (s: string): string[] => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+const mots = (s: string): string[] => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .split(/[^a-z0-9%]+/).filter((m) => m.length > 1 && !VIDES.has(m))
   // pluriel et singulier se valent : « leads » = « lead »
   .map((m) => m.length > 3 && m.endsWith("s") ? m.slice(0, -1) : m)

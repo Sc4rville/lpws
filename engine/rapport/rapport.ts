@@ -1,6 +1,6 @@
 /**
  * rapport.ts — LE RAPPORT CLIENT : une page HTML autonome, prête à envoyer, par test
- * (docs/business-model-rapport.md §6 ; feuille de route 3.4, 4.1).
+ * (docs/recherche/business-model.md §6 ; feuille de route 3.4, 4.1).
  *
  * Ce qu'on a testé et pourquoi, les deux versions côte à côte, le taux de conversion et le coût
  * par conversion avant / après, la recommandation, et ce que la mémoire du client dit des tests

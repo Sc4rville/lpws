@@ -115,7 +115,7 @@ export async function etat() {
         diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0, ecartes: diag.ecartes ?? [] } : null,
         audit, alertes,
         surveillance: releves[0] ? { dernier: releves[0].quand, releves: releves.length, concordance: releves[0].concordance?.score ?? null, lcpMs: releves[0].lcpMs,
-          serie: releves.slice(0, 12).reverse().map((r) => ({ quand: r.quand, lcpMs: r.lcpMs, concordance: r.concordance?.score ?? null, gclid: r.gclid })) } : null,
+          serie: releves.slice(0, 12).reverse().map((r) => ({ quand: r.quand, lcpMs: r.lcpMs, concordance: r.concordance?.score ?? null, gclid: r.gclid, statut: r.statut })) } : null,
         mandat: compte.mandats[c] ?? null,
         propositions,
         // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini

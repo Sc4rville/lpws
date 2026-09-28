@@ -31,7 +31,7 @@ const b64url = (s: string | Buffer) =>
   Buffer.from(s).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
 
 /** Un jeton d'accès d'une heure, obtenu avec la clé du compte de service. */
-export async function jeton(sa: CompteDeService): Promise<string> {
+async function jeton(sa: CompteDeService): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const entete = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))
   const corps = b64url(JSON.stringify({
