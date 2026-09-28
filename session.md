@@ -18,6 +18,8 @@
   Paliers seulement avec `LPWS_FACTURATION=1`, surveillance auto avec `LPWS_SURVEILLANCE=1`.
 - **Interface** (`ui/`, direction dans [ui/design.md](ui/design.md)) : parcours complet prouvé sur la
   démo Relay (https://lpws-app.vercel.app/demo/).
+  Aucune « certitude » affichée : un test en ligne montre hausse, fourchette et ce qui reste avant
+  l'horizon ; le calculateur passe par `STATS.planifier` comme le lancement.
 - **Instances** : la box (https://lpws.46.225.146.226.sslip.io, service `lpws-ui`) est **la seule
   qui publie** sur `lpws-app.vercel.app` ; en local, `LPWS_SANS_VERCEL=1`.
 - **Repo rangé le 2026-09-28** : racine = readme · CLAUDE · session ; docs en `recherche/` et
