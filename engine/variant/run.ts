@@ -25,6 +25,7 @@ import { extraireSignaux, SignauxMecaniques } from "./signaux.ts"
 import { corpsDe, juger, SignauxJuges } from "./jugement.ts"
 import { diagnostiquer, type Diagnostic } from "./diagnostic.ts"
 import { ecrireVariantes } from "./variantes.ts"
+import { langueDe } from "./garde.ts"
 import { FAMILLES } from "./regles.ts"
 import { step, fail, timed } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
@@ -83,7 +84,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
 
   // 4. écrire
   if (opts.sansVariantes) return { d, variantes: [] }
-  const langue = /lang="fr/i.test(await readFile(f.capture, "utf8").then((h) => h.slice(0, 400))) ? "français" : "la langue de la page (probablement anglais)"
+  const langue = langueDe(await readFile(f.capture, "utf8"))
   const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue))
   // ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit
   const propositions = variantes.map((v) => {

@@ -52,6 +52,7 @@ export const FAMILLES: Record<Famille, string> = {
 const tous: Niche[] = ["ecom", "saas", "b2b"]
 const j = (s: Signaux) => s.j
 const chiffreDans = (t: string) => /\d/.test(t)
+const CTA_GENERIQUE = /^(submit|send|soumettre|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok|go)$/i
 
 export const REGLES: Regle[] = [
   /* ————— la promesse tenue ————— */
@@ -275,12 +276,14 @@ export const REGLES: Regle[] = [
     quand: (s) => s.m.ctas.length ? !s.m.ctaAuDessusDuPliMobile : null,
     test: { cible: "cta", verbes: ["duplicate", "move"], consigne: "Dupliquer le bouton principal juste sous le sous-titre du hero." } },
   { id: "sea-cta-generique", famille: "sea", niches: tous, impact: 3, preuve: 3, risque: 1, sortie: "test",
-    signal: "Le bouton principal dit « Envoyer », « En savoir plus » ou « Cliquez ici ».",
+    signal: "Un bouton d'action dit « Envoyer », « En savoir plus » ou « Cliquez ici ».",
     pourquoi: "Le libellé du bouton est la dernière promesse avant l'action : un verbe vide n'engage à rien.",
     action: "Dire ce que le visiteur obtient en cliquant.",
     sources: ["cxl", "unbounce"],
-    quand: (s) => s.m.ctas.length ? /^(submit|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok)$/i.test(s.m.ctas[0].texte) : null,
-    test: { cible: "cta", verbes: ["set"], consigne: "Remplacer par un libellé qui nomme le résultat (« Voir ma démo », « Commencer l'essai gratuit »)." } },
+    // tous les boutons, pas seulement le premier : le « Submit » du formulaire est souvent le
+    // dernier de la page, et c'est lui qui convertit
+    quand: (s) => s.m.ctas.length ? s.m.ctas.some((x) => CTA_GENERIQUE.test(x.texte)) : null,
+    test: { cible: "cta", verbes: ["set"], consigne: "Remplacer le libellé générique (« Submit », « Envoyer », « En savoir plus ») par un libellé qui nomme le résultat, pris dans ce que la page promet (« Voir ma démo », « Commencer l'essai gratuit »)." } },
   { id: "sea-trop-de-ctas", famille: "sea", niches: tous, impact: 3, preuve: 3, risque: 2, sortie: "test",
     signal: "Plus de quatre appels à l'action différents au-dessus du pli.",
     pourquoi: "Chaque bouton en plus divise l'attention ; une page de campagne a une seule action à obtenir.",

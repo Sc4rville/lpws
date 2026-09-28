@@ -11,6 +11,7 @@
  * question indépendante avec un type de sortie déclaré (docs/architecture.md, « capteur / raisonnement ») : testable seule,
  * remplaçable seule.
  */
+import { bandesDuRendu } from "../clone/1_acquire/mark.ts"
 import { lancerNavigateur, nouvellePage, servirDossiers, UA } from "../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -79,10 +80,19 @@ function lirePage(hauteurPli: number) {
   const ctas = [...document.querySelectorAll("a[data-lpws],button[data-lpws]")]
     .filter((e) => visible(e) && !e.closest("nav,header,footer,[role=navigation]"))
     .map((e) => ({ anchor: e.getAttribute("data-lpws")!, texte: norme(e.textContent || ""), href: e.getAttribute("href") || "", y: y(e) }))
-    .filter((c) => c.texte.length >= 2 && c.texte.length <= 60 && (verbe.test(c.texte) || /button/i.test((document.querySelector(`[data-lpws="${c.anchor}"]`)?.className) || "")))
+    // un bouton de formulaire est un appel à l'action même quand il dit « Submit » : c'est
+    // précisément le libellé générique que sea-cta-generique doit voir
+    .filter((c) => {
+      if (c.texte.length < 2 || c.texte.length > 60) return false
+      const el = document.querySelector(`[data-lpws="${c.anchor}"]`)
+      const cls = typeof el?.className === "string" ? el.className : ""
+      return verbe.test(c.texte) || /\b(btn|button|cta)/i.test(cls) || el?.tagName === "BUTTON" || el?.getAttribute("role") === "button"
+    })
     .map((c) => ({ ...c, auDessusDuPli: c.y < hauteurPli }))
 
-  const nav = document.querySelector("nav[data-lpws],header[data-lpws] nav,header[data-lpws]")
+  // le <nav> lui-même d'abord : une liste de sélecteurs rend le premier élément du DOM, donc
+  // l'en-tête qui le contient (et le logo avec) — retirer « la navigation » retirait tout l'en-tête
+  const nav = document.querySelector("nav[data-lpws]") ?? document.querySelector("header[data-lpws]")
   const navLiens = nav ? nav.querySelectorAll("a").length : 0
 
   const form = [...document.querySelectorAll("form")].find(visible) ?? null
@@ -113,12 +123,6 @@ function lirePage(hauteurPli: number) {
   const altTexte = [...document.querySelectorAll("img[alt], [aria-label]")].map((e) => e.getAttribute("alt") || e.getAttribute("aria-label") || "").join(" ")
   const paiementMarqueurs = [...new Set(((corps + " " + altTexte).match(/paiement s[ée]curis[ée]|secure (?:checkout|payment)|\bssl\b|3-?d ?secure|\bvisa\b|mastercard|paypal|apple pay|google pay|\bstripe\b|chiffr[ée]e?s?|encrypted/gi) ?? []).map((x) => x.toLowerCase()))].slice(0, 8)
 
-  const sections = [...document.querySelectorAll('[data-lpws^="s"]')].map((s) => {
-    const r = s.getBoundingClientRect()
-    const titre = norme(s.querySelector("h1,h2,h3")?.textContent || "").slice(0, 80)
-    return { anchor: s.getAttribute("data-lpws")!, y: Math.round(r.top + window.scrollY), h: Math.round(r.height), titre }
-  })
-
   return {
     hero: { titre: norme(h1?.textContent || ""), titreAnchor: h1?.getAttribute("data-lpws") || undefined,
       sousTitre: norme(sousTitre?.textContent || ""), sousTitreAnchor: sousTitre?.getAttribute("data-lpws") || undefined,
@@ -137,7 +141,6 @@ function lirePage(hauteurPli: number) {
     lisibilite: { mots: mots.length, motsParPhrase: phrases.length ? Math.round(mots.length / phrases.length) : 0, motsLongs },
     fonctionnalitesListees: fonctionnalites,
     personnalisationIdentite: perso,
-    sections,
     paiement: { marqueurs: paiementMarqueurs },
   }
 }
@@ -153,7 +156,11 @@ export async function extraireSignaux(baseline: string): Promise<SignauxMecaniqu
       await servirDossiers(page, ORIGIN, [baseline])
       await page.goto(`${ORIGIN}/${fichier}`, { waitUntil: "load" })
       await page.waitForTimeout(500)
-      return page.evaluate(lirePage, viewport.height)
+      const lu = await page.evaluate(lirePage, viewport.height)
+      // les bandes de haut niveau selon la MÊME géométrie que le juge : une <section> sémantique
+      // porte une ancre e<n>, pas s<n> — un sélecteur sur « s » seul voyait 0 section sur ces pages
+      const sections = (await page.evaluate(bandesDuRendu)).map((b) => ({ ...b, titre: b.titre.slice(0, 80) }))
+      return { ...lu, sections }
     }
     const [d, m, mesure, vitesse] = await Promise.all([
       lire("capture.html", { width: 1440, height: 900 }),

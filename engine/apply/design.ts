@@ -37,13 +37,14 @@ export type DesignSystem = {
 }
 
 /** Récolte les rôles. Retourne aussi la liste des rôles introuvables. */
-export function harvestDesign(): DesignSystem {
+export function harvestDesign(bandesConnues: string[] = []): DesignSystem {
   const ds: DesignSystem = { manques: [] }
   const role = (el: Element | null | undefined): Role | undefined =>
     el ? { tag: el.tagName.toLowerCase(), cls: el.getAttribute("class") ?? "" } : undefined
   const box = (el: Element) => el.getBoundingClientRect()
   const visible = (el: Element) => { const r = box(el); return r.width > 4 && r.height > 4 }
-  const bandes = [...document.querySelectorAll('[data-lpws^="s"]')].filter(visible)
+  const selBandes = ['[data-lpws^="s"]', ...bandesConnues.map((a) => `[data-lpws="${a}"]`)].join(",")
+  const bandes = [...document.querySelectorAll(selBandes)].filter(visible)
 
   /* — titre de section : la classe de titre la PLUS FRÉQUENTE dans les bandes.
        Prendre le plus gros donnerait le titre du héros — un cas particulier, pas le
@@ -69,7 +70,7 @@ export function harvestDesign(): DesignSystem {
 
   /* — bande + conteneur : on réemploie le conteneur EXACT de ce titre plutôt qu'un ancêtre
        choisi par sa largeur — c'est lui qui porte la gouttière et l'alignement. — */
-  const bande = titre?.closest('[data-lpws^="s"]') ?? bandes[0]
+  const bande = titre?.closest(selBandes) ?? bandes[0]
   ds.band = role(bande)
   // le conteneur définitif est choisi plus bas : celui de la grille porte la gouttière,
   // celui du titre ne l'a pas toujours (constaté sur Jira : titre collé au bord gauche)
