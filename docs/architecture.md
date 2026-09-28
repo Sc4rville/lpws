@@ -14,6 +14,8 @@ lpws/
                        json validé, modèle, navigateur + origine synthétique, http statique
     clone/             famille 1 : url → baseline fidèle          ← en cours
     apply/             famille 2 : hypothèse → variante prouvée   ← en cours
+    audit/ surveille/  audit tracking gratuit · relevés et alertes de la vraie page
+    compte/ rapport/   paliers, mandats, paiement, coûts · rapport client HTML
   clients/             LES SORTIES — data par client/campagne, gitignoré
   .claude/skills/      LA RÉFLEXION — les moments de jugement, pilotés par Claude
 ```

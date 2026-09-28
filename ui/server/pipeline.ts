@@ -8,6 +8,9 @@ import { Contexte } from "../../engine/variant/contexte.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience } from "../../engine/measure/experience.ts"
+import { lireCompte, peutLancer } from "../../engine/compte/compte.ts"
+import { CLIENTS_ROOT } from "../../engine/shared/paths.ts"
+import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
 import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
 import { type Job, nouveauJob, dire, finir, lancer } from "./jobs.ts"
 import { construireTag, appliquerParts, publierTag, sonderBalise, ecrireConfigClient } from "./tag.ts"
@@ -152,7 +155,7 @@ export async function creerTestDepuisProposition(c: string, camp: string, nom: s
   const txt = await textes(c, camp)
   const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
   const job = nouveauJob("test")
-  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id })
+  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, regle: p.regle })
   await ecrireJson(fichiersDe(d).tests, tests)
   pipelineTest(job, c, camp, nom, base, specPath)
   return { job, id: nom }
@@ -163,6 +166,14 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
   if (!t) throw new Error("test inconnu")
+  /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
+   * mandaté le buyer (docs/business-model-rapport.md §7). Le palier ne limite qu'en SaaS. */
+  if (etat === "live") {
+    const compte = await lireCompte(FICHIER_COMPTE)
+    const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))
+      : compte.mandats[c] ? { ok: true as const } : { ok: false as const, action: "mandat" as const, raison: "Aucun mandat déclaré pour ce client : LPWS ne met rien en ligne sur un site sans l’accord écrit de son propriétaire. Déclarez-le une fois, puis lancez." }
+    if (!droit.ok) throw Object.assign(new Error(droit.raison), { code: 402, action: droit.action })
+  }
   /* PAS DE MISE EN LIGNE SANS BALISE.
    * Constaté en rejouant le parcours : le test passait « En ligne · 50 % » alors que la balise
    * n'était sur aucune page. Le buyer croyait tester, personne ne voyait la variante. On sonde

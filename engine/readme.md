@@ -18,6 +18,10 @@ engine/
   deploy/     FAMILLE 4 — variante validée → page publiable et jugée        ← en cours
   intent/     BRIQUE À PART — termes de recherche Google Ads → intentions   ← fondations
               (alimente le brain et, plus tard, la répartition du tag)
+  audit/      l'audit tracking gratuit : gclid, balises, Consent Mode, LCP
+  surveille/  la vraie page relue : relevés datés, alertes, annonce ↔ page
+  compte/     paliers, essai, mandats, Stripe optionnel, coût des diagnostics
+  rapport/    le rapport client HTML (LPWS ou marque blanche)
 ```
 
 Le workflow produit complet est dans le [readme racine](../readme.md) ; la carte

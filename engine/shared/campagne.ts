@@ -20,6 +20,9 @@
  *   mesure.json          buyer      propriété GA4 + compte de service
  *   resultats.json       measure    sessions et conversions par version
  *   experiences.json     measure    le journal : chaque test arrêté, son échantillon, sa conclusion
+ *   audit.json           audit      le diagnostic tracking de la vraie page
+ *   surveillance/        surveille  un relevé daté par passage + alertes.json
+
  */
 import { join } from "node:path"
 import { z } from "zod"
@@ -49,6 +52,10 @@ export function campagne(dir: string) {
     mesure: join(dir, "mesure.json"),
     resultats: join(dir, "resultats.json"),
     experiences: join(dir, "experiences.json"),
+    audit: join(dir, "audit.json"),
+    surveillance: join(dir, "surveillance"),
+    releve: (quand: string) => join(dir, "surveillance", `${quand}.json`),
+    alertes: join(dir, "surveillance", "alertes.json"),
   }
 }
 export type Campagne = ReturnType<typeof campagne>
@@ -73,6 +80,8 @@ export const Test = z.object({
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),
+  /** la règle du brain qui a produit ce test, si c'en est un */
+  regle: z.string().optional(),
 })
 export type Test = z.infer<typeof Test>
 
