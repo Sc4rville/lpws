@@ -104,6 +104,10 @@ export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecte
   const orphelins: Test[] = journal.filter((e) => e.lanceLe && !courants.has(cleLancement(e.test, e.lanceLe)) && enAttente(e.luLe, e.arreteLe))
     .map((e) => ({ id: e.test, titre: e.titre, teste: e.teste, pourquoi: e.pourquoi, edits: e.edits, part: e.part, etat: "stop",
       creeLe: e.lanceLe!, lanceLe: e.lanceLe, finLe: e.arreteLe, plan: e.plan, regle: e.regle }))
+  // un lancement remplacé dont l'arrêt n'a jamais été écrit : tests.json en garde la fenêtre
+  for (const t of vivants) for (const a of t.anciens ?? [])
+    if (!journal.some((x) => x.test === t.id && x.lanceLe === a.lanceLe))
+      orphelins.push({ ...t, etat: "stop", lanceLe: a.lanceLe, finLe: a.finLe, part: a.part, plan: a.plan, anciens: undefined })
   for (const t of orphelins) archives[cleLancement(t.id, t.lanceLe!)] = await fenetre(t.id, t.lanceLe!, t.finLe)
   const res: Resultats = { luLe: new Date().toISOString(), depuis, source: exemple ? "exemple" : "ga4", versions, parTest, ...(orphelins.length ? { archives } : {}) }
   await ecrireJson(f.resultats, res)
