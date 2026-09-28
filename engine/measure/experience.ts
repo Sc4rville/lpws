@@ -52,9 +52,9 @@ export async function planAuLancement(dir: string, part: number): Promise<NonNul
   return { tauxBase: p.tauxBase, tauxSuppose: p.tauxSuppose, mde: p.mde, part, controle: p.controle, variante: p.variante, jours: p.jours }
 }
 
-/** L'original et la variante d'un test, comptés sur sa fenêtre quand la mesure l'a fournie. */
-export function comptes(res: Resultats | null, id: string): { o: Compte | null; v: Compte | null } {
-  const p = res?.parTest?.[id]
+/** L'original et la variante d'un test, comptés sur la fenêtre de ce lancement quand la mesure l'a fournie. */
+export function comptes(res: Resultats | null, id: string, lanceLe?: string): { o: Compte | null; v: Compte | null } {
+  const p = (lanceLe ? res?.archives?.[`${id}@${lanceLe}`] : undefined) ?? res?.parTest?.[id]
   if (p) return { o: p.controle, v: p.variante }
   return { o: res?.versions?.controle ?? null, v: res?.versions?.[id] ?? null }
 }
@@ -64,7 +64,7 @@ export async function verdictDe(dir: string, t: Test, maintenant = new Date().to
   const f = fichiersDe(dir)
   const res = await lireJson<Resultats | null>(f.resultats, null)
   const ctx = await lireJson<Ctx>(f.contexte, null)
-  const { o, v } = comptes(res, t.id)
+  const { o, v } = comptes(res, t.id, t.lanceLe)
   const verdict = juger({
     o, v, jours: t.lanceLe ? joursEntre(t.lanceLe, t.finLe ?? maintenant) : 0,
     // la part pendant la collecte : celle du plan, pas les 100 % d'un gagnant déployé
@@ -95,7 +95,7 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
       lanceLe: t.lanceLe, arreteLe: fin, controle: o, variante: v,
       luLe: res?.luLe ?? null, source: res ? res.source ?? "ga4" : null,
       hausse: hausse(o, v), conclusion: CONCLUSION[verdict.k],
-      regle: spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle,
+      regle: spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle ?? t.regle,
       plan: t.plan, verdict: `${verdict.titre}. ${verdict.detail}.`,
       // remettre l'original après un déploiement ne réécrit pas l'histoire : il a été déployé
       deploye: t.etat === "gagnant" || (i >= 0 && journal[i].deploye === true),
