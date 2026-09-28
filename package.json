@@ -24,6 +24,7 @@
     "measure": "tsx engine/measure/run.ts",
     "brain": "tsx engine/variant/run.ts",
     "brain:eval": "tsx engine/variant/eval.ts",
+    "test": "tsx --test \"engine/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

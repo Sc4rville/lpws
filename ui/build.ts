@@ -14,6 +14,7 @@
  *         npm run ui:deploy     → build puis `vercel deploy --prod` depuis ui/dist
  */
 import { lancerNavigateur } from "../engine/shared/navigateur.ts"
+import { pageAvecStats } from "./stats-embarque.ts"
 import { readFile, writeFile, mkdir, readdir, stat, cp } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, basename, dirname } from "node:path"
@@ -66,7 +67,7 @@ for (const [key, p] of files) {
 await browser.close()
 
 await mkdir(dirname(OUT), { recursive: true })
-await writeFile(OUT, html.replace("/*THUMBS*/", `const IMG = ${JSON.stringify(img)};`))
+await writeFile(OUT, await pageAvecStats(html.replace("/*THUMBS*/", `const IMG = ${JSON.stringify(img)};`)))
 // les visuels de l'interface (fond flouté, illustration tramée) partent avec la page
 await cp(join(ROOT, "ui", "assets"), join(dirname(OUT), "assets"), { recursive: true })
 // la landing page de démonstration (Relay) : la page à nous sur laquelle tout le parcours se rejoue

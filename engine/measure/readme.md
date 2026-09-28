@@ -16,8 +16,28 @@ npm run measure -- clients/<client>/<campagne> --exemple    # rejoue une répons
 | **Entrée** | `tests.json` (la date de lancement) + `mesure.json` : `{ "propriete": "<id numérique GA4>", "compteDeService": "<chemin du JSON>" }` |
 | **Sortie** | `resultats.json` : `{ luLe, depuis, source, versions: { controle: {n, c}, <nom-du-test>: {n, c} } }` |
 
-`n` = sessions, `c` = conversions (« key events » dans GA4). L'interface calcule le reste :
-taux, écart, certitude, « encore ~N jours ».
+`n` = sessions, `c` = conversions (« key events » dans GA4).
+
+## Le droit de conclure — `stats.ts`
+
+Un seul module, compilé aussi pour le navigateur (`ui/stats-embarque.ts`) : l'écran et le
+serveur rendent le même verdict.
+
+- **L'horizon est fixé avant de regarder** : au lancement, `planAuLancement` calcule
+  l'échantillon par version (taux de conversion déclaré dans le contexte, sinon 3 % supposés ;
+  hausse cherchée selon le trafic) et le fige dans `tests.json` (`plan`).
+- **Pas de verdict avant l'horizon, ni avant une semaine pleine, ni sous 25 conversions** par
+  version. Seule exception : un écart écrasant (|z| ≥ 3) après une semaine.
+- **Inconclusif dit comme tel** (`nul`), et **« ce test ne conclura pas »** quand il faudrait
+  plus de huit semaines au rythme observé.
+- **Répartition faussée** (SRM, p < 0,001 dès 200 visiteurs) : le verdict est suspendu.
+
+## La mémoire — `experiences.ts`
+
+À l'arrêt ou au déploiement, le test devient une expérience dans `experiences.json` : règle,
+dates, plan, comptes, issue (`gagnant`, `perdant`, `nul`, `interrompu`, `sans-donnees`, `srm`),
+verdict. `historique` relit toutes les pages du client ; `aEviter` en tire les règles perdues
+ou refusées par le buyer, que le brain ne repropose plus.
 
 ## Ce que le buyer fait, une fois par client (3 minutes)
 

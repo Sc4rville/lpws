@@ -12,7 +12,8 @@
  *   GET  /api/jobs/<id>                     suivre un job (lignes, état)
  *   GET  /api/clients/<c>/<camp>/textes     les textes de la page qu'un test peut changer
  *   POST /api/clients/<c>/<camp>/tests      {titre, pourquoi, edits:[{anchor,text}]} → variante + tag (job)
- *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop', part}  → config republiée (job)
+ *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop'|'gagnant', part}  → config republiée (job)
+ *                                           ; un test qui cesse de collecter est archivé (experiences.json)
  *   POST /api/clients/<c>/<camp>/verifier   la balise est-elle posée sur la vraie page ? (job)
  *   GET  /files/<chemin>                    clients/ en statique (captures)
  *   GET  /t/<client>.js · /v/<client>.json  les fichiers du tag, tels que Vercel les sert
@@ -39,6 +40,8 @@ import { lireJson, ecrireJson } from "../engine/shared/json.ts"
 import { envoyerFichier, envoyerJson as json } from "../engine/shared/http.ts"
 import { mimeDe } from "../engine/shared/mime.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../engine/shared/campagne.ts"
+import { archiver, historique, planAuLancement } from "../engine/measure/experiences.ts"
+import { pageAvecStats } from "./stats-embarque.ts"
 
 const SCOPE = "ui"
 const PORT = Number(process.env.PORT ?? 4700)
@@ -108,7 +111,7 @@ async function tagPublie(slug: string): Promise<boolean | null> {
   _publie.set(slug, { at: Date.now(), v })
   return v
 }
-const joursDepuis = (iso?: string) => iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)) : 0
+const joursDepuis = (iso?: string, fin?: string) => iso ? Math.max(0, Math.floor(((fin ? new Date(fin).getTime() : Date.now()) - new Date(iso).getTime()) / 86_400_000)) : 0
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 async function etat() {
@@ -171,6 +174,8 @@ async function etat() {
         contexte,
         diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0 } : null,
         propositions,
+        // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
+        experiences: (await historique(cdir)).experiences.sort((a, b) => b.finLe.localeCompare(a.finLe)).slice(0, 20),
         brainEnCours, brainJob: brainJob?.id,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
@@ -183,7 +188,7 @@ async function etat() {
         },
         ads: null,
         tests: tests.map((t) => ({
-          id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe), potentiel: "Moyen",
+          id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe, t.finLe), potentiel: "Moyen", plan: t.plan, fin: t.finLe ? dateFr(t.finLe) : undefined,
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
@@ -367,7 +372,7 @@ async function appliquerParts(c: string, camp: string) {
   const cfg = await lireJson<any>(f, null)
   if (!cfg) return
   cfg.actif = true
-  for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && t.etat === "live" ? t.part : 0 }
+  for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0 }
   await ecrireJson(f, cfg)
 }
 /** copie loader + config dans ui/dist et pousse sur Vercel : l'URL que GTM connaît */
@@ -399,7 +404,7 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
       const t = testsCamp.find((x) => x.id === v.nom)
       if (!t || t.etat === "echec") continue
       if (fusion.variantes.some((x: any) => x.nom === v.nom && x.page === v.page)) continue
-      fusion.variantes.push({ ...v, part: t.etat === "live" ? t.part : 0 })
+      fusion.variantes.push({ ...v, part: t.etat === "live" || t.etat === "gagnant" ? t.part : 0 })
     }
   }
   if (!fusion.delaiMasque) fusion.delaiMasque = 1200
@@ -430,7 +435,7 @@ function VERCEL(args: string[]): [string, string[]] {
   return global ? ["vercel", args] : ["npx", ["--yes", "vercel@latest", ...args]]
 }
 
-async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number) {
+async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop" | "gagnant", part: number) {
   const d = dossier(c, camp)
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
@@ -446,23 +451,49 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
     if (!sonde.installe)
       throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
   }
-  const avant = tests.map((o) => [o.id, o.etat, o.part] as const)
-  if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
-  else { t.etat = "stop" }
+  const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan] as const)
+  const maintenant = new Date().toISOString()
+  // un test qui cesse de collecter : sa date de fin fige le verdict qu'on archivera
+  const finir_ = (o: Test) => { if (o.etat === "live") o.finLe = maintenant }
+  const arretes: Test[] = []
+  const deploye = tests.find((o) => o !== t && o.etat === "gagnant")
+  // un gagnant servi à 100 % capte tous les visiteurs : un nouveau test ne toucherait personne
+  if (etat === "live" && deploye)
+    throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
+  if (etat === "live") {
+    // l'horizon se fixe AVANT de regarder : c'est lui qui donne le droit de conclure
+    t.etat = "live"; t.part = part || 50; t.lanceLe = maintenant; delete t.finLe
+    t.plan = await planAuLancement(d, t.part / 100)
+    for (const o of tests) if (o !== t && o.etat === "live") { finir_(o); if (o.lanceLe) arretes.push(o); o.etat = "stop" }
+  } else if (etat === "gagnant") {
+    if (t.etat !== "live" && t.etat !== "stop") throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
+    finir_(t); arretes.push(t); t.etat = "gagnant"; t.part = 100
+    for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant")) { finir_(o); if (o.lanceLe) arretes.push(o); o.etat = "stop"; o.part = 0 }
+  } else {
+    // « Remettre l'original » : un gagnant déployé redescend à 0 %, un test vivant s'arrête
+    if (t.etat === "gagnant") t.part = 0
+    finir_(t); if (t.lanceLe) arretes.push(t); t.etat = "stop"
+  }
   await ecrireJson(fichiersDe(d).tests, tests)
   await appliquerParts(c, camp)
   const job = nouveauJob("config")
   ;(async () => {
-    dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : "arrêt : l’original reprend 100 % du trafic")
+    dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : etat === "gagnant" ? "déploiement : 100 % des visiteurs verront la variante" : "arrêt : l’original reprend 100 % du trafic")
     const code = await publierTag(job, c, camp)
     // l'état affiché doit être l'état EN LIGNE : si la publication rate, on revient en arrière et on dit pourquoi
     const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
     const cible = all.find((x) => x.id === id)
     if (code !== 0) {
-      for (const [oid, oetat, opart] of avant) { const o = all.find((x) => x.id === oid); if (o) { o.etat = oetat; o.part = opart } }
+      for (const [oid, oetat, opart, olance, ofin, oplan] of avant) { const o = all.find((x) => x.id === oid); if (o) Object.assign(o, { etat: oetat, part: opart, lanceLe: olance, finLe: ofin, plan: oplan }) }
       if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)
+    // publié : ce qui a cessé de collecter entre dans la mémoire du client
+    if (code === 0) for (const o of arretes) {
+      const x = all.find((y) => y.id === o.id)
+      const e = x ? await archiver(d, x, x.etat === "gagnant") : null
+      if (e) dire(job, `mémoire : « ${e.titre} » archivé (${e.issue})`)
+    }
     if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()
@@ -524,7 +555,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
     const seg = p.split("/").filter(Boolean)
-    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await readFile(UI)); return }
+    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await pageAvecStats(await readFile(UI, "utf8"))); return }
     if (p === "/api/etat") return json(res, 200, await etat())
     if (p === "/api/clients" && req.method === "POST") {
       const { url: u } = await body(req)
@@ -546,7 +577,7 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
         const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" ? "live" : "stop", Number(b.part) || 50)
+        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })

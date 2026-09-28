@@ -24,6 +24,8 @@ export type Constat = {
 export type Diagnostic = {
   faitLe: string
   regime: "gros-changements" | "chirurgical" | "inconnu"
+  /** tests retirés par la mémoire du client (perdus chez lui, ou refusés par le buyer) */
+  ecartes: Array<{ id: string; signal: string; raison: string }>
   tests: Constat[]
   conseils: Constat[]
   methode: Constat[]
@@ -54,5 +56,5 @@ export function diagnostiquer(s: Signaux, c: Contexte): Diagnostic {
   tests.sort(parPriorite); conseils.sort(parPriorite); methode.sort(parPriorite)
 
   const regime = c.visiteursMois === undefined ? "inconnu" : c.visiteursMois < 200_000 ? "gros-changements" : "chirurgical"
-  return { faitLe: new Date().toISOString(), regime, tests, conseils, methode, nonEvaluables, calmes }
+  return { faitLe: new Date().toISOString(), regime, ecartes: [], tests, conseils, methode, nonEvaluables, calmes }
 }

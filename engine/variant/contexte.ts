@@ -43,6 +43,8 @@ export const Contexte = z.object({
   marge: z.number().min(0).max(100).optional(),
   /** « Combien de visiteurs par mois ? » : en dessous d'un volume, aucun petit test ne conclut */
   visiteursMois: z.number().positive().optional(),
+  /** « Quel est le taux de conversion de la page aujourd'hui ? » en % : il fixe la durée du test avant de le lancer */
+  tauxConversion: z.number().positive().max(100).optional(),
   /** « Qu'est-ce qu'on n'a pas le droit de dire ? » : les allégations sont étayées par le client, pas inventées */
   limites: z.string().optional(),
 })

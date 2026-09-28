@@ -19,6 +19,7 @@
  *   express.json         ui         la balise est-elle posée ?
  *   mesure.json          buyer      propriété GA4 + compte de service
  *   resultats.json       measure    sessions et conversions par version
+ *   experiences.json     measure    chaque test terminé, son horizon, son issue : la mémoire du client
  */
 import { join } from "node:path"
 import { z } from "zod"
@@ -47,6 +48,7 @@ export function campagne(dir: string) {
     express: join(dir, "express.json"),
     mesure: join(dir, "mesure.json"),
     resultats: join(dir, "resultats.json"),
+    experiences: join(dir, "experiences.json"),
   }
 }
 export type Campagne = ReturnType<typeof campagne>
@@ -61,6 +63,10 @@ export const Test = z.object({
   part: z.number(),
   creeLe: z.string(),
   lanceLe: z.string().optional(),
+  /** arrêt ou déploiement : la date à laquelle le test a cessé de collecter */
+  finLe: z.string().optional(),
+  /** l'horizon fixé au lancement (stats.ts) : on s'engage avant de regarder */
+  plan: z.object({ tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(), controle: z.number(), variante: z.number(), jours: z.number().nullable() }).optional(),
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),
