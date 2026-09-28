@@ -41,12 +41,19 @@ test("journal : un perdant entre dans la mémoire, et sa règle n'est plus repro
 
   await ecrireJson(f.propositions, [
     { nom: "x", regle: "pr-preuve", refusee: true, raison: "hors charte" },
-    { nom: "y", regle: "vp-titre", refusee: true, raison: "trop long", declineDe: "z" },
+    { nom: "y", regle: "vp-titre", refusee: true, raison: "trop long", declineDe: "z", fichier: f.spec("y"), refuseeLe: "2026-09-20T00:00:00Z" },
+    { nom: "w", regle: "fr-form", refusee: true, raison: "Pas maintenant", motif: "plus-tard", fichier: f.spec("w") },
+    { nom: "v", regle: "of-prix", refusee: true, raison: "Pas le ton de la marque", motif: "ton", fichier: f.spec("v"), refuseeLe: "2026-09-22T00:00:00Z" },
   ])
-  const m = aEviter(await historique(clientDir))
+  const h = await historique(clientDir)
+  const m = aEviter(h)
   assert.match(m.get("mm-titre")!, /l’original a gagné/)
   assert.match(m.get("pr-preuve")!, /hors charte/)
   assert.equal(m.has("vp-titre"), false, "une déclinaison refusée n'écarte pas sa règle")
+  assert.equal(m.has("fr-form"), false, "« pas maintenant » n'écarte pas sa règle")
+  assert.match(m.get("of-prix")!, /Pas le ton de la marque/)
+  // les leçons : chaque refus avec sa spec, le plus récent d'abord, sauf « pas maintenant »
+  assert.deepEqual(h.lecons.map((l) => [l.regle, l.motif]), [["of-prix", "ton"], ["vp-titre", undefined]])
   await rm(racine, { recursive: true })
 })
 
