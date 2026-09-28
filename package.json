@@ -26,7 +26,10 @@
     "brain": "tsx engine/variant/run.ts",
     "brain:eval": "tsx engine/variant/eval.ts",
     "test": "tsx --test \"engine/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "audit": "tsx engine/audit/audit.ts",
+    "surveille": "tsx engine/surveille/surveille.ts",
+    "couts": "tsx engine/compte/couts.ts"
   },
   "dependencies": {
     "esbuild": "~0.28.2",

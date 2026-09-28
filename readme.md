@@ -85,7 +85,18 @@ npm run clone -- https://exemple.com --client acme --campaign printemps
 
 # rejuger une baseline existante sans recapturer
 npm run verify -- clients/acme/printemps/baseline
+
+# audit tracking gratuit d'une page (gclid, redirections, balises, Consent Mode, LCP)
+npm run audit -- https://exemple.com/landing
+
+# relever la page et lever les alertes · coût réel des diagnostics
+npm run surveille -- clients/acme/printemps      # ou --tout
+npm run couts
 ```
+
+Variables optionnelles de l'interface : `LPWS_FACTURATION=1` (appliquer les paliers),
+`LPWS_SURVEILLANCE=1` (relevés automatiques), `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` ·
+`STRIPE_PRIX_*` (paiement ; sans elles, l'interface le dit).
 
 État d'avancement du clonage : [engine/clone/readme.md](engine/clone/readme.md).
 

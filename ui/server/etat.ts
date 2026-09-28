@@ -7,13 +7,16 @@ import { lireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { ROOT, BASE_TAGS } from "./config.ts"
 import { jobs } from "./jobs.ts"
+import { resumeCompte } from "./compte.ts"
+import { type Audit } from "../../engine/audit/audit.ts"
+import { historique as relevesDe, type Alerte } from "../../engine/surveille/surveille.ts"
 import { historique, comptes } from "../../engine/measure/experience.ts"
 import type { Resultats } from "../../engine/measure/run.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
 const nomsDeSites = new Map<string, string>()
-async function nomDuSite(d: string, c: string): Promise<string> {
+export async function nomDuSite(d: string, c: string): Promise<string> {
   if (nomsDeSites.has(d)) return nomsDeSites.get(d)!
   let nom = cap(c)
   try {
@@ -50,7 +53,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 export async function etat() {
   const clients: unknown[] = []
   const root = join(ROOT, CLIENTS_ROOT)
-  if (!existsSync(root)) return { clients, base: BASE_TAGS }
+  const compte = await resumeCompte()
+  if (!existsSync(root)) return { clients, base: BASE_TAGS, compte }
   for (const c of await readdir(root)) {
     const cdir = join(root, c)
     if (!(await stat(cdir)).isDirectory() || c.startsWith("_")) continue
@@ -78,6 +82,9 @@ export async function etat() {
         const { o, v } = comptes(resultats, id)
         return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
       }
+      const audit = await lireJson<Audit | null>(fichiersDe(d).audit, null)
+      const alertes = (await lireJson<Alerte[]>(fichiersDe(d).alertes, [])).slice(0, 10)
+      const releves = await relevesDe(d)
       const url = (meta?.source ?? encours?.url ?? "").replace(/^https?:\/\//, "")
       const site = url.split("/")[0].replace(/^www\./, "")
       const clientSlug = slugify(meta?.client ?? c)
@@ -105,7 +112,11 @@ export async function etat() {
         capture,
         job: captureEnCours ? encours!.job : undefined,
         contexte,
-        diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0 } : null,
+        diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0, ecartes: diag.ecartes ?? [] } : null,
+        audit, alertes,
+        surveillance: releves[0] ? { dernier: releves[0].quand, releves: releves.length, concordance: releves[0].concordance?.score ?? null, lcpMs: releves[0].lcpMs,
+          serie: releves.slice(0, 12).reverse().map((r) => ({ quand: r.quand, lcpMs: r.lcpMs, concordance: r.concordance?.score ?? null, gclid: r.gclid })) } : null,
+        mandat: compte.mandats[c] ?? null,
         propositions,
         // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
         experiences: (await historique(cdir)).experiences.sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 20),
@@ -126,6 +137,7 @@ export async function etat() {
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
           res: resDe(t.id),
+          lanceLe: t.lanceLe, regle: t.regle,
         })),
       })
     }
@@ -135,5 +147,5 @@ export async function etat() {
   const lettres = new Map<string, number>()
   for (const x of clients as any[]) lettres.set(x.client[0], (lettres.get(x.client[0]) ?? 0) + 1)
   for (const x of clients as any[]) if ((lettres.get(x.client[0]) ?? 0) > 1) x.ini = cap(x.client.slice(0, 2))
-  return { clients, base: BASE_TAGS }
+  return { clients, base: BASE_TAGS, compte }
 }

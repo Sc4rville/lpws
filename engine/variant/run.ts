@@ -37,6 +37,7 @@ const SCOPE = "variant"
 export async function brain(campagne: string, opts: { refaire?: boolean; sansJugement?: boolean; sansVariantes?: boolean } = {}) {
   const f = fichiersDe(campagne)
   const base = f.baseline
+  process.env.LPWS_CAMPAGNE = campagne // le journal des coûts range chaque appel modèle par page
   if (!existsSync(f.capture)) fail(SCOPE, `${f.capture} introuvable : cloner la page d'abord`)
 
   if (!existsSync(f.contexte))

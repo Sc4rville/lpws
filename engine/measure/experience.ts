@@ -72,6 +72,7 @@ export async function verdictDe(dir: string, t: Test, maintenant = new Date().to
     tauxBase: t.plan && !t.plan.tauxSuppose ? t.plan.tauxBase : ctx?.tauxConversion ? ctx.tauxConversion / 100 : null,
     mde: t.plan?.mde ?? mdePour(ctx?.visiteursMois),
     visiteursJour: visiteursJour(ctx),
+    cible: t.plan ? { controle: t.plan.controle, variante: t.plan.variante } : null,
   })
   return { verdict, o, v, res }
 }
@@ -104,6 +105,25 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
   }
   await ecrireJson(f.experiences, journal)
   return nouvelles
+}
+
+/** Un test déjà arrêté puis déployé : seul le drapeau change, ses chiffres restent ceux de l'arrêt. */
+export async function marquerDeploye(dir: string, t: Test): Promise<boolean> {
+  const f = fichiersDe(dir)
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  const e = journal.find((x) => x.test === t.id && x.lanceLe === t.lanceLe)
+  if (!e) return false
+  e.deploye = true
+  await ecrireJson(f.experiences, journal)
+  return true
+}
+
+/** Un arrêt annulé : le test reprend, son expérience n'est pas finie. */
+export async function retirerExperience(dir: string, t: Test): Promise<void> {
+  const f = fichiersDe(dir)
+  const journal = await lireJson<Experience[]>(f.experiences, [])
+  const reste = journal.filter((x) => !(x.test === t.id && x.lanceLe === t.lanceLe))
+  if (reste.length !== journal.length) await ecrireJson(f.experiences, reste)
 }
 
 export type Refus = { regle: string; raison: string; le?: string }
