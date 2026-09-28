@@ -15,6 +15,11 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
+## Fait le 2026-09-28 (journal des expériences)
+- Chaque test arrêté laisse une ligne dans `experiences.json` (`engine/measure/experience.ts`) :
+  échantillon, fourchette, conclusion, non-concluants compris. Feuille de route 4.1 cochée
+  (reste : les variantes refusées et pourquoi).
+
 ## Fait le 2026-09-28 (ui)
 - Interface « décider d'abord » : fourchette + jalons sur chaque résultat, trois chiffres
   d'accueil, palette ⌘K, Annuler au lieu de confirmer, une adresse par écran, panneau

@@ -19,6 +19,7 @@
  *   express.json         ui         la balise est-elle posée ?
  *   mesure.json          buyer      propriété GA4 + compte de service
  *   resultats.json       measure    sessions et conversions par version
+ *   experiences.json     measure    le journal : chaque test arrêté, son échantillon, sa conclusion
  */
 import { join } from "node:path"
 import { z } from "zod"
@@ -47,6 +48,7 @@ export function campagne(dir: string) {
     express: join(dir, "express.json"),
     mesure: join(dir, "mesure.json"),
     resultats: join(dir, "resultats.json"),
+    experiences: join(dir, "experiences.json"),
   }
 }
 export type Campagne = ReturnType<typeof campagne>
@@ -69,3 +71,24 @@ export type Test = z.infer<typeof Test>
 
 /** La balise Express vue sur la vraie page. */
 export type Express = { installe: boolean; verifieLe?: string; version?: string; mode?: string; detail?: string }
+
+const Compte = z.object({ n: z.number(), c: z.number() })
+
+/** Une expérience terminée : ce qui a été testé, sur qui, et ce qu'on a le droit d'en dire. */
+export const Experience = z.object({
+  test: z.string(),
+  titre: z.string(),
+  teste: z.string(),
+  pourquoi: z.string(),
+  edits: Test.shape.edits,
+  part: z.number(),
+  lanceLe: z.string().optional(),
+  arreteLe: z.string(),
+  controle: Compte.nullable(),
+  variante: Compte.nullable(),
+  luLe: z.string().nullable(),
+  source: z.enum(["ga4", "exemple"]).nullable(),
+  hausse: z.object({ lo: z.number(), mid: z.number(), hi: z.number() }).nullable(),
+  conclusion: z.enum(["gagnant", "perdant", "non concluant", "trop tôt", "sans données"]),
+})
+export type Experience = z.infer<typeof Experience>
