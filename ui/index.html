@@ -1778,7 +1778,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'report': {
-      const tt = t || (c && c.tests.find(x => x.id === S.test));
+      const tt = t || (c && (c.tests.find(x => x.id === S.test) || c.tests.find(x => x.etat === 'live' && x.res) || c.tests.find(x => x.res)));
       if (!c || !tt) { toast('Ouvrez un test pour en faire le rapport'); break; }
       if (LIVE) { window.open(`/api/clients/${c.id}/rapport/${encodeURIComponent(tt.id)}`, '_blank', 'noopener'); break; }
       const txt = rapportTest(c, tt); copier(txt, 'Rapport copié');
