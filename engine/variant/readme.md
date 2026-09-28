@@ -35,13 +35,18 @@ l'interface, c'est le bouton « Décliner » de chaque proposition.
 
 Les deux temps « modèle » tournent sur les crédits du plan (`claude -p`), pas sur l'API.
 
-## La base de connaissances ([`regles.ts`](regles.ts))
+## La base de connaissances ([`regles.json`](regles.json) + [`regles.ts`](regles.ts))
 
 Les 30 règles de [docs/brain.html](../../docs/brain.html), plus 4 propres à la recherche
 payante (mot-clé dans le titre, bouton visible sans défiler sur mobile, bouton générique,
 trop de boutons), et 7 pour la page produit et l'essai (livraison, retours, paiement
 fractionné, guide des tailles, prix barré sans référence 30 jours, bouton d'achat sous le pli
-mobile, « sans carte » caché), portées en **données exécutables**. Une règle d'achat sur une
+mobile, « sans carte » caché). Tout ce qui se lit (prose, notes, sources, consigne de test)
+est dans `regles.json`, vérifié au chargement par un schéma : ajouter ou corriger une règle ne
+touche pas au code, sauf son déclencheur (`QUAND` dans `regles.ts`, un par id). Une faute dans
+le fichier (note hors bornes, verbe inconnu, test sans consigne, id en double ou sans
+déclencheur) arrête le brain en nommant la règle ; chaque source citée doit être décrite dans
+`docs/brain.html`. Une règle d'achat sur une
 page sans bouton d'achat est **calme**, pas non évaluable : elle ne concerne pas la page.
 Les règles sont testées sur des signaux construits à la main (`regles.test.ts`) ; la page
 produit de démonstration est `ui/demo/boutique/`. Chaque règle :

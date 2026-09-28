@@ -166,7 +166,7 @@ comptés, 8 questions jugées, 34 règles évaluées, 3 variantes écrites, une 
 - ✅ 30 règles rédigées, 28 sources avec leurs biais assumés
 - 🟡 Issues de la recherche v1, orientée B2B : la famille e-commerce est mince
 - 🔴 **Lancer la recherche v2** — le brief est prêt ([docs/recherche/v2-brief.md](recherche/v2-brief.md)), livrable : 80 à 120 règles rééquilibrées
-- 🟡 KB extraite de la page HTML vers [`regles.ts`](../engine/variant/regles.ts) : exécutable, typée, pas encore un fichier de données pur
+- ✅ KB en fichier de données validé par schéma : [`regles.json`](../engine/variant/regles.json), déclencheurs typés dans [`regles.ts`](../engine/variant/regles.ts) — prêt à recevoir les règles de la v2
 - 🟡 Trois sorties distinctes dans le moteur : test / conseil / méthode ; les refus et garde-fous restent à brancher
 - ⬜ Ajouter la famille e-commerce : revenu par visiteur, retours, remise contre marge, guide des tailles, frais de port, achat invité, paiement fractionné, contenu client
 - ⬜ ⚠️ Ajouter la continuité créa → haut de page : **totalement absente** de la v1
