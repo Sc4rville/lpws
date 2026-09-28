@@ -666,7 +666,11 @@ const THEMES = { auto: ['Auto', 'auto'], light: ['Clair', 'sun'], dark: ['Sombre
 let theme = (() => { try { const t = localStorage.getItem('lpws-theme'); return THEMES[t] ? t : 'auto'; } catch { return 'auto'; } })();
 const calme = matchMedia('(prefers-reduced-motion: reduce)');
 /** les changements d'écran passent par une transition de vue quand le navigateur sait la faire */
-function transition(f) { if (!document.startViewTransition || calme.matches) { f(); return; } document.startViewTransition(f).ready.catch(() => {}); }
+function transition(f) {
+  if (!document.startViewTransition || calme.matches) { f(); return; }
+  const app = document.querySelector('.app'); app.inert = true;
+  document.startViewTransition(() => { app.inert = false; f(); }).ready.catch(() => {});
+}
 function changerTheme(t, depuis) {
   const appliquer = () => {
     theme = t; const r = document.documentElement;
@@ -1440,6 +1444,12 @@ function synchroniserUrl() {
   if (h2 && document.getElementById('cmdk').hidden) { h2.setAttribute('tabindex', '-1'); h2.focus({ preventScroll: true }); }
 }
 window.addEventListener('popstate', () => { if (lireHash()) transition(render); });
+/** une navigation interne : l'état et l'historique changent tout de suite, le rendu suit la transition */
+function naviguer(spec) {
+  go(spec); const h = hashDe();
+  if (urlRendue !== null && location.hash !== h) history.pushState(null, '', h);
+  transition(render);
+}
 
 /* ---------- la palette : un client, un test, une action, sans quitter le clavier ---------- */
 const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -1479,7 +1489,7 @@ function dessinerK() {
 function choisirK(n) {
   const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur();
   if (e.theme) { changerTheme(e.theme, document.querySelector('[data-act="theme"]')); return; }
-  go(e.go); transition(render);
+  naviguer(e.go);
 }
 document.addEventListener('keydown', e => {
   const ouverte = !document.getElementById('cmdk').hidden;
@@ -1538,7 +1548,7 @@ document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]');
   if (g) {
     if (g.dataset.go.startsWith('mode:')) { const m = g.dataset.go.slice(5); S.openMode = S.openMode === m ? null : m; renderPanel(); save(); return; }
-    go(g.dataset.go); transition(render); return;
+    naviguer(g.dataset.go); return;
   }
   const pk = e.target.closest('[data-pick]');
   if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois','tauxConversion']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
