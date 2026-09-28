@@ -1,5 +1,5 @@
 /**
- * paliers.ts — LA GRILLE, telle que proposée (docs/business-model-rapport.md §4) et le droit
+ * paliers.ts — LA GRILLE, telle que proposée (docs/recherche/business-model.md §4) et le droit
  * qu'elle donne. Hypothèse à valider par les entretiens buyers : les montants et les plafonds
  * se changent ICI, nulle part ailleurs.
  *
@@ -46,5 +46,3 @@ export const PALIERS: Record<IdPalier, Palier> = {
 export const ESSAI_JOURS = 14
 /** le palier que l'essai ouvre */
 export const PALIER_ESSAI: IdPalier = "solo"
-/** commission partenaire : 30 % pendant 12 mois (Unbounce 25–35 %, rapport §5) */
-export const COMMISSION = { part: 0.3, mois: 12 }

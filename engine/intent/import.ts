@@ -70,7 +70,7 @@ function cellules(ligne: string, sep: string): string[] {
 }
 
 /** « 1 234,56 € » → 1234.56 (fr) · « 1,234.56 » → 1234.56 (en) · « 7,41 % » → 7.41 */
-export function nombre(s: string | undefined, langue: "fr" | "en"): number {
+function nombre(s: string | undefined, langue: "fr" | "en"): number {
   if (!s) return 0
   let t = s.replace(/[^\d.,-]/g, "")
   if (!t) return 0

@@ -8,7 +8,7 @@
  *
  * La page est rendue dans un vrai Chromium depuis la copie (capture.html), aux deux tailles :
  * « au-dessus du pli » n'a de sens qu'avec une hauteur d'écran. Chaque signal est une
- * question indépendante avec un type de sortie déclaré (cf. ETAT.md) : testable seule,
+ * question indépendante avec un type de sortie déclaré (docs/architecture.md, « capteur / raisonnement ») : testable seule,
  * remplaçable seule.
  */
 import { lancerNavigateur, nouvellePage, servirDossiers, UA } from "../shared/navigateur.ts"

@@ -167,7 +167,7 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
   const t = tests.find((x) => x.id === id)
   if (!t) throw new Error("test inconnu")
   /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
-   * mandaté le buyer (docs/business-model-rapport.md §7). Le palier ne limite qu'en SaaS. */
+   * mandaté le buyer (docs/recherche/business-model.md §7). Le palier ne limite qu'en SaaS. */
   if (etat === "live") {
     const compte = await lireCompte(FICHIER_COMPTE)
     const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))

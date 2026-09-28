@@ -29,7 +29,7 @@ type Ctx = { visiteursMois?: number; tauxConversion?: number } | null
 const Z95 = 1.96
 
 /** L'intervalle à 95 % de la hausse relative de la variante, ou null si l'original n'a rien converti. */
-export function hausse(o: Compte | null, v: Compte | null): Experience["hausse"] {
+function hausse(o: Compte | null, v: Compte | null): Experience["hausse"] {
   if (!o || !v || o.n <= 0 || v.n <= 0) return null
   const p1 = o.c / o.n, p2 = v.c / v.n
   if (p1 <= 0) return null

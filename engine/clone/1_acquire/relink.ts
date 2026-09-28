@@ -66,7 +66,7 @@ const suffixeCommun = (a: string, b: string): number => {
  * le seul signal qu'un rebuild du site ne détruit pas. Les classes pèsent peu (CSS-in-JS),
  * le rang encore moins (c'est lui qu'on ne veut plus croire).
  */
-export function score(a: Empreinte, b: Empreinte): number {
+function score(a: Empreinte, b: Empreinte): number {
   if (a.role !== b.role) return 0
 
   let s = 0

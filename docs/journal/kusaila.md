@@ -2,7 +2,7 @@
 
 > Journal de MES contributions à LPWS, pour savoir d'un coup d'œil ce qui vient de moi.
 > Le reste du dépôt (vision, machine, feuille de route) est documenté ailleurs :
-> [readme](readme.md) · [feuille de route](docs/feuille-de-route.md) · [session](session.md).
+> [readme](../../readme.md) · [feuille de route](../feuille-de-route.md) · [session](../../session.md).
 > Une entrée = une date, ce qui a été fait, **pourquoi**, et **comment le vérifier soi-même**.
 
 ---
@@ -19,9 +19,9 @@ autre contenu** après une seule insertion.
 
 | Fichier | Rôle |
 |---|---|
-| [`engine/clone/1_acquire/fingerprint.ts`](engine/clone/1_acquire/fingerprint.ts) | relève à la capture ce que chaque élément EST : rôle stable (un h2 devenu h3 reste un titre), texte normalisé, classes débarrassées des hachages de build, chemin des parents, section, rang → `anchors.json` |
-| [`engine/clone/1_acquire/relink.ts`](engine/clone/1_acquire/relink.ts) | re-lie deux captures. Les correspondances franches forment une ossature filtrée par sa plus longue sous-suite croissante (l'ordre du document ne s'inverse pas), puis cet ordre contraint le voisinage |
-| [`engine/clone/1_acquire/relink-check.ts`](engine/clone/1_acquire/relink-check.ts) | la preuve rejouable : rejoue la mutation exacte sur une vraie baseline et juge contre la vérité terrain |
+| [`engine/clone/1_acquire/fingerprint.ts`](../../engine/clone/1_acquire/fingerprint.ts) | relève à la capture ce que chaque élément EST : rôle stable (un h2 devenu h3 reste un titre), texte normalisé, classes débarrassées des hachages de build, chemin des parents, section, rang → `anchors.json` |
+| [`engine/clone/1_acquire/relink.ts`](../../engine/clone/1_acquire/relink.ts) | re-lie deux captures. Les correspondances franches forment une ossature filtrée par sa plus longue sous-suite croissante (l'ordre du document ne s'inverse pas), puis cet ordre contraint le voisinage |
+| [`engine/clone/1_acquire/relink-check.ts`](../../engine/clone/1_acquire/relink-check.ts) | la preuve rejouable : rejoue la mutation exacte sur une vraie baseline et juge contre la vérité terrain |
 | `engine/apply/spec.ts` → `attendu` | le témoin d'identité de la cible dans la spec |
 | `engine/apply/apply.ts` | **refuse en échec franc** si l'ancre ne désigne plus la même chose |
 
@@ -52,7 +52,7 @@ pouvait mettre en ligne. J'ai ouvert la famille 4 **par son bout utile** : pas l
 la **mesure**. Le media buyer envoie du trafic PAYANT vers cette URL ; s'il perd
 l'attribution, il perd son reporting client, et ça ne se rattrape pas rétroactivement.
 
-**Ce que j'ai ajouté** ([`engine/deploy/`](engine/deploy/readme.md)) :
+**Ce que j'ai ajouté** ([`engine/deploy/`](../../engine/deploy/readme.md)) :
 
 | Fichier | Rôle |
 |---|---|
@@ -96,7 +96,7 @@ chez son client. Inacceptable comme entrée : on ne répond pas « configure un 
 quelqu'un qu'on veut convaincre. Le tag s'applique sur **la vraie page, à la vraie URL**, et le
 buyer le pose depuis un Google Tag Manager auquel il a déjà accès.
 
-**Ce que j'ai ajouté** ([`engine/deploy/tag/`](engine/deploy/tag/readme.md)) : `selector.ts`
+**Ce que j'ai ajouté** ([`engine/deploy/tag/`](../../engine/deploy/tag/readme.md)) : `selector.ts`
 (résolution à la construction), `loader.ts` (le script collé une fois), `build.ts` (loader +
 config servie), `check.ts` (le juge, sur le site LIVE), `lcp.ts` (le verdict de vitesse).
 
@@ -195,7 +195,7 @@ que `lpws.vercel.app/t/<client>.js` réponde ; puis le vrai test qui manque à t
 ## 2026-09-18 (nuit) · La refonte visuelle de l'interface, façon a1mobile
 
 **La demande.** kabylesystem veut pour les media buyers le même monde que son application
-a1mobile : clair, cocooning, net. La direction est figée dans [`design.md`](design.md).
+a1mobile : clair, cocooning, net. La direction est figée dans [`ui/design.md`](../../ui/design.md).
 
 **Ce qui a changé, sans toucher à la logique de Yann** (les gabarits et l'API sont intacts,
 seule la couche visuelle et quelques textes bougent) :

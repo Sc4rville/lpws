@@ -1,6 +1,6 @@
 /**
  * surveille.ts — LA SURVEILLANCE DE PAGE : la vraie page, relue à intervalle régulier, comparée
- * au relevé précédent (docs/business-model-rapport.md §6 ; feuille de route 1.1.3, 3.2, 3.3).
+ * au relevé précédent (docs/recherche/business-model.md §6 ; feuille de route 1.1.3, 3.2, 3.3).
  *
  * C'est ce qui fait passer LPWS d'un outil qu'on ouvre à un service qu'on paie chaque mois : le
  * buyer apprend que le tracking a cassé AVANT de brûler une semaine de budget. Chaque passage :

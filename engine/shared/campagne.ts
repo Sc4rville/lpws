@@ -58,7 +58,6 @@ export function campagne(dir: string) {
     alertes: join(dir, "surveillance", "alertes.json"),
   }
 }
-export type Campagne = ReturnType<typeof campagne>
 
 /** Un test du buyer : une variante, sa part de trafic, son cycle de vie. */
 export const Test = z.object({
