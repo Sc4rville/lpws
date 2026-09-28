@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
-import { join, normalize, resolve } from "node:path"
+import { join, normalize, resolve, sep } from "node:path"
 import { mimeDe } from "../engine/shared/mime.ts"
 
 const ROOT = resolve(import.meta.dirname, "..")
@@ -24,47 +24,50 @@ async function etape(nom: string, cmd: string, args: string[], cwd = ROOT): Prom
   let sortie = ""
   p.stdout.on("data", (b: Buffer) => { sortie += b; process.stdout.write(b) })
   const code = await new Promise<number | null>((ok) => p.on("close", ok))
-  if (code !== 0) {
-    console.error(`\n✗ verif : « ${nom} » a échoué (code ${code})`)
-    process.exit(1)
-  }
+  if (code !== 0) throw new Error(`« ${nom} » a échoué (code ${code})`)
   return sortie
 }
 
-await etape("typecheck", "npm", ["run", "-s", "typecheck"])
-await etape("menage", "npm", ["run", "-s", "menage"])
-await etape("tests", "npm", ["test", "--silent"])
-await etape("interface", "npm", ["run", "-s", "ui"])
-
-const serveur = createServer((req, res) => {
-  const chemin = normalize(decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname))
-  let f = join(UI, chemin)
-  if (!f.startsWith(UI)) return void res.writeHead(403).end()
-  if (f.endsWith("/")) f = join(f, "index.html")
-  try {
-    const corps = readFileSync(f)
-    res.writeHead(200, { "content-type": mimeDe(f) }).end(corps)
-  } catch {
-    res.writeHead(404).end()
-  }
-})
-await new Promise<void>((ok) => serveur.listen(0, "127.0.0.1", ok))
-const port = (serveur.address() as AddressInfo).port
-const bac = mkdtempSync(join(tmpdir(), "lpws-verif-"))
-
-try {
-  for (const [page, client] of [["demo/", "relay"], ["demo/boutique/", "halden"]]) {
-    const sortie = await etape(`clone de ${page} (fidèle)`, "npx",
-      ["tsx", join(ROOT, "engine/clone/run.ts"), `http://127.0.0.1:${port}/${page}`, "--client", client, "--campaign", "demo"], bac)
-    const verdict = JSON.parse(sortie.slice(sortie.lastIndexOf("\n{") + 1)) as { fidele?: boolean }
-    if (!verdict.fidele) {
-      console.error(`\n✗ verif : le clone de ${page} n'est pas fidèle`)
-      process.exit(1)
+/** la démo servie par un node:http interne ; les clones écrivent dans un bac jetable */
+async function clones() {
+  const serveur = createServer((req, res) => {
+    const chemin = normalize(decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname))
+    let f = join(UI, chemin)
+    if (f !== UI && !f.startsWith(UI + sep)) return void res.writeHead(403).end()
+    if (f.endsWith("/")) f = join(f, "index.html")
+    try {
+      const corps = readFileSync(f)
+      res.writeHead(200, { "content-type": mimeDe(f) }).end(corps)
+    } catch {
+      res.writeHead(404).end()
     }
+  })
+  await new Promise<void>((ok) => serveur.listen(0, "127.0.0.1", ok))
+  const port = (serveur.address() as AddressInfo).port
+  const bac = mkdtempSync(join(tmpdir(), "lpws-verif-"))
+
+  try {
+    for (const [page, client] of [["demo/", "relay"], ["demo/boutique/", "halden"]]) {
+      // le tsx du dépôt, en chemin absolu : depuis le bac, npx irait le chercher sur le registre
+      const sortie = await etape(`clone de ${page} (fidèle)`, join(ROOT, "node_modules/.bin/tsx"),
+        [join(ROOT, "engine/clone/run.ts"), `http://127.0.0.1:${port}/${page}`, "--client", client, "--campaign", "demo"], bac)
+      const verdict = JSON.parse(sortie.slice(sortie.lastIndexOf("\n{") + 1)) as { fidele?: boolean }
+      if (!verdict.fidele) throw new Error(`le clone de ${page} n'est pas fidèle`)
+    }
+  } finally {
+    serveur.close()
+    rmSync(bac, { recursive: true, force: true })
   }
-} finally {
-  serveur.close()
-  rmSync(bac, { recursive: true, force: true })
 }
 
-console.log(`\n✓ verif : tout passe (${Math.round((Date.now() - debut) / 1000)} s)`)
+try {
+  await etape("typecheck", "npm", ["run", "-s", "typecheck"])
+  await etape("menage", "npm", ["run", "-s", "menage"])
+  await etape("tests", "npm", ["test", "--silent"])
+  await etape("interface", "npm", ["run", "-s", "ui"])
+  await clones()
+  console.log(`\n✓ verif : tout passe (${Math.round((Date.now() - debut) / 1000)} s)`)
+} catch (e) {
+  console.error(`\n✗ verif : ${(e as Error).message}`)
+  process.exitCode = 1
+}
