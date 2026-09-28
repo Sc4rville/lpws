@@ -117,7 +117,10 @@ createServer(async (req, res) => {
     if (p === "/api/compte/abonnement" && req.method === "POST") {
       const b = await body(req)
       const retour = String(req.headers.origin ?? `http://${req.headers.host}`)
-      return json(res, 200, { url: await sessionPaiement(await lireCompte(FICHIER_COMPTE), b.palier, retour) })
+      const c0 = await lireCompte(FICHIER_COMPTE)
+      const s = await sessionPaiement(c0, b.palier, retour)
+      await ecrireCompte({ ...c0, stripe: { ...c0.stripe, session: s.id } }, FICHIER_COMPTE)
+      return json(res, 200, { url: s.url })
     }
     if (p === "/api/conclure") {
       const q = url.searchParams

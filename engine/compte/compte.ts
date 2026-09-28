@@ -38,7 +38,7 @@ export const Compte = z.object({
   marque: z.object({ nom: z.string().default(""), couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#111214"), logo: z.string().optional() }).default({ nom: "", couleur: "#111214" }),
   essai: z.object({ debut: z.string(), fin: z.string() }).optional(),
   codePartenaire: z.string().optional(),
-  stripe: z.object({ client: z.string().optional(), abonnement: z.string().optional(), statut: z.string().optional() }).optional(),
+  stripe: z.object({ session: z.string().optional(), client: z.string().optional(), abonnement: z.string().optional(), statut: z.string().optional() }).optional(),
   mandats: z.record(z.string(), Mandat).default({}),
   /** conditions d'utilisation acceptées (version, date) */
   conditions: z.object({ version: z.string(), accepteesLe: z.string() }).optional(),
