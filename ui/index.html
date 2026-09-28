@@ -227,6 +227,7 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 .toast.on{opacity:1}
 .toast.act{pointer-events:auto;padding-right:8px}
 .toast .undo{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s}
+.toast .undo[hidden]{display:none}
 .toast .undo:hover{background:rgba(255,255,255,.26)}
 .toast .undo kbd{background:transparent;color:var(--pill-muted);box-shadow:none;padding:0}
 [tabindex="-1"]:focus{outline:none}
@@ -1421,6 +1422,8 @@ function go(spec) {
     else if (k === 'guide') { S.view = 'guide'; S.mode = v; S.openMode = v; }
   }
 }
+/** un double-clic ne doit pas arrêter puis relancer : le bouton suivant apparaît sous le pointeur */
+const ACTES_ETAT = ['launch', 'stop', 'deploy', 'restore']; let dernierActe = -Infinity;
 document.addEventListener('click', e => {
   if (e.target.id === 'cmdk') { fermerK(); return; }
   const kk = e.target.closest('[data-k]');
@@ -1437,6 +1440,7 @@ document.addEventListener('click', e => {
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
   if (!act) return;
+  if (ACTES_ETAT.includes(act.dataset.act)) { if (e.timeStamp - dernierActe < 600) return; dernierActe = e.timeStamp; }
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
   const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
   switch (act.dataset.act) {
