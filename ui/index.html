@@ -1564,7 +1564,7 @@ function calcSS() {
   if (!(p > 0 && mde > 0 && clics > 0)) { out.textContent = ''; return; }
   const pl = STATS.planifier({ tauxBase: p, mde, part: .5, visiteursJour: clics });
   const base = `Avec <b>${fr(clics)} clics par jour</b> et <b>${pct(p, 1)}</b> de conversion aujourd’hui, voir une hausse de <b>${pct(mde, 0)}</b> demande ~${fr(pl.controle)} visiteurs par version`;
-  out.innerHTML = pl.faisable ? `${base} : <b>~${fr(pl.jours)} jours</b> à 50 / 50${pl.jours === STATS.REGLES.joursMin ? ' (une semaine pleine au minimum, pour lisser les jours creux)' : ''}.`
+  out.innerHTML = pl.faisable ? `${base} : <b>~${fr(pl.jours)} jours</b> à 50 / 50${pl.jours > Math.ceil((pl.controle + pl.variante) / clics) ? ' (une semaine pleine au minimum, pour lisser les jours creux)' : ''}.`
     : `${base} : ~${fr(Math.round(pl.jours / 7))} semaines, au-delà des huit qu’un test peut durer.${pl.mdeEnHuitSemaines ? ` En huit semaines, seule une hausse d’au moins <b>${pct(pl.mdeEnHuitSemaines, 0)}</b> se voit : testez un changement plus franc.` : ''}`;
 }
 function render() { renderRail(); renderPanel(); renderMain(); save(); synchroniserUrl(); }
