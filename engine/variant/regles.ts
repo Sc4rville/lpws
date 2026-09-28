@@ -24,7 +24,8 @@ import { readFileSync } from "node:fs"
 import { z } from "zod"
 import type { SignauxMecaniques } from "./signaux.ts"
 import type { SignauxJuges } from "./jugement.ts"
-import { type Contexte, Niche, nicheDe } from "./contexte.ts"
+import { type Contexte, Niche, nicheDe, texteAnnonce } from "./contexte.ts"
+import { accrocheReprise } from "./concordance.ts"
 
 export type Signaux = { m: SignauxMecaniques; j: SignauxJuges | null }
 
@@ -74,7 +75,11 @@ const CTA_GENERIQUE = /^(submit|send|soumettre|envoyer|en savoir plus|learn more
 export const QUAND: Record<string, Quand> = {
   /* ————— la promesse tenue ————— */
   "mm-promesse-titre": (s) => j(s) ? !j(s)!.promesseDansTitre.valeur : null,
-  "mm-chiffre-annonce": (s, c) => chiffreDans(c.annonce.titre + " " + (c.annonce.description ?? "")) ? s.m.hero.chiffres.length === 0 : false,
+  "mm-chiffre-annonce": (s, c) => chiffreDans(texteAnnonce(c)) ? s.m.hero.chiffres.length === 0 : false,
+  "mm-accroche-crea": (s, c) => {
+    const r = c.crea ? accrocheReprise(c.crea.accroche, s.m.hero.titre + " " + s.m.hero.sousTitre) : null
+    return r === null ? null : !r
+  },
   "mm-intentions-melangees": (_s, c) => c.annonce.motsCles.length >= 6 ? true : c.annonce.motsCles.length ? false : null,
 
   /* ————— ce que la page promet ————— */

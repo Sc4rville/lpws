@@ -37,6 +37,24 @@
     }
   },
   {
+    "id": "mm-accroche-crea",
+    "famille": "mm",
+    "niches": ["ecom", "saas", "b2b"],
+    "impact": 5,
+    "preuve": 3,
+    "risque": 1,
+    "sortie": "test",
+    "signal": "Les mots incrustés sur la créa ne se retrouvent pas en haut de la page.",
+    "pourquoi": "En paid social, le visiteur n'a rien tapé : il a vu une image ou une vidéo. C'est l'accroche de la créa qu'il cherche en arrivant ; s'il ne la retrouve pas, il croit s'être trompé de page.",
+    "action": "Reprendre l'accroche de la créa dans le titre, avec ses mots.",
+    "sources": ["instapage", "unbounce"],
+    "test": {
+      "cible": "titre",
+      "verbes": ["set"],
+      "consigne": "Réécrire le titre pour qu'il reprenne l'accroche de la créa, avec ses mots, sans rien ajouter que la page ou la créa n'affirment déjà."
+    }
+  },
+  {
     "id": "mm-intentions-melangees",
     "famille": "mm",
     "niches": ["saas", "b2b"],

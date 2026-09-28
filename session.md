@@ -10,7 +10,7 @@
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),
   **Natif** (template Shopify, contrat prêt dans [engine/deploy/readme.md](engine/deploy/readme.md)).
 - **Corpus fidèle** : HubSpot, Jira, Salesforce, Asana, monday tous sous 2,1 % desktop / 0,9 % mobile ([docs/corpus.md](docs/corpus.md)).
-- **Brain** (`engine/variant`) : signaux + jugements typés + 40 règles dans `regles.json` validé par schéma (dont 7 page produit/essai) → diagnostic → 3 variantes
+- **Brain** (`engine/variant`) : signaux + jugements typés + 41 règles dans `regles.json` validé par schéma (dont 7 page produit/essai) → diagnostic → 3 variantes
   passées aux garde-fous (chiffre inventé, superlatif, « ! » : refus dans `variantes-refusees.json`).
   Jugement mesuré à 73 % contre 6 pages annotées (`npm run brain:eval`).
   Décliner : chaque proposition donne à la demande 3 autres versions du même test (bouton « Décliner », `--decliner`).
@@ -37,7 +37,7 @@
    une vraie propriété GA4 (`customUser:lpws_variante`, `sessionKeyEventRate`), trancher la langue
    de l'interface (FR aujourd'hui).
 2. **Nourrir** (bloc 4) : refus appris par client (motif + textes) ; reste l'apprentissage entre clients (4.4).
-3. Brain : verser les règles de la recherche v2 dans `regles.json` (brief prêt, famille e-commerce et continuité créa).
+3. Brain : verser les règles de la recherche v2 dans `regles.json` (brief prêt, famille e-commerce) ; continuité créa : l'accroche est comparée, le visuel pas encore.
 4. **Intégral** : spike sur une vraie page WordPress/Webflow, seulement si un client le demande.
 5. **Shopify** : compte Partner + boutique de dev (Yann), puis backend `?view=`.
 6. Comptes et droits sur l'interface (un mot de passe partagé aujourd'hui).

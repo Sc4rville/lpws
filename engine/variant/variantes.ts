@@ -21,7 +21,7 @@ import { z } from "zod"
 import { VariantSpec } from "../apply/spec.ts"
 import type { Constat, Diagnostic } from "./diagnostic.ts"
 import type { SignauxMecaniques } from "./signaux.ts"
-import type { Contexte } from "./contexte.ts"
+import { type Contexte, texteAnnonce } from "./contexte.ts"
 import { slugify } from "../shared/paths.ts"
 import { controler, nomDeSpec, texteDuHtml, type Portee } from "./garde.ts"
 import { step } from "../shared/log.ts"
@@ -84,7 +84,7 @@ function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: s
   return `Tu écris des variantes de page d'atterrissage pour un media buyer. Tu ne conseilles pas, tu produis des éditions précises, dans un cadre fermé.
 
 RÈGLES ABSOLUES
-- N'écris que ce que la page ou l'annonce affirment déjà. Aucun chiffre, aucune garantie, aucun nom de client, aucune promesse qui ne figure ni sur la page ni dans l'annonce. ${c.limites ? "Interdit par le client : " + c.limites + "." : ""}
+- N'écris que ce que la page ou l'annonce (créa comprise) affirment déjà. Aucun chiffre, aucune garantie, aucun nom de client, aucune promesse qui ne figure ni sur la page ni dans l'annonce. ${c.limites ? "Interdit par le client : " + c.limites + "." : ""}
 - Une variante = UNE hypothèse = 1 ou 2 éditions. Pas une nouvelle page.
 - Langue de la page : ${langue}. Ton de la page. Pas de superlatif, pas de point d'exclamation.
 - Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose.
@@ -94,7 +94,7 @@ ${AMPLEUR[regime]}
 
 ANNONCE : « ${c.annonce.titre} » ${c.annonce.description ? "/ « " + c.annonce.description + " »" : ""}
 MOTS-CLÉS : ${c.annonce.motsCles.join(", ") || "(aucun)"}
-MODE DE VENTE : ${c.vente}${c.cible ? " · CIBLE : " + c.cible : ""}${c.offre ? " · OFFRE : " + c.offre : ""}
+${c.crea ? `CRÉA (${c.trafic}) : accroche « ${c.crea.accroche} »${c.crea.visuel ? " · on y voit : " + c.crea.visuel : ""}\n` : ""}MODE DE VENTE : ${c.vente}${c.cible ? " · CIBLE : " + c.cible : ""}${c.offre ? " · OFFRE : " + c.offre : ""}
 
 ANCRES DISPONIBLES
 ${ancres}
@@ -168,7 +168,7 @@ export async function ecrireVariantes(
       : m.ctas.find((x) => x.anchor === a)?.texte ?? parAncre.get(a)?.text ?? ""
   const garde = {
     page: texteDuHtml(await readFile(f.capture, "utf8")),
-    annonce: `${c.annonce.titre} ${c.annonce.description ?? ""}`,
+    annonce: texteAnnonce(c),
     avant: new Map(empreintes.map((e) => [e.a, texteAvant(e.a)])),
     boutons: new Set(m.ctas.map((x) => x.anchor)),
     ampleurMin: regime === "gros-changements" ? AMPLEUR_MIN : undefined,

@@ -20,7 +20,7 @@ l'interface, c'est le bouton « Décliner » de chaque proposition.
 
 | | |
 |---|---|
-| **Entrée** | `baseline/` (famille clone) + `context.json` : au minimum `{ annonce: { titre, description?, motsCles? }, vente }` ([`contexte.ts`](contexte.ts)) |
+| **Entrée** | `baseline/` (famille clone) + `context.json` : au minimum `{ annonce: { titre, description?, motsCles? }, vente }` ; en paid social, `trafic` et `crea: { accroche, visuel? }` : l'accroche de la créa est ce que le visiteur cherche en arrivant ([`contexte.ts`](contexte.ts)) |
 | **Sortie** | `signaux.json` · `jugement.json` · `diagnostic.json` · `specs/<nom>.json` ×3 |
 
 ## Les quatre temps, et pourquoi ils sont séparés

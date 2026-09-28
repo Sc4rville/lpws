@@ -12,6 +12,7 @@
  *   (sans mots-clés : le titre seul)
  */
 const VIDES = new Set(("a au aux avec ce ces dans de des du en et est la le les leur ou par pour sans sur un une vos votre "
+  + "qui que ne pas plus il elle on nous se sa son ses ce cette tout tous enfin "
   + "the and for with your you our are from that this into to of in on at by or an is be get").split(" "))
 
 const mots = (s: string): string[] => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -29,4 +30,10 @@ export function concordance(annonce: { titre: string; description?: string; mots
   const presents = mc.filter((k) => mots(k).every((m) => page.has(m)))
   const score = mc.length ? 0.6 * presents.length / mc.length + 0.4 * partTitre : partTitre
   return { score: Math.round(score * 100) / 100, motsClesPresents: presents, motsClesAbsents: mc.filter((k) => !presents.includes(k)), motsTitreAbsents: titre.filter((m) => !page.has(m)) }
+}
+
+/** L'accroche de la créa est reprise quand au moins un tiers de ses mots sont en haut de page ; null si elle n'en a aucun. */
+export function accrocheReprise(accroche: string, hautDePage: string): boolean | null {
+  const a = [...new Set(mots(accroche))], page = new Set(mots(hautDePage))
+  return a.length ? a.filter((m) => page.has(m)).length * 3 >= a.length : null
 }

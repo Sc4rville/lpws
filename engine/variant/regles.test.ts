@@ -91,6 +91,15 @@ test("bouton générique : un « Submit » en bas de page suffit, pas seulement 
   assert.ok(ids(diagnostiquer({ m, j: null }, saas)).tests.includes("sea-cta-generique"))
 })
 
+test("paid social : l'accroche de la créa absente du haut de page est un test ; reprise, la règle se tait", () => {
+  const meta = (accroche: string) => Contexte.parse({ annonce: { titre: "Linen overshirt" }, vente: "achat", trafic: "meta", crea: { accroche, visuel: "un homme dans un aéroport" } })
+  assert.ok(ids(diagnostiquer({ m: base(), j: null }, meta("La chemise qui ne froisse pas, même après 8 h de vol"))).tests.includes("mm-accroche-crea"))
+  assert.ok(ids(diagnostiquer({ m: base(), j: null }, meta("Washed linen overshirts, made in Europe"))).calmes.includes("mm-accroche-crea"))
+  assert.ok(ids(diagnostiquer({ m: base(), j: null }, ecom)).nonEvaluables.includes("mm-accroche-crea"))
+  // un chiffre incrusté sur la créa est une promesse chiffrée que la page doit tenir
+  assert.ok(ids(diagnostiquer({ m: base(), j: null }, meta("-30 % sur le lin cette semaine"))).tests.includes("mm-chiffre-annonce"))
+})
+
 const brutes = (): Array<Record<string, unknown>> => JSON.parse(readFileSync(new URL("./regles.json", import.meta.url), "utf8"))
 
 test("regles.json : chaque faute de la base arrête le chargement, en nommant la règle", () => {

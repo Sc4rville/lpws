@@ -22,7 +22,7 @@
  * Usage : npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sans-variantes]
  *         npm run brain -- clients/<client>/<campagne> --decliner <nom> [--consigne "plus court"] [--n 3]
  */
-import { readFile } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { dirname } from "node:path"
 import { Contexte } from "./contexte.ts"
@@ -79,7 +79,11 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   // 2. juger
   let j: SignauxJuges | null = null
   if (!opts.sansJugement) {
-    j = opts.refaire ? null : await lireCache(SignauxJuges, f.jugement)
+    // le jugement compare la page à l'annonce : une annonce ou une capture plus récente que lui le périme
+    const date = async (x: string) => (await stat(x)).mtimeMs
+    const perime = existsSync(f.jugement) && Math.max(await date(f.contexte), await date(f.capture)) > await date(f.jugement)
+    if (perime && !opts.refaire) step(SCOPE, "jugement : l'annonce ou la capture a changé depuis, on rejuge")
+    j = opts.refaire || perime ? null : await lireCache(SignauxJuges, f.jugement)
     if (j) step(SCOPE, "jugement : cache")
     else {
       const corps = corpsDe(await readFile(f.capture, "utf8"))
