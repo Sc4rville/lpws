@@ -1370,7 +1370,7 @@ function ouvrirK() {
   document.getElementById('cmdk').hidden = false;
   const q = document.getElementById('k-q'); q.value = ''; dessinerK(); q.focus();
 }
-function fermerK() { document.getElementById('cmdk').hidden = true; if (K.avant && K.avant.focus) K.avant.focus(); }
+function fermerK() { document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur(); if (K.avant && K.avant.isConnected && K.avant.focus) K.avant.focus(); }
 function dessinerK() {
   const mots = norm(K.q).split(/\s+/).filter(Boolean);
   K.list = entrees().filter(e => { const h = norm(`${e.g} ${e.l} ${e.d}`); return mots.every(m => h.includes(m)); }).slice(0, 40);
@@ -1382,7 +1382,7 @@ function dessinerK() {
   if (K.list.length) q.setAttribute('aria-activedescendant', 'k-' + K.i); else q.removeAttribute('aria-activedescendant');
   const on = document.getElementById('k-' + K.i); if (on) on.scrollIntoView({ block: 'nearest' });
 }
-function choisirK(n) { const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; go(e.go); render(); }
+function choisirK(n) { const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur(); go(e.go); render(); }
 document.addEventListener('keydown', e => {
   const ouverte = !document.getElementById('cmdk').hidden;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ouverte ? fermerK() : ouvrirK(); return; }
