@@ -13,6 +13,7 @@
  *   diagnostic.json      variant    règles déclenchées
  *   propositions.json    variant    ce que le buyer choisit
  *   specs/<nom>.json     variant    VariantSpec prêtes pour apply
+ *   variantes-refusees.json variant  propositions du modèle refusées par les garde-fous, et pourquoi
  *   variants/<nom>/      apply      variante rendue + delta
  *   tags/                deploy     loader.js + v/<client>.json
  *   tests.json           ui         l'état des tests (prep → live → stop)
@@ -43,6 +44,7 @@ export function campagne(dir: string) {
     propositions: join(dir, "propositions.json"),
     specs: join(dir, "specs"),
     spec: (nom: string) => join(dir, "specs", `${nom}.json`),
+    refusees: join(dir, "variantes-refusees.json"),
     variante: (nom: string) => join(dir, "variants", nom),
     tags: join(dir, "tags"),
     loader: join(dir, "tags", "loader.js"),
