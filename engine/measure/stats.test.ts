@@ -96,4 +96,7 @@ test("juger : l'échantillon figé au lancement gouverne, pas le taux observé",
   assert.equal(f.k, "collecte")
   assert.equal(f.plan.controle, 13_911)
   assert.ok(!f.jalons.vol)
+  // un plan sérialisé à 0 ou 100 % (Infinity → null) ne vaut pas « volume atteint »
+  const nul = juger({ ...e, o: { n: 300, c: 30 }, v: { n: 300, c: 45 }, cible: { controle: null as unknown as number, variante: null as unknown as number } })
+  assert.ok(!nul.jalons.vol)
 })

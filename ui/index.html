@@ -998,7 +998,7 @@ function vTest(c) {
   const url = previewUrl(c, t);
   const o = imgOf(c), v = imgTest(c, t);
   const ex = c.connexion.express;
-  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="0" max="100" step="5" value="${t.part}" aria-label="Part du trafic"${live && c.live ? ' disabled title="La part d’un test en cours ne change pas : arrêtez-le puis relancez-le"' : ''}><span class="v" id="partv">${t.part} %</span></label>` : '';
+  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="5" max="95" step="5" value="${t.part}" aria-label="Part du trafic"${live && c.live ? ' disabled title="La part d’un test en cours ne change pas : arrêtez-le puis relancez-le"' : ''}><span class="v" id="partv">${t.part} %</span></label>` : '';
   const principal = t.etat === 'prep' ? `<button class="btn lg" disabled>${I.clock(16)}En préparation</button>`
     : t.etat === 'echec' ? `<button class="btn lg" data-go="view:nouveau">${I.sparkle(16)}Refaire un test</button>`
     : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}" title="Annulable pendant quelques secondes">${I.stop(16)}Arrêter : l’original reprend 100 %</button>`

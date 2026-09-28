@@ -181,7 +181,10 @@ export type EntreeVerdict = {
 export function juger(e: EntreeVerdict): Verdict {
   const part = e.part > 0 && e.part < 1 ? e.part : 0.5
   const { o, v } = e
-  const fige = (p: Plan): Plan => e.cible ? { ...p, controle: e.cible.controle, variante: e.cible.variante } : p
+  // une cible nulle ou infinie (part de 0 ou 100 %, sérialisée en null) ne fige rien
+  const valide = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x > 0
+  const cible = e.cible && valide(e.cible.controle) && valide(e.cible.variante) ? e.cible : null
+  const fige = (p: Plan): Plan => cible ? { ...p, controle: cible.controle, variante: cible.variante } : p
   const planInitial = fige(planifier({ tauxBase: e.tauxBase, mde: e.mde, part, visiteursJour: e.visiteursJour }))
   const vide = { jalons: { conv: false, vol: false, duree: false, net: false }, progression: 0, joursRestants: planInitial.jours, anticipe: false, stats: null, plan: planInitial, srm: null }
   if (!o || !v || o.n <= 0 || v.n <= 0)
@@ -192,7 +195,7 @@ export function juger(e: EntreeVerdict): Verdict {
   const jours = Math.max(0, e.jours)
   const convTotal = o.c + v.c
   // sans plan figé (test d'avant les plans) : ré-estimation à l'aveugle, le taux global, jamais l'écart
-  const tauxBase = !e.cible && convTotal >= REGLES.convMin ? convTotal / (o.n + v.n) : e.tauxBase
+  const tauxBase = !cible && convTotal >= REGLES.convMin ? convTotal / (o.n + v.n) : e.tauxBase
   const vjObs = jours >= 1 ? (o.n + v.n) / jours : e.visiteursJour ?? null
   const plan = fige(planifier({ tauxBase, mde: e.mde, part, visiteursJour: vjObs }))
   const progression = Math.min(1, o.n / plan.controle, v.n / plan.variante)
