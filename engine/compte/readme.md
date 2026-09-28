@@ -11,6 +11,6 @@
   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRIX_*` : l'interface le dit. Le webhook
   n'accepte que la session créée par l'instance, payée ; un abonnement ni `active`, ni `trialing`,
   ni `past_due` ramène à l'Atelier. Retour après paiement : `LPWS_URL_PUBLIQUE` (sinon l'hôte de la
-  requête). La facturation des clients en plus de l'Agence n'est pas encore envoyée à Stripe.
+  requête). Les clients en plus de l'Agence ne sont pas encore envoyés à Stripe : au-delà de 15, un compte abonné par Stripe est bloqué (sans Stripe, la note du dépassement reste affichée).
 - [`couts.ts`](couts.ts) : coût réel des appels modèle (`clients/couts.jsonl`), groupés en
   diagnostics. `npm run couts`.

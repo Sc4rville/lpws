@@ -78,6 +78,8 @@ export const Test = z.object({
   lanceLe: z.string().optional(),
   /** la fin de la collecte (arrêt ou déploiement) : le verdict archivé se lit à cette date */
   finLe: z.string().optional(),
+  /** le jour où un gagnant déployé a cessé d'être servi : il a occupé le client jusque-là (clients actifs du mois) */
+  retireLe: z.string().optional(),
   /** l'horizon fixé AU LANCEMENT (engine/measure/stats.ts) : on ne le recalcule pas en regardant */
   plan: Plan.optional(),
   /** les lancements terminés qu'une relance a remplacés : leur fenêtre reste mesurable même sans ligne au journal */

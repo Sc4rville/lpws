@@ -217,7 +217,7 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     throw Object.assign(new Error("Un test se lance entre 5 et 95 % : à 0 ou 100 %, il n’y a rien à comparer."), { code: 409 })
   if (etat === "gagnant" && t.etat !== "live" && t.etat !== "stop")
     throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
-  const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan, o.anciens] as const)
+  const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan, o.anciens, o.retireLe] as const)
   const maintenant = new Date().toISOString()
   // seul un test qui collectait entre au journal : un test déjà arrêté a ses chiffres, on n'y touche plus
   const arretes = new Set<string>(), deployes = new Set<string>()
@@ -237,10 +237,10 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
   } else if (etat === "gagnant") {
     if (t.etat === "stop") deployes.add(t.id)
     cesse(t); t.etat = "gagnant"; t.part = 100
-    for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant")) { cesse(o); o.etat = "stop"; o.part = 0 }
+    for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant")) { if (o.etat === "gagnant") o.retireLe = maintenant; cesse(o); o.etat = "stop"; o.part = 0 }
   } else {
     // « Remettre l'original » : un gagnant déployé redescend à 0 %, un test vivant s'arrête
-    if (t.etat === "gagnant") t.part = 0
+    if (t.etat === "gagnant") { t.part = 0; t.retireLe = maintenant }
     cesse(t); t.etat = "stop"
   }
   await ecrireJson(fichiersDe(d).tests, tests)
@@ -253,7 +253,7 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
     const cible = all.find((x) => x.id === id)
     if (code !== 0) {
-      for (const [oid, oetat, opart, olance, ofin, oplan, oanciens] of avant) { const o = all.find((x) => x.id === oid); if (o) Object.assign(o, { etat: oetat, part: opart, lanceLe: olance, finLe: ofin, plan: oplan, anciens: oanciens }) }
+      for (const [oid, oetat, opart, olance, ofin, oplan, oanciens, oretire] of avant) { const o = all.find((x) => x.id === oid); if (o) Object.assign(o, { etat: oetat, part: opart, lanceLe: olance, finLe: ofin, plan: oplan, anciens: oanciens, retireLe: oretire }) }
       if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)

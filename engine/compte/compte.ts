@@ -90,7 +90,7 @@ export async function clientsActifs(racine = CLIENTS_ROOT, maintenant = new Date
     for (const k of await readdir(join(racine, c.name), { withFileTypes: true })) {
       if (!k.isDirectory()) continue
       const tests = await lireJson<Test[]>(fichiersDe(join(racine, c.name, k.name)).tests, [])
-      if (tests.some((t) => t.lanceLe && (t.etat === "live" || t.etat === "gagnant" || (t.finLe ?? t.lanceLe) >= debutMois))) { actif = true; break }
+      if (tests.some((t) => t.lanceLe && (t.etat === "live" || t.etat === "gagnant" || (t.retireLe ?? t.finLe ?? t.lanceLe) >= debutMois))) { actif = true; break }
     }
     if (actif) actifs.push(c.name)
   }
@@ -108,6 +108,9 @@ export async function peutLancer(c: Compte, client: string, racine = CLIENTS_ROO
     return { ok: false, action: "palier", raison: "L’Atelier prépare et diagnostique, il ne met pas en ligne. Démarrez l’essai de 14 jours (sans carte) ou passez en Solo pour lancer ce test." }
   const actifs = await clientsActifs(racine)
   if (p.clientsActifs === null || actifs.includes(client) || actifs.length < p.clientsActifs) return { ok: true }
+  // Stripe ne facture que l'abonnement : un client en plus n'y serait jamais payé
+  if (p.parClientEnPlus !== null && c.stripe?.abonnement)
+    return { ok: false, action: "limite", raison: `${p.nom} inclut ${p.clientsActifs} clients actifs par mois, et ${actifs.length} le sont déjà. Les clients en plus ne sont pas encore facturables en ligne : écrivez-nous pour passer au Régime, ou attendez le mois prochain.` }
   if (p.parClientEnPlus !== null)
     return { ok: true, note: `${actifs.length + 1}ᵉ client actif ce mois-ci : ${p.parClientEnPlus} $ en plus de l’abonnement ${p.nom}.` }
   return { ok: false, action: "limite", raison: `${p.nom} inclut ${p.clientsActifs} clients actifs par mois, et ${actifs.length} le sont déjà (${actifs.join(", ")}). Passez en Agence, ou attendez le mois prochain.` }

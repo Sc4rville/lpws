@@ -96,7 +96,7 @@ npm run couts
 
 Variables optionnelles de l'interface : `LPWS_FACTURATION=1` (appliquer les paliers),
 `LPWS_SURVEILLANCE=1` (relevés automatiques), `STRIPE_SECRET_KEY` · `STRIPE_WEBHOOK_SECRET` ·
-`STRIPE_PRIX_*` (paiement ; sans elles, l'interface le dit), `LPWS_URL_PUBLIQUE` (retour après paiement).
+`STRIPE_PRIX_*` (paiement ; sans elles, l'interface le dit), `LPWS_URL_PUBLIQUE` (retour après paiement), `LPWS_AUDIT_LOCAL=1` (une instance hébergée, avec `LPWS_MOT_DE_PASSE`, refuse sinon d'auditer ou de copier une adresse de son réseau interne).
 
 État d'avancement du clonage : [engine/clone/readme.md](engine/clone/readme.md).
 

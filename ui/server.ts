@@ -54,6 +54,7 @@ import { etat, nomDuSite } from "./server/etat.ts"
 import { FICHIER_COMPTE, FACTURATION, resumeCompte } from "./server/compte.ts"
 import { lancerAudit, lancerSurveillance, tourDeSurveillance } from "./server/suivi.ts"
 import { dossierAudit } from "../engine/audit/audit.ts"
+import { verifierAdresse } from "./server/adresse.ts"
 import { planifier, mdePour } from "../engine/measure/stats.ts"
 import { rapportHtml } from "../engine/rapport/rapport.ts"
 import { MOTIFS, estMotif } from "../engine/measure/experience.ts"
@@ -101,6 +102,7 @@ createServer(async (req, res) => {
       const { url: u } = await body(req)
       let cible: URL
       try { cible = new URL(String(u ?? "").trim()) ; if (!/^https?:$/.test(cible.protocol)) throw 0 } catch { return json(res, 400, { erreur: "Collez l’adresse complète de la page, avec https://" }) }
+      await verifierAdresse(cible)
       const r = await capturer(cible.toString())
       return json(res, 202, { job: r.job.id, client: r.client, campagne: r.campagne, id: `${r.client}/${r.campagne}` })
     }
@@ -135,6 +137,7 @@ createServer(async (req, res) => {
       const { url: u } = await body(req)
       let cible: URL
       try { cible = new URL(String(u ?? "").trim()); if (!/^https?:$/.test(cible.protocol)) throw 0 } catch { return json(res, 400, { erreur: "Collez l’adresse complète de la page, avec https://" }) }
+      await verifierAdresse(cible)
       return json(res, 202, { job: lancerAudit(cible.toString(), join(ROOT, dossierAudit(cible.toString()))).id })
     }
     if (seg[0] === "api" && seg[1] === "jobs" && seg[2]) { const j = jobs.get(seg[2]); return j ? json(res, 200, j) : json(res, 404, { erreur: "job inconnu" }) }
