@@ -1445,7 +1445,7 @@ document.addEventListener('click', e => {
   if (!act) return;
   if (ACTES_ETAT.includes(act.dataset.act)) {
     const cle = `${act.dataset.client || S.ctx}/${act.dataset.test || S.test}`;
-    if (e.timeStamp - (dernierActe[cle] ?? -Infinity) < 600) return;
+    if (e.detail > 1 || e.timeStamp - (dernierActe[cle] ?? -Infinity) < 600) return;
     dernierActe[cle] = e.timeStamp;
   }
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
