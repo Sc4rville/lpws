@@ -14,6 +14,7 @@
   passées aux garde-fous (chiffre inventé, superlatif, « ! » : refus dans `variantes-refusees.json`).
   Jugement mesuré à 73 % contre 6 pages annotées (`npm run brain:eval`).
   Décliner : chaque proposition donne à la demande 3 autres versions du même test (bouton « Décliner », `--decliner`).
+  « Pas celui-là » prend un motif ; les refus du client sont relus à chaque écriture (textes refusés interdits).
 - **Mesure** : GA4 par fenêtre de test, un seul moteur stats (`engine/measure/stats.ts`, embarqué
   aussi dans l'UI), journal des expériences, « Peut-on conclure ? ».
 - **Modules business** : audit tracking, surveillance, compte/paliers/mandats, rapport client, coûts.
@@ -33,7 +34,7 @@
 1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
    une vraie propriété GA4 (`customUser:lpws_variante`, `sessionKeyEventRate`), trancher la langue
    de l'interface (FR aujourd'hui).
-2. **Nourrir** (bloc 4) : apprendre des refus de propositions (déjà stockés).
+2. **Nourrir** (bloc 4) : refus appris par client (motif + textes) ; reste l'apprentissage entre clients (4.4).
 3. Brain : les règles en fichier de données validé par schéma (aujourd'hui dans `regles.ts`).
 4. **Intégral** : spike sur une vraie page WordPress/Webflow, seulement si un client le demande.
 5. **Shopify** : compte Partner + boutique de dev (Yann), puis backend `?view=`.

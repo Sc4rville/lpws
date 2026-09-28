@@ -56,6 +56,7 @@ import { lancerAudit, lancerSurveillance, tourDeSurveillance } from "./server/su
 import { dossierAudit } from "../engine/audit/audit.ts"
 import { planifier, mdePour } from "../engine/measure/stats.ts"
 import { rapportHtml } from "../engine/rapport/rapport.ts"
+import { MOTIFS, estMotif } from "../engine/measure/experience.ts"
 import { lireCompte, ecrireCompte, demarrerEssai, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
 import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/compte/stripe.ts"
 import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat } from "./server/pipeline.ts"
@@ -176,7 +177,11 @@ createServer(async (req, res) => {
         const props = await lireJson<any[]>(f, [])
         const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
         // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
-        p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = String((await body(req)).raison ?? "")
+        // le motif en un clic, la raison en mots si le buyer en écrit une : le brain relit les deux
+        const b = await body(req), m: unknown = b.motif, motif = estMotif(m) ? m : undefined
+        const libre = String(b.raison ?? "").trim().slice(0, 300)
+        p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = [motif && MOTIFS[motif], libre].filter(Boolean).join(" : ")
+        if (motif) p.motif = motif
         await ecrireJson(f, props); return json(res, 200, { ok: true })
       }
       if (seg[4] === "propositions" && seg[5] && seg[6] === "decliner" && req.method === "POST")

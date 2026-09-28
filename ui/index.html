@@ -1342,15 +1342,27 @@ function vCampagne(c) {
       </div>
     </div>`;
 }
+/* « Pas celui-là » : les motifs de engine/measure/experience.ts (MOTIFS), en un clic */
+const MOTIFS_REFUS = [
+  ['ton', 'Pas le ton de la marque', 'LPWS évitera ce ton chez ce client'],
+  ['promesse', 'Promet ce que le client ne tient pas', 'LPWS évitera cette promesse chez ce client'],
+  ['essaye', 'Déjà essayé', 'Ce test ne sera plus proposé chez ce client'],
+  ['plus-tard', 'Pas maintenant', 'Retirée pour cette fois : elle pourra revenir à la prochaine analyse'],
+];
 /* Décliner : d'une proposition, trois autres versions du même test, à la consigne du buyer */
 function carteProposition(c, p) {
   const nom = esc(p.nom), dc = c.declinaison, ecrit = dc && dc.source === p.nom, occupe = !!dc;
   const pied = ecrit
     ? `<div class="d"><b>LPWS écrit d’autres versions de ce test.</b></div>${jobBox(dc.job)}`
+    : S.refus === p.nom
+    ? `<div class="d"><b>Pourquoi ?</b> LPWS s’en souvient : les prochaines versions pour ce client en tiennent compte.</div>
+       <div class="f" style="flex-wrap:wrap">${MOTIFS_REFUS.map(([k, l, t]) => `<button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}" data-motif="${k}" title="${t}">${l}</button>`).join('')}</div>
+       <label class="fld"><input class="inp" id="refus-raison" maxlength="300" placeholder="Ou en vos mots (facultatif) : ex. le client ne parle jamais de prix" value="${esc(S.refusRaison || '')}"></label>
+       <div class="f"><button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}">Retirer</button><button class="btn sm" data-act="refus-fermer">Annuler</button></div>`
     : S.decl === p.nom
     ? `<label class="fld" style="font-weight:600">D’autres versions de ce test<input class="inp" id="decl-consigne" maxlength="300" placeholder="Une consigne ? ex. plus court, parler de la livraison" value="${esc(S.declConsigne || '')}"><span class="muted" style="font-weight:400">Trois variantes différentes de celles déjà proposées, avec les mêmes garde-fous : rien que la page ou l’annonce n’affirme déjà.</span></label>
        <div class="f">${GO(I.sparkle(15) + 'Écrire 3 versions', `data-act="decliner" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-fermer">Annuler</button></div>`
-    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : 'title="Trois autres versions de ce test, à votre consigne"'}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div>`;
+    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : 'title="Trois autres versions de ce test, à votre consigne"'}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refus-ouvrir" data-nom="${nom}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div>`;
   const source = p.declineDe && (c.propositions || []).find(x => x.nom === p.declineDe);
   return `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.declineDe ? `<span class="chip" title="${esc(source ? 'Déclinée de « ' + source.titre + ' »' : 'Déclinaison')}">Déclinaison</span>` : ''}${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div>${p.consigne ? `<div class="d"><b>Consigne.</b> ${esc(p.consigne)}</div>` : ''}<div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div>${pied}</div>`;
 }
@@ -1783,7 +1795,9 @@ document.addEventListener('click', e => {
       api(`/api/clients/${c.id}/propositions/${act.dataset.nom}`).then(async r => { toast('Test en préparation : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Test prêt à lancer' : 'La préparation a échoué'); await chargerEtat(); render(); }); }).catch(e => toast(e.message));
       break;
     }
-    case 'decliner-ouvrir': S.decl = act.dataset.nom; S.declConsigne = ''; render(); setTimeout(() => { const z = document.getElementById('decl-consigne'); if (z) z.focus(); }); break;
+    case 'refus-ouvrir': S.refus = act.dataset.nom; S.refusRaison = ''; S.decl = null; render(); setTimeout(() => { const z = document.getElementById('refus-raison'); if (z) z.focus(); }); break;
+    case 'refus-fermer': S.refus = null; render(); break;
+    case 'decliner-ouvrir': S.decl = act.dataset.nom; S.declConsigne = ''; S.refus = null; render(); setTimeout(() => { const z = document.getElementById('decl-consigne'); if (z) z.focus(); }); break;
     case 'decliner-fermer': S.decl = null; render(); break;
     case 'decliner': {
       if (!c) break;
@@ -1797,7 +1811,8 @@ document.addEventListener('click', e => {
     case 'rapport': if (c) copier(rapportTexte(c), 'Rapport copié'); break;
     case 'refuser': {
       if (!c) break;
-      api(`/api/clients/${c.id}/propositions/${act.dataset.nom}/refuser`, {}).then(async () => { toast('Proposition retirée'); await chargerEtat(); render(); }).catch(e => toast(e.message));
+      const motif = act.dataset.motif, raison = (document.getElementById('refus-raison') || {}).value || '';
+      api(`/api/clients/${c.id}/propositions/${act.dataset.nom}/refuser`, { motif, raison }).then(async () => { S.refus = null; toast(motif === 'plus-tard' ? 'Retirée pour cette fois' : 'Retirée : LPWS s’en souviendra'); await chargerEtat(); render(); }).catch(e => toast(e.message));
       break;
     }
     case 'report': {
@@ -1894,6 +1909,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'au-url') S.auditUrl = e.target.value;
   if (e.target.id === 'md-par') S.mandatPar = e.target.value;
   if (e.target.id === 'decl-consigne') S.declConsigne = e.target.value;
+  if (e.target.id === 'refus-raison') S.refusRaison = e.target.value;
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
   if (e.target.id === 'nt-text') S.ntText = e.target.value;
   if (e.target.id === 'nt-why') S.ntWhy = e.target.value;

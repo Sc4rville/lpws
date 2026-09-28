@@ -49,7 +49,11 @@ lancement : remettre l'original après un déploiement met la ligne à jour sans
 `deploye`. Les non-concluants restent : c'est ce qu'on apprendra de plus utile.
 
 `historique` relit toutes les pages du client ; `aEviter` en tire les règles perdues ou
-refusées par le buyer, que le brain ne repropose plus.
+refusées par le buyer, que le brain ne repropose plus. « Pas celui-là » demande un motif en un
+clic (`MOTIFS` : ton, promesse, déjà essayé, pas maintenant) et une raison libre ; « pas
+maintenant » retire la proposition sans écarter la règle. Les autres refus deviennent des
+`lecons` : l'écriture des variantes du client relit leurs textes et leur raison, et refuse
+un texte déjà refusé.
 
 ## Ce que le buyer fait, une fois par client (3 minutes)
 

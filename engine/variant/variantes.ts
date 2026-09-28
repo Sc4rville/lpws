@@ -68,7 +68,11 @@ const Propositions = z.array(z.unknown()).min(1).max(4)
  *  éventuellement la consigne du buyer (« plus court », « parler de la livraison »). */
 export type Declinaison = { n: number; consigne?: string; deja: string[] }
 
-function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime, dec?: Declinaison): string {
+/** Ce que le buyer a refusé chez ce client, en clair : les textes de la spec et sa raison. */
+export type RefusBuyer = { textes: string[]; raison: string }
+const LECONS_MAX = 8
+
+function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime, dec?: Declinaison, lecons: RefusBuyer[] = []): string {
   const ancres = [
     m.hero.titreAnchor && `${m.hero.titreAnchor} = TITRE « ${m.hero.titre} »`,
     m.hero.sousTitreAnchor && `${m.hero.sousTitreAnchor} = SOUS-TITRE « ${m.hero.sousTitre.slice(0, 120)} »`,
@@ -97,7 +101,7 @@ ${ancres}
 
 ${dec ? `CONSTAT À DÉCLINER EN ${dec.n} VARIANTE${dec.n > 1 ? "S" : ""} (chacune avec "regle": "${constats[0].id}", différentes entre elles et de celles déjà proposées)` : "CONSTATS À TRANSFORMER EN VARIANTES (une variante par constat, dans cet ordre)"}
 ${constats.map((k, i) => `${i + 1}. [${k.id}] ${k.signal}\n   Action : ${k.action}\n   Consigne : ${k.test?.consigne}\n   Verbes autorisés : ${k.test?.verbes.join(", ")} · Cible : ${k.test?.cible}`).join("\n")}
-${dec?.deja.length ? `\nDÉJÀ PROPOSÉ POUR CE CONSTAT (ne pas le répéter, ni le reformuler à peine) :\n${dec.deja.map((x) => "- " + x).join("\n")}\n` : ""}${dec?.consigne ? `\nCONSIGNE DU MEDIA BUYER (à suivre dans les règles absolues, qui priment toujours) : ${dec.consigne}\n` : ""}
+${dec?.deja.length ? `\nDÉJÀ PROPOSÉ POUR CE CONSTAT (ne pas le répéter, ni le reformuler à peine) :\n${dec.deja.map((x) => "- " + x).join("\n")}\n` : ""}${lecons.length ? `\nREFUSÉ PAR LE MEDIA BUYER CHEZ CE CLIENT (ne pas y revenir, et en tirer la leçon pour le ton et la promesse) :\n${lecons.map((l) => `- ${l.textes.map((t) => "« " + t.slice(0, 90) + " »").join(" + ")}${l.raison ? " : " + l.raison : ""}`).join("\n")}\n` : ""}${dec?.consigne ? `\nCONSIGNE DU MEDIA BUYER (à suivre dans les règles absolues, qui priment toujours) : ${dec.consigne}\n` : ""}
 Réponds UNIQUEMENT par un tableau JSON, sans texte autour, sans balises :
 [{"regle": "<id du constat>", "titre": "...", "hypothese": "Si ... alors ... parce que ...", "metrique": "...", "risque": "...", "edits": [{"anchor": "e123", "op": "set", "text": "...", "pourquoi": "..."}]}]`
 }
@@ -127,8 +131,11 @@ export type VarianteProduite = { nom: string; regle: string; fichier: string; ti
 const normer = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
 
 export async function ecrireVariantes(
-  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime = "inconnu", dec?: Declinaison,
+  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime = "inconnu",
+  opts: { dec?: Declinaison; lecons?: RefusBuyer[]; reserves?: string[] } = {},
 ): Promise<VarianteProduite[]> {
+  const { dec } = opts
+  const lecons = (opts.lecons ?? []).filter((l) => l.textes.length).slice(0, LECONS_MAX)
   const f = fichiersDe(campagne)
   const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(f.ancres, "utf8"))
   const parAncre = new Map(empreintes.map((e) => [e.a, e]))
@@ -153,7 +160,7 @@ export async function ecrireVariantes(
   // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
   // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
   // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
-  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue, regime, dec), Propositions, "liste")
+  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue, regime, dec, lecons), Propositions, "liste")
   if (!brutes) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
   const texteAvant = (a: string): string =>
@@ -180,8 +187,9 @@ export async function ecrireVariantes(
     step(SCOPE, `proposition hors contrat (${premierEcart(r.error)}) : refusée, les autres continuent`)
   }
   // une déclinaison s'ajoute aux specs existantes : elle ne doit en écraser aucune
-  const pris = new Set<string>(dec && existsSync(f.specs) ? (await readdir(f.specs)).map((x) => x.replace(/\.json$/, "")) : [])
-  const dejaVus = new Set((dec?.deja ?? []).map(normer))
+  const pris = new Set<string>([...opts.reserves ?? [], ...dec && existsSync(f.specs) ? (await readdir(f.specs)).map((x) => x.replace(/\.json$/, "")) : []])
+  const dejaVus = new Map<string, string>((dec?.deja ?? []).map((t) => [normer(t), "est déjà proposé"]))
+  for (const l of opts.lecons ?? []) for (const t of l.textes) dejaVus.set(normer(t), "a déjà été refusé par le buyer")
   const sorties: VarianteProduite[] = []
   for (const p of props) {
     if (dec && sorties.length >= dec.n) break
@@ -193,7 +201,7 @@ export async function ecrireVariantes(
     if (inconnue) { refuser(p, [`vise l'ancre ${inconnue} qui n'existe pas`]); continue }
     // le prompt demande ; le script vérifie
     const raisons = controler(p.edits, garde, porteeDe(k, m))
-    for (const e of p.edits) if (e.text && dejaVus.has(normer(e.text))) raisons.push(`« ${e.text.slice(0, 60)} » est déjà proposé`)
+    for (const e of p.edits) { const vu = e.text && dejaVus.get(normer(e.text)); if (vu) raisons.push(`« ${e.text!.slice(0, 60)} » ${vu}`) }
     if (raisons.length) { refuser(p, raisons); continue }
 
     const nom = nomDeSpec(p.titre, pris, slugify)
@@ -226,7 +234,7 @@ export async function ecrireVariantes(
       : e0.op === "swap" ? `Échanger ${nommer(e0.anchor)} et ${nommer(e0.with ?? "")}`
       : `Déplacer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
     sorties.push({ nom, regle: k.id, fichier, titre: p.titre, teste })
-    for (const e of p.edits) if (e.text) dejaVus.add(normer(e.text))
+    for (const e of p.edits) if (e.text) dejaVus.set(normer(e.text), "est déjà proposé")
     step(SCOPE, `✓ ${p.titre} → ${fichier}`)
   }
   // le relevé des défauts d'écriture : ce que le modèle a tenté et pourquoi c'est tombé

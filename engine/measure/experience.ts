@@ -14,6 +14,8 @@
  *
  * `aEviter` lit toutes les pages d'un client et rend les règles à ne plus reproposer : celles
  * dont la variante a PERDU, et celles que le buyer a refusées. Le brain les écarte et le dit.
+ * « Pas maintenant » retire la proposition sans écarter la règle. Chaque refus devient aussi une
+ * `lecon` (le texte refusé et son motif) que l'écriture des variantes relit chez ce client.
  *
  * `bilanRegles` lit tous les clients et compte, règle par règle, les tests conclus : c'est la
  * confiance de la base de connaissances (4.5). Seuls des COMPTES en sortent — ni texte, ni page,
@@ -134,6 +136,19 @@ export async function retirerExperience(dir: string, t: Test): Promise<void> {
 
 export type Refus = { regle: string; raison: string; le?: string }
 
+/** Pourquoi le buyer retire une proposition : « Pas celui-là », en un clic. */
+export const MOTIFS = {
+  ton: "Pas le ton de la marque",
+  promesse: "Promet ce que le client ne tient pas",
+  essaye: "Déjà essayé",
+  "plus-tard": "Pas maintenant",
+} as const
+export type Motif = keyof typeof MOTIFS
+export const estMotif = (x: unknown): x is Motif => typeof x === "string" && Object.hasOwn(MOTIFS, x)
+
+/** Une proposition refusée, relue à la prochaine écriture : la spec dit ce qui a été refusé, la raison pourquoi. */
+export type Lecon = { regle: string; fichier: string; raison: string; motif?: Motif; le?: string }
+
 export type Bilan = { gagnes: number; perdus: number; nuls: number; clients: number }
 
 /** Ce que chaque règle a donné, tous clients confondus : des comptes, rien d'autre. */
@@ -157,9 +172,9 @@ export async function bilanRegles(racine: string): Promise<Map<string, Bilan>> {
 }
 
 /** Tout ce qu'on sait déjà d'un client, toutes pages confondues. */
-export async function historique(clientDir: string): Promise<{ experiences: Array<Experience & { campagne: string }>; refus: Refus[] }> {
-  const experiences: Array<Experience & { campagne: string }> = [], refus: Refus[] = []
-  if (!existsSync(clientDir)) return { experiences, refus }
+export async function historique(clientDir: string): Promise<{ experiences: Array<Experience & { campagne: string }>; refus: Refus[]; lecons: Lecon[] }> {
+  const experiences: Array<Experience & { campagne: string }> = [], refus: Refus[] = [], lecons: Lecon[] = []
+  if (!existsSync(clientDir)) return { experiences, refus, lecons }
   for (const camp of await readdir(clientDir)) {
     const d = join(clientDir, camp)
     if (!(await stat(d)).isDirectory()) continue
@@ -169,11 +184,16 @@ export async function historique(clientDir: string): Promise<{ experiences: Arra
       if (e.success) experiences.push({ ...e.data, campagne: camp })
     }
     // refuser une déclinaison, c'est refuser une formulation, pas la règle : le texte, lui, reste
-    // dans les « déjà proposé » des prochaines déclinaisons
-    for (const p of await lireJson<Array<{ regle?: string; refusee?: boolean; raison?: string; refuseeLe?: string; declineDe?: string }>>(f.propositions, []))
-      if (p.refusee && p.regle && !p.declineDe) refus.push({ regle: p.regle, raison: p.raison ?? "", le: p.refuseeLe })
+    // dans les « déjà proposé » des prochaines déclinaisons ; « pas maintenant » n'écarte rien
+    for (const p of await lireJson<Array<{ regle?: string; fichier?: string; refusee?: boolean; raison?: string; motif?: string; refuseeLe?: string; declineDe?: string }>>(f.propositions, [])) {
+      if (!p.refusee || !p.regle) continue
+      const motif = estMotif(p.motif) ? p.motif : undefined
+      if (!p.declineDe && motif !== "plus-tard") refus.push({ regle: p.regle, raison: p.raison ?? "", le: p.refuseeLe })
+      if (p.fichier && motif !== "plus-tard") lecons.push({ regle: p.regle, fichier: p.fichier, raison: p.raison ?? "", ...(motif ? { motif } : {}), le: p.refuseeLe })
+    }
   }
-  return { experiences, refus }
+  lecons.sort((a, b) => (b.le ?? "").localeCompare(a.le ?? ""))
+  return { experiences, refus, lecons }
 }
 
 /** Les règles à ne plus reproposer chez ce client, avec la raison que le brain affichera. */
