@@ -59,7 +59,7 @@ a{color:inherit}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:8px}
 svg{flex:none}
 ::selection{background:var(--blue);color:var(--on-accent)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
 .app{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:64px 292px minmax(0,1fr);gap:14px;padding:16px}
 /* le verre : flou saturé, un reflet net sur l'arête haute, un liseré qui capte la lumière */
@@ -666,7 +666,7 @@ const THEMES = { auto: ['Auto', 'auto'], light: ['Clair', 'sun'], dark: ['Sombre
 let theme = (() => { try { const t = localStorage.getItem('lpws-theme'); return THEMES[t] ? t : 'auto'; } catch { return 'auto'; } })();
 const calme = matchMedia('(prefers-reduced-motion: reduce)');
 /** les changements d'écran passent par une transition de vue quand le navigateur sait la faire */
-function transition(f) { if (!document.startViewTransition || calme.matches) { f(); return; } document.startViewTransition(f); }
+function transition(f) { if (!document.startViewTransition || calme.matches) { f(); return; } document.startViewTransition(f).ready.catch(() => {}); }
 function changerTheme(t, depuis) {
   const appliquer = () => {
     theme = t; const r = document.documentElement;
@@ -678,7 +678,7 @@ function changerTheme(t, depuis) {
   const r = document.documentElement, b = depuis && depuis.getBoundingClientRect();
   if (b) { r.style.setProperty('--tx', b.left + b.width / 2 + 'px'); r.style.setProperty('--ty', b.top + b.height / 2 + 'px'); }
   r.classList.add('vt-theme');
-  document.startViewTransition(appliquer).finished.finally(() => r.classList.remove('vt-theme'));
+  const vt = document.startViewTransition(appliquer); vt.ready.catch(() => {}); vt.finished.finally(() => r.classList.remove('vt-theme'));
 }
 
 /* ---------- utilitaires ---------- */
@@ -1439,7 +1439,7 @@ function synchroniserUrl() {
   const h2 = document.querySelector('#main h2');
   if (h2 && document.getElementById('cmdk').hidden) { h2.setAttribute('tabindex', '-1'); h2.focus({ preventScroll: true }); }
 }
-window.addEventListener('popstate', () => { transition(() => { if (lireHash()) render(); }); });
+window.addEventListener('popstate', () => { if (lireHash()) transition(render); });
 
 /* ---------- la palette : un client, un test, une action, sans quitter le clavier ---------- */
 const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -1479,7 +1479,7 @@ function dessinerK() {
 function choisirK(n) {
   const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur();
   if (e.theme) { changerTheme(e.theme, document.querySelector('[data-act="theme"]')); return; }
-  transition(() => { go(e.go); render(); });
+  go(e.go); transition(render);
 }
 document.addEventListener('keydown', e => {
   const ouverte = !document.getElementById('cmdk').hidden;
@@ -1538,7 +1538,7 @@ document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]');
   if (g) {
     if (g.dataset.go.startsWith('mode:')) { const m = g.dataset.go.slice(5); S.openMode = S.openMode === m ? null : m; renderPanel(); save(); return; }
-    transition(() => { go(g.dataset.go); render(); }); return;
+    go(g.dataset.go); transition(render); return;
   }
   const pk = e.target.closest('[data-pick]');
   if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois','tauxConversion']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
