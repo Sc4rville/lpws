@@ -10,7 +10,8 @@
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),
   **Natif** (template Shopify, contrat prêt dans [engine/deploy/readme.md](engine/deploy/readme.md)).
 - **Corpus fidèle** : HubSpot, Jira, Salesforce, Asana, monday tous sous 2,1 % desktop / 0,9 % mobile ([docs/corpus.md](docs/corpus.md)).
-- **Brain** (`engine/variant`) : signaux + jugements typés + 34 règles → diagnostic → 3 variantes.
+- **Brain** (`engine/variant`) : signaux + jugements typés + 41 règles (dont 7 page produit/essai) → diagnostic → 3 variantes
+  passées aux garde-fous (chiffre inventé, superlatif, « ! » : refus dans `variantes-refusees.json`).
   Jugement mesuré à 73 % contre 6 pages annotées (`npm run brain:eval`).
 - **Mesure** : GA4 par fenêtre de test, un seul moteur stats (`engine/measure/stats.ts`, embarqué
   aussi dans l'UI), journal des expériences, « Peut-on conclure ? ».
