@@ -18,7 +18,7 @@
 import { readFile } from "node:fs/promises"
 import { z } from "zod"
 import { VariantSpec } from "../apply/spec.ts"
-import type { Constat } from "./diagnostic.ts"
+import type { Constat, Diagnostic } from "./diagnostic.ts"
 import type { SignauxMecaniques } from "./signaux.ts"
 import type { Contexte } from "./contexte.ts"
 import { slugify } from "../shared/paths.ts"
@@ -29,6 +29,18 @@ import { ecrireJson, premierEcart } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
 
 const SCOPE = "variant/variantes"
+
+type Regime = Diagnostic["regime"]
+
+/** Sous 200 k visiteurs/mois, une variante faite de textes seuls doit en changer au moins la moitié. */
+const AMPLEUR_MIN = 0.5
+
+/** L'ampleur des éditions que le volume du client permet de mesurer (docs/brain.html). */
+const AMPLEUR: Record<Regime, string> = {
+  "gros-changements": "- PEU DE TRAFIC : seul un gros changement se mesure. Réécris vraiment (un autre angle, pas trois mots retouchés), ou déplace, retire, duplique. Une retouche fine serait refusée.",
+  "chirurgical": "- BEAUCOUP DE TRAFIC : un changement ciblé se mesure. Une seule idée par variante, pour savoir ce qui a joué.",
+  "inconnu": "",
+}
 
 const Proposition = z.object({
   regle: z.string(),
@@ -51,7 +63,7 @@ const Proposition = z.object({
  * les deux autres (constaté : un « pourquoi » trop court faisait tomber les trois variantes) */
 const Propositions = z.array(z.unknown()).min(1).max(4)
 
-function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string): string {
+function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime): string {
   const ancres = [
     m.hero.titreAnchor && `${m.hero.titreAnchor} = TITRE « ${m.hero.titre} »`,
     m.hero.sousTitreAnchor && `${m.hero.sousTitreAnchor} = SOUS-TITRE « ${m.hero.sousTitre.slice(0, 120)} »`,
@@ -67,6 +79,7 @@ RÈGLES ABSOLUES
 - Une variante = UNE hypothèse = 1 ou 2 éditions. Pas une nouvelle page.
 - Langue de la page : ${langue}. Ton de la page. Pas de superlatif, pas de point d'exclamation.
 - Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose.
+${AMPLEUR[regime]}
 - op "set" : remplace le texte (clé "text"). op "remove" : retire l'élément. op "move" : déplace l'ancre avant ("before") ou après ("after") une autre ancre. op "duplicate" : copie l'ancre et la pose "before"/"after" une autre, avec "as": un suffixe alphanumérique court. op "swap" : échange avec "with".
 - Le "titre" de la variante est ce que le buyer lira dans sa liste : court, dans ses mots (ex. « Le titre reprend la promesse de l'annonce »).
 
@@ -107,7 +120,7 @@ export type Refus = { regle: string; titre: string; raisons: string[]; edits: un
 export type VarianteProduite = { nom: string; regle: string; fichier: string; titre: string; teste: string }
 
 export async function ecrireVariantes(
-  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string,
+  campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime = "inconnu",
 ): Promise<VarianteProduite[]> {
   const f = fichiersDe(campagne)
   const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(f.ancres, "utf8"))
@@ -132,7 +145,7 @@ export async function ecrireVariantes(
   // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
   // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
   // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
-  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
+  const brutes = await demanderValide(SCOPE, cadre(choisis, m, c, langue, regime), Propositions, "liste")
   if (!brutes) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
   const texteAvant = (a: string): string =>
@@ -143,6 +156,7 @@ export async function ecrireVariantes(
     annonce: `${c.annonce.titre} ${c.annonce.description ?? ""}`,
     avant: new Map(empreintes.map((e) => [e.a, texteAvant(e.a)])),
     boutons: new Set(m.ctas.map((x) => x.anchor)),
+    ampleurMin: regime === "gros-changements" ? AMPLEUR_MIN : undefined,
   }
   const refus: Refus[] = []
   const refuser = (p: z.infer<typeof Proposition>, raisons: string[]) => {
