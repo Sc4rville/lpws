@@ -214,8 +214,10 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     await ecrireJson(fichiersDe(d).tests, all)
     // publié : ce qui a cessé de collecter entre dans le journal du client
     if (code === 0)
-      for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
-        dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
+      try {
+        for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
+          dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
+      } catch (e) { dire(job, `journal : non écrit (${(e as Error).message.split("\n")[0]}) — la mise en ligne, elle, est faite`) }
     if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()

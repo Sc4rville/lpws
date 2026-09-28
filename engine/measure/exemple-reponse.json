@@ -1,10 +1,10 @@
 {
   "dimensionHeaders": [{ "name": "customUser:lpws_variante" }],
-  "metricHeaders": [{ "name": "sessions", "type": "TYPE_INTEGER" }, { "name": "keyEvents", "type": "TYPE_INTEGER" }],
+  "metricHeaders": [{ "name": "sessions", "type": "TYPE_INTEGER" }, { "name": "sessionKeyEventRate", "type": "TYPE_FLOAT" }],
   "rows": [
-    { "dimensionValues": [{ "value": "controle" }], "metricValues": [{ "value": "1240" }, { "value": "38" }] },
-    { "dimensionValues": [{ "value": "titre-oriente-benefice" }], "metricValues": [{ "value": "1236" }, { "value": "51" }] },
-    { "dimensionValues": [{ "value": "(not set)" }], "metricValues": [{ "value": "412" }, { "value": "9" }] }
+    { "dimensionValues": [{ "value": "controle" }], "metricValues": [{ "value": "1240" }, { "value": "0.030645" }] },
+    { "dimensionValues": [{ "value": "titre-oriente-benefice" }], "metricValues": [{ "value": "1236" }, { "value": "0.041262" }] },
+    { "dimensionValues": [{ "value": "(not set)" }], "metricValues": [{ "value": "412" }, { "value": "0.021845" }] }
   ],
   "rowCount": 3,
   "metadata": { "currencyCode": "EUR", "timeZone": "Europe/Paris" },
