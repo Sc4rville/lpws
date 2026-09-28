@@ -141,8 +141,10 @@ export async function historique(clientDir: string): Promise<{ experiences: Arra
       const e = Experience.safeParse(x)
       if (e.success) experiences.push({ ...e.data, campagne: camp })
     }
-    for (const p of await lireJson<Array<{ regle?: string; refusee?: boolean; raison?: string; refuseeLe?: string }>>(f.propositions, []))
-      if (p.refusee && p.regle) refus.push({ regle: p.regle, raison: p.raison ?? "", le: p.refuseeLe })
+    // refuser une déclinaison, c'est refuser une formulation, pas la règle : le texte, lui, reste
+    // dans les « déjà proposé » des prochaines déclinaisons
+    for (const p of await lireJson<Array<{ regle?: string; refusee?: boolean; raison?: string; refuseeLe?: string; declineDe?: string }>>(f.propositions, []))
+      if (p.refusee && p.regle && !p.declineDe) refus.push({ regle: p.regle, raison: p.raison ?? "", le: p.refuseeLe })
   }
   return { experiences, refus }
 }

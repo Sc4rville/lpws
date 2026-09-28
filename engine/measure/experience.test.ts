@@ -39,10 +39,14 @@ test("journal : un perdant entre dans la mémoire, et sa règle n'est plus repro
   await enregistrerExperiences(dir, [t])
   assert.equal((await lireJson<Experience[]>(f.experiences, [])).length, 1)
 
-  await ecrireJson(f.propositions, [{ nom: "x", regle: "pr-preuve", refusee: true, raison: "hors charte" }])
+  await ecrireJson(f.propositions, [
+    { nom: "x", regle: "pr-preuve", refusee: true, raison: "hors charte" },
+    { nom: "y", regle: "vp-titre", refusee: true, raison: "trop long", declineDe: "z" },
+  ])
   const m = aEviter(await historique(clientDir))
   assert.match(m.get("mm-titre")!, /l’original a gagné/)
   assert.match(m.get("pr-preuve")!, /hors charte/)
+  assert.equal(m.has("vp-titre"), false, "une déclinaison refusée n'écarte pas sa règle")
   await rm(racine, { recursive: true })
 })
 
