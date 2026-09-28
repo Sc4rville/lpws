@@ -67,8 +67,9 @@ type Evenement = { type: string; data: { object: Record<string, any> } }
 /** Ce qu'un événement Stripe change au compte. Les autres événements sont ignorés. */
 export function appliquerEvenement(c: Compte, e: Evenement): Compte {
   const o = e.data.object
-  if (e.type === "checkout.session.completed") {
+  if (e.type === "checkout.session.completed" || e.type === "checkout.session.async_payment_succeeded") {
     if (!c.stripe?.session || o.id !== c.stripe.session) return c
+    if (o.payment_status !== "paid" && o.payment_status !== "no_payment_required") return c
     const palier = (o.client_reference_id ?? o.metadata?.palier) as IdPalier | undefined
     if (palier !== "solo" && palier !== "agence") return c
     return { ...c, palier, stripe: { session: o.id, client: o.customer, abonnement: o.subscription, statut: "active" } }
