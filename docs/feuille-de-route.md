@@ -61,10 +61,10 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Rapport honnête : retrouvées / déplacées / ambiguës / perdues, jamais de tranchage au hasard
 - ✅ `apply` refuse une édition dont l'empreinte ne correspond plus (`attendu` dans [`spec.ts`](../engine/apply/spec.ts))
 - ✅ Preuve rejouable sur mutation connue : `npm run relink:check -- <baseline>`
-- ⬜ Versionner les captures d'un client au lieu de les écraser
+- ✅ Versionner les captures d'un client au lieu de les écraser *(`captures/<date>/` : empreintes, méta, verdict de la capture sortante, archivés avant chaque recapture)*
 - ⬜ Corpus de test du re-liage : les mêmes pages capturées à deux dates réelles *(la mutation synthétique prouve le mécanisme, pas la dérive d'un vrai site)*
 - ⬜ Remplir `attendu` automatiquement à l'écriture d'une spec *(sinon personne ne le remplira)*
-- ⬜ Rejouer une spec ancienne sur une capture neuve en traduisant ses ancres par le rapport de re-liage
+- ✅ Rejouer une spec ancienne sur une capture neuve en traduisant ses ancres par le rapport de re-liage *(`npm run rejouer` : une ancre ambiguë ou perdue refuse toute la spec ; essayé sur la démo avec une bannière ajoutée : `e11 → e12`, apply propre)*
 
 ### 1.1.4 · Le juge
 - ✅ Diff visuel contre le live, desktop et mobile
