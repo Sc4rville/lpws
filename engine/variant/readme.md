@@ -7,7 +7,14 @@ page est lue, l'annonce comparée, les règles évaluées, et trois variantes so
 
 ```bash
 npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sans-variantes]
+npm run brain -- clients/<client>/<campagne> --decliner <proposition> [--consigne "plus court"] [--n 3]
 ```
+
+**Décliner** : une proposition → jusqu'à trois autres versions du même constat, avec la consigne
+du buyer s'il en donne une. Le modèle voit tout ce qui a déjà été écrit pour ce constat ; un texte
+déjà proposé est refusé comme les autres écarts aux garde-fous. Les déclinaisons s'ajoutent aux
+propositions juste après leur source (`declineDe`, `consigne`), sans écraser aucune spec ; dans
+l'interface, c'est le bouton « Décliner » de chaque proposition.
 
 ## Contrat
 

@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process"
 import { ROOT } from "./config.ts"
 
-export type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown; campagne?: string }
+export type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown; campagne?: string; sujet?: string }
 export const jobs = new Map<string, Job>()
 export function nouveauJob(type: string): Job {
   const job: Job = { id: Math.random().toString(36).slice(2, 10), type, etat: "en cours", lignes: [], debut: new Date().toISOString() }

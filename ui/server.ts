@@ -13,6 +13,7 @@
  *   GET  /api/clients/<c>/<camp>/textes     les textes de la page qu'un test peut changer
  *   POST /api/clients/<c>/<camp>/tests      {titre, pourquoi, edits:[{anchor,text}]} → variante + tag (job)
  *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop'|'gagnant', part} → config republiée (job) ; archivée dans experiences.json à l'arrêt
+ *   POST /api/clients/<c>/<camp>/propositions/<nom>/decliner {consigne?, n?} → n (1-3) variantes de plus (job)
  *   POST /api/clients/<c>/<camp>/verifier   la balise est-elle posée sur la vraie page ? (job)
  *   POST /api/clients/<c>/<camp>/audit      l'audit tracking de la vraie page (job)
  *   POST /api/clients/<c>/<camp>/surveiller un relevé de surveillance maintenant (job)
@@ -57,7 +58,7 @@ import { planifier, mdePour } from "../engine/measure/stats.ts"
 import { rapportHtml } from "../engine/rapport/rapport.ts"
 import { lireCompte, ecrireCompte, demarrerEssai, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
 import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/compte/stripe.ts"
-import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, changerEtat } from "./server/pipeline.ts"
+import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat } from "./server/pipeline.ts"
 import { verifier } from "./server/tag.ts"
 
 const SCOPE = "ui"
@@ -178,6 +179,8 @@ createServer(async (req, res) => {
         p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = String((await body(req)).raison ?? "")
         await ecrireJson(f, props); return json(res, 200, { ok: true })
       }
+      if (seg[4] === "propositions" && seg[5] && seg[6] === "decliner" && req.method === "POST")
+        return json(res, 202, { job: (await lancerDeclinaison(c, camp, seg[5], await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
     if (p.startsWith("/assets/")) return envoyerFichier(res, join(ROOT, "ui", "assets"), decodeURIComponent(p.slice(8)))

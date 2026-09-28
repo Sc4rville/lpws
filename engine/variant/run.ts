@@ -15,7 +15,12 @@
  * `--refaire`. Sans context.json, on s'arrête et on dit exactement ce qu'il faut : le brain ne
  * devine pas ce que promet une annonce.
  *
+ * DÉCLINER : une proposition existante → N variantes de plus sur le même constat, différentes de
+ * tout ce qui a déjà été proposé pour lui, avec la consigne du buyer s'il en donne une. Mêmes
+ * garde-fous, mêmes specs ; elles s'ajoutent aux propositions, juste après leur source.
+ *
  * Usage : npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sans-variantes]
+ *         npm run brain -- clients/<client>/<campagne> --decliner <nom> [--consigne "plus court"] [--n 3]
  */
 import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -23,8 +28,8 @@ import { dirname } from "node:path"
 import { Contexte } from "./contexte.ts"
 import { extraireSignaux, SignauxMecaniques } from "./signaux.ts"
 import { corpsDe, juger, SignauxJuges } from "./jugement.ts"
-import { diagnostiquer, type Diagnostic } from "./diagnostic.ts"
-import { ecrireVariantes } from "./variantes.ts"
+import { diagnostiquer, type Constat, type Diagnostic } from "./diagnostic.ts"
+import { ecrireVariantes, type VarianteProduite } from "./variantes.ts"
 import { langueDe } from "./garde.ts"
 import { FAMILLES } from "./regles.ts"
 import { step, fail, timed } from "../shared/log.ts"
@@ -34,6 +39,19 @@ import { campagne as fichiersDe } from "../shared/campagne.ts"
 import { aEviter, bilanRegles, historique } from "../measure/experience.ts"
 
 const SCOPE = "variant"
+
+export type Proposition = {
+  nom: string; titre: string; teste: string; regle: string; score: number; pourquoi: string; signal: string
+  sources: string[]; bilan?: Constat["bilan"]; fichier: string; proposeLe: string; refusee?: boolean; declineDe?: string; consigne?: string
+}
+
+/** ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit */
+const versPropositions = (variantes: VarianteProduite[], tests: Diagnostic["tests"], plus: Partial<Proposition> = {}): Proposition[] =>
+  variantes.map((v) => {
+    const k = tests.find((x) => x.id === v.regle)
+    return { nom: v.nom, titre: v.titre, teste: v.teste, regle: v.regle, score: k?.score ?? 0,
+      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString(), ...plus }
+  })
 
 export async function brain(campagne: string, opts: { refaire?: boolean; sansJugement?: boolean; sansVariantes?: boolean } = {}) {
   const f = fichiersDe(campagne)
@@ -88,23 +106,56 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   if (opts.sansVariantes) return { d, variantes: [] }
   const langue = langueDe(await readFile(f.capture, "utf8"))
   const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () => ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime))
-  // ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit
-  const propositions = variantes.map((v) => {
-    const k = d.tests.find((x) => x.id === v.regle)
-    return { nom: v.nom, titre: v.titre, teste: v.teste, regle: v.regle, score: k?.score ?? 0,
-      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString() }
-  })
+  const propositions = versPropositions(variantes, d.tests)
   // les refus du buyer restent : ils sont la mémoire de ce qu'il ne veut pas (feuille de route 4.1)
-  const refusees = (await lireJson<Array<{ nom: string; refusee?: boolean }>>(f.propositions, [])).filter((p) => p.refusee && !propositions.some((n) => n.nom === p.nom))
+  const refusees = (await lireJson<Proposition[]>(f.propositions, [])).filter((p) => p.refusee && !propositions.some((n) => n.nom === p.nom))
   await ecrireJson(f.propositions, [...propositions, ...refusees])
   step(SCOPE, `${variantes.length} variante(s) prête(s) pour apply`)
   return { d, variantes }
+}
+
+/** Le texte que chaque édition d'une spec écrit, ou ce qu'elle fait : la liste « déjà proposé ». */
+async function ecritures(fichier: string): Promise<string[]> {
+  const spec = await lireJson<{ edits?: Array<{ op?: string; text?: string; anchor: string; before?: string; after?: string }> }>(fichier, {})
+  return (spec.edits ?? []).map((e) => !e.op || e.op === "set" ? e.text ?? "" : `${e.op} ${e.anchor}${e.before ? " avant " + e.before : e.after ? " après " + e.after : ""}`).filter(Boolean)
+}
+
+export async function decliner(campagne: string, source: string, opts: { n?: number; consigne?: string } = {}) {
+  const f = fichiersDe(campagne)
+  process.env.LPWS_CAMPAGNE = campagne
+  const n = Number.isFinite(opts.n) ? Math.min(3, Math.max(1, Math.round(opts.n!))) : 3
+  const consigne = opts.consigne?.trim().slice(0, 300) || undefined
+  const ctx = await lireValide(Contexte, f.contexte).catch((e: Error) => fail(SCOPE, e.message))
+  const m = await lireCache(SignauxMecaniques, f.signaux)
+  const d = await lireJson<Diagnostic | null>(f.diagnostic, null)
+  if (!m || !d) fail(SCOPE, "pas de diagnostic pour cette page : lancer l'analyse avant de décliner")
+  const props = await lireJson<Proposition[]>(f.propositions, [])
+  const p = props.find((x) => x.nom === source)
+  if (!p) fail(SCOPE, `proposition inconnue : ${source}`)
+  const k = d.tests.find((x) => x.id === p.regle)
+  if (!k?.test) fail(SCOPE, `« ${p.titre} » ne vient pas d'un constat testable du diagnostic actuel (${p.regle}) : relancer l'analyse`)
+  const deja = [...new Set((await Promise.all(props.filter((x) => x.regle === p.regle).map((x) => ecritures(x.fichier)))).flat())]
+  step(SCOPE, `décliner « ${p.titre} » : ${n} variante(s) sur ${k.id}${consigne ? ` · consigne : ${consigne}` : ""} · ${deja.length} écriture(s) déjà proposée(s)`)
+
+  const langue = langueDe(await readFile(f.capture, "utf8"))
+  const variantes = await timed(SCOPE, "écriture des déclinaisons (sur le plan)", () => ecrireVariantes(campagne, [k], m, ctx, langue, d.regime, { n, consigne, deja }))
+  const nouvelles = versPropositions(variantes, d.tests, { declineDe: source, ...(consigne ? { consigne } : {}) })
+  // relues juste avant d'écrire : le buyer a pu refuser ou lancer une proposition pendant l'écriture
+  const maintenant = await lireJson<Proposition[]>(f.propositions, [])
+  const i = maintenant.findIndex((x) => x.nom === source)
+  maintenant.splice(i < 0 ? maintenant.length : i + 1, 0, ...nouvelles)
+  await ecrireJson(f.propositions, maintenant)
+  step(SCOPE, `${nouvelles.length} déclinaison(s) ajoutée(s) aux propositions`)
+  if (!nouvelles.length) fail(SCOPE, "aucune déclinaison n'a passé les garde-fous (détail dans variantes-refusees.json)")
+  return nouvelles
 }
 
 /* CLI */
 if (estLance(import.meta.url)) {
   const args = lireArgs(["--refaire", "--sans-jugement", "--sans-variantes"])
   const [campagne] = args.libres
-  if (!campagne) fail(SCOPE, "usage : npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sans-variantes]")
+  if (!campagne) fail(SCOPE, "usage : npm run brain -- clients/<client>/<campagne> [--refaire] [--sans-jugement] [--sans-variantes] | --decliner <nom> [--consigne \"…\"] [--n 3]")
+  const source = args.option("--decliner")
+  if (source) { await decliner(campagne, source, { n: Number(args.option("--n") ?? 3), consigne: args.option("--consigne") }); process.exit(0) }
   await brain(campagne, { refaire: args.drapeau("--refaire"), sansJugement: args.drapeau("--sans-jugement"), sansVariantes: args.drapeau("--sans-variantes") })
 }
