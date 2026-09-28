@@ -293,6 +293,7 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 /* ---------- le haut de l'accueil : trois chiffres ---------- */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:-12px 0 28px}
 .kpis .stat{background:var(--paper);box-shadow:var(--shadow)}
+.nt{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 
 /* ---------- tableau de score ---------- */
 .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -369,6 +370,7 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
   .tbl{overflow-x:auto}.tr{min-width:760px}
   .kx{padding-top:10vh}
   .kf{display:none}
+  .nt{grid-template-columns:1fr}
   .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-16px 0 24px}
   .kpis .stat{padding:14px}
   .kpis .stat .v{font-size:24px}
@@ -1178,7 +1180,7 @@ function vNouveau(c) {
   const genre = choix ? (choix.tag.startsWith('h') ? 'titre' : choix.tag === 'p' ? 'texte' : 'bouton') : '';
   return `
     <div class="hd"><div><h2>Nouveau test</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez un texte de la page, écrivez celui que vous voulez tester. L’original reste tel quel pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
-    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start">
+    <div class="grid nt">
       <div class="card"><h3>1 · Le texte à changer</h3>${rows}</div>
       <div class="card"><h3>2 · La nouvelle version</h3>
         ${choix ? `<p class="muted" style="margin-bottom:12px">Aujourd’hui : « ${esc(choix.text)} »</p>` : '<p class="muted">Choisissez d’abord un texte à gauche.</p>'}
