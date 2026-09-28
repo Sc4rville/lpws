@@ -16,16 +16,34 @@ npm run measure -- clients/<client>/<campagne> --exemple    # rejoue une répons
 | **Entrée** | `tests.json` (la date de lancement) + `mesure.json` : `{ "propriete": "<id numérique GA4>", "compteDeService": "<chemin du JSON>" }` |
 | **Sortie** | `resultats.json` : `{ luLe, depuis, source, versions: { controle: {n, c}, <nom-du-test>: {n, c} } }` |
 
-`n` = sessions, `c` = conversions (« key events » dans GA4). L'interface calcule le reste :
-taux, écart, certitude, « encore ~N jours ».
+`n` = sessions, `c` = conversions (« key events » dans GA4).
 
-## Le journal des expériences
+## Le droit de conclure — `stats.ts`
 
-Quand un test s'arrête (bouton Arrêter, ou un autre test lancé à sa place), `experience.ts`
-ajoute une ligne à `experiences.json` : éditions, dates, part de trafic, échantillon lu dans
-`resultats.json`, fourchette à 95 % de la hausse et conclusion — `gagnant`, `perdant`,
-`non concluant`, `trop tôt` (moins de 25 conversions sur la version la moins vue) ou
-`sans données`. Les non-concluants restent : c'est ce qu'on apprendra de plus utile.
+Un seul module, compilé aussi pour le navigateur (`ui/stats-embarque.ts`) : l'écran et le
+serveur rendent le même verdict.
+
+- **L'horizon est fixé avant de regarder** : au lancement, `planAuLancement` calcule
+  l'échantillon par version (taux de conversion déclaré dans le contexte, sinon 3 % supposés ;
+  hausse cherchée selon le trafic) et le fige dans `tests.json` (`plan`).
+- **Pas de verdict avant l'horizon, ni avant une semaine pleine, ni sous 25 conversions** par
+  version. Seule exception : un écart écrasant (|z| ≥ 3) après une semaine.
+- **Inconclusif dit comme tel** (`nul`), et **« ce test ne conclura pas »** quand il faudrait
+  plus de huit semaines au rythme observé.
+- **Répartition faussée** (SRM, p < 0,001 dès 200 visiteurs) : le verdict est suspendu.
+
+## Le journal des expériences — `experience.ts`
+
+Quand un test cesse de collecter (bouton Arrêter, un autre test lancé à sa place, ou le
+gagnant déployé), `experience.ts` écrit une ligne dans `experiences.json` : éditions, règle du
+brain, dates, part de trafic, horizon fixé au lancement, échantillon lu dans `resultats.json`,
+fourchette à 95 % de la hausse, verdict et conclusion — `gagnant`, `perdant`, `non concluant`,
+`trop tôt` (arrêté avant l'horizon), `sans données` ou `répartition faussée`. Une ligne par
+lancement : remettre l'original après un déploiement met la ligne à jour sans effacer
+`deploye`. Les non-concluants restent : c'est ce qu'on apprendra de plus utile.
+
+`historique` relit toutes les pages du client ; `aEviter` en tire les règles perdues ou
+refusées par le buyer, que le brain ne repropose plus.
 
 ## Ce que le buyer fait, une fois par client (3 minutes)
 

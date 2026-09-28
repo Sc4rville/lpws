@@ -28,10 +28,10 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 
 ## Fait le 2026-09-28 (modules du business model)
 - `engine/audit` (audit tracking gratuit), `engine/surveille` (relevés + alertes, dont annonce ↔ page),
-  `engine/measure/puissance.ts` (peut-on conclure ?), `memoire.ts` (mémoire client, le brain n'y
-  revient pas), `engine/compte` (paliers, essai, mandat, code partenaire, Stripe optionnel, coûts
+  écran « Peut-on conclure ? » (sur `engine/measure/stats.ts`), mémoire client affichée dans Suivi
+  (`experience.ts`), `engine/compte` (paliers, essai, mandat, code partenaire, Stripe optionnel, coûts
   modèle), `engine/rapport` (rapport client HTML). Écrans : Audit, Peut-on conclure ?, Compte et
-  offres, Suivi. Scripts : `audit`, `conclure`, `memoire`, `surveille`, `couts`.
+  offres, Suivi. Scripts : `audit`, `surveille`, `couts`.
 - Non branché faute d'accès : Stripe (clés `STRIPE_*`), annonces Google Ads/AI Max, Shopify, Intégral.
   Paliers appliqués seulement avec `LPWS_FACTURATION=1` ; surveillance auto avec `LPWS_SURVEILLANCE=1`.
 

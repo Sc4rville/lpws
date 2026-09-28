@@ -22,10 +22,9 @@
  *   experiences.json     measure    le journal : chaque test arrêté, son échantillon, sa conclusion
  *   audit.json           audit      le diagnostic tracking de la vraie page
  *   surveillance/        surveille  un relevé daté par passage + alertes.json
- *
- * Et au niveau du client, `clients/<client>/` : memoire.json (la mémoire, toutes campagnes).
+
  */
-import { join, dirname } from "node:path"
+import { join } from "node:path"
 import { z } from "zod"
 
 export function campagne(dir: string) {
@@ -57,8 +56,6 @@ export function campagne(dir: string) {
     surveillance: join(dir, "surveillance"),
     releve: (quand: string) => join(dir, "surveillance", `${quand}.json`),
     alertes: join(dir, "surveillance", "alertes.json"),
-    /** la mémoire est au niveau du client : une hypothèse perdue sur une page l'est pour ses autres pages */
-    memoire: join(dirname(dir), "memoire.json"),
   }
 }
 export type Campagne = ReturnType<typeof campagne>
@@ -73,17 +70,18 @@ export const Test = z.object({
   part: z.number(),
   creeLe: z.string(),
   lanceLe: z.string().optional(),
+  /** la fin de la collecte (arrêt ou déploiement) : le verdict archivé se lit à cette date */
+  finLe: z.string().optional(),
+  /** l'horizon fixé AU LANCEMENT (engine/measure/stats.ts) : on ne le recalcule pas en regardant */
+  plan: z.object({
+    tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(),
+    controle: z.number(), variante: z.number(), jours: z.number().nullable(),
+  }).optional(),
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),
   /** la règle du brain qui a produit ce test, si c'en est un */
   regle: z.string().optional(),
-  /** le plan fixé au lancement : combien de visiteurs, combien de jours (measure/puissance.ts) */
-  plan: z.object({
-    taux: z.number(), visiteursJour: z.number(), part: z.number(), hausse: z.number(),
-    nParVersion: z.number(), jours: z.number(), hausseEn8Semaines: z.number(), conclura: z.boolean(), phrase: z.string(),
-  }).optional(),
-  finLe: z.string().optional(),
 })
 export type Test = z.infer<typeof Test>
 
@@ -107,6 +105,13 @@ export const Experience = z.object({
   luLe: z.string().nullable(),
   source: z.enum(["ga4", "exemple"]).nullable(),
   hausse: z.object({ lo: z.number(), mid: z.number(), hi: z.number() }).nullable(),
-  conclusion: z.enum(["gagnant", "perdant", "non concluant", "trop tôt", "sans données"]),
+  conclusion: z.enum(["gagnant", "perdant", "non concluant", "trop tôt", "sans données", "répartition faussée"]),
+  /** la règle du brain qui a produit la variante (absente pour un test écrit à la main) */
+  regle: z.string().optional(),
+  /** l'horizon fixé au lancement, et le verdict rendu à l'arrêt contre lui */
+  plan: Test.shape.plan,
+  verdict: z.string().optional(),
+  /** la variante a été déployée à 100 % (reste vrai si l'original est remis ensuite) */
+  deploye: z.boolean().optional(),
 })
 export type Experience = z.infer<typeof Experience>

@@ -12,11 +12,10 @@
  */
 import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { lireJson } from "../shared/json.ts"
 import { campagne as fichiersDe, type Test } from "../shared/campagne.ts"
-import { bilan } from "../measure/puissance.ts"
-import { lireMemoire } from "../measure/memoire.ts"
+import { historique, verdictDe } from "../measure/experience.ts"
 import type { Resultats } from "../measure/run.ts"
 import type { Compte } from "../compte/compte.ts"
 import { palierEnVigueur } from "../compte/compte.ts"
@@ -39,7 +38,7 @@ export async function rapportHtml(campagneDir: string, testId: string, compte: C
   const meta = await lireJson<{ source?: string }>(f.meta, {})
   const ctx = await lireJson<{ cpc?: number; annonce?: { titre: string } } | null>(f.contexte, null)
   const res = await lireJson<Resultats | null>(f.resultats, null)
-  const memoire = (await lireMemoire(campagneDir)).filter((e) => e.test !== t.id).slice(0, 5)
+  const memoire = (await historique(dirname(campagneDir))).experiences.filter((e) => e.test !== t.id).sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 5)
   const p = palierEnVigueur(compte)
   const blanche = p.marqueBlanche && !!compte.marque.nom
   const marque = blanche ? compte.marque.nom : "LPWS"
@@ -47,12 +46,12 @@ export async function rapportHtml(campagneDir: string, testId: string, compte: C
 
   const o = res?.versions.controle, v = res?.versions[t.id]
   const jours = t.lanceLe ? Math.max(0, Math.floor((Date.parse(t.finLe ?? new Date().toISOString()) - Date.parse(t.lanceLe)) / 86_400_000)) : 0
-  const b = o && v && o.n && v.n ? bilan(o, v, { jours, part: (t.part || 50) / 100, plan: t.plan }) : null
+  const b = o && v && o.n && v.n ? (await verdictDe(campagneDir, t)).verdict : null
   const reco = !b ? (t.etat === "live" ? "Pas encore de résultats mesurés : le test continue, aucune conclusion n'est tirée." : "Test arrêté sans résultats mesurés : aucune conclusion n'est tirée.")
     : b.k === "gagnant" ? "Déployer la variante sur 100 % du trafic, puis tester l'étape suivante."
     : b.k === "perdant" ? "Garder l'original. Ce que la variante changeait n'est pas ce qui retient vos visiteurs : on teste une autre piste."
-    : b.k === "neutre" || b.k === "jamais" ? "Garder l'original : l'écart ne justifie pas le changement. Le test est enregistré, il ne sera pas re-proposé."
-    : b.k === "repartition" ? "Corriger la répartition avant toute conclusion (voir ci-dessus)."
+    : b.k === "nul" || b.k === "jamais" ? "Garder l'original : l'écart ne justifie pas le changement. Le test est enregistré, il ne sera pas re-proposé."
+    : b.k === "srm" ? "Corriger la répartition avant toute conclusion (voir ci-dessus)."
     : "Laisser courir le test jusqu'à l'échantillon prévu."
   const ligne = (nom: string, x: { n: number; c: number }) => {
     const taux = x.n ? x.c / x.n : 0
@@ -77,14 +76,14 @@ figcaption{padding:10px 14px;font-weight:600;font-size:13.5px} .muted{color:#7a7
 <header><b>${esc(marque)}</b><span class="muted">Rapport du ${date(new Date().toISOString())}</span></header>
 <h1>${esc(t.titre)}</h1><div class="u">${esc(meta.source ?? "")}</div>
 <div class="card"><b>Ce qu'on a testé.</b> ${esc(t.teste)}<br><b>Pourquoi.</b> ${esc(t.pourquoi)}${ctx?.annonce ? `<br><b>L'annonce.</b> « ${esc(ctx.annonce.titre)} »` : ""}
-<p class="muted" style="margin:10px 0 0">Lancé le ${date(t.lanceLe)}${t.finLe ? `, arrêté le ${date(t.finLe)}` : ""} · ${jours} jour(s) · ${t.part || 50} % des visiteurs sur la variante${t.plan ? ` · échantillon prévu : ${t.plan.nParVersion.toLocaleString("fr-FR")} visiteurs par version` : ""}</p></div>
-<div class="card verdict"><b>${b ? { gagnant: "La variante gagne", perdant: "L'original gagne", neutre: "Non concluant", jamais: "Ne conclura pas", repartition: "Répartition à corriger", attendre: "Pas encore de verdict" }[b.k] : "Pas encore de résultats"}</b>
-<p>${esc(b ? b.phrase : "GA4 n'a pas encore renvoyé de mesures pour ce test.")}</p>${b ? `<p class="muted">Écart probable entre ${pc(b.fourchette[0])} et ${pc(b.fourchette[1])} (intervalle à 95 %).</p>` : ""}
+<p class="muted" style="margin:10px 0 0">Lancé le ${date(t.lanceLe)}${t.finLe ? `, arrêté le ${date(t.finLe)}` : ""} · ${jours} jour(s) · ${t.part || 50} % des visiteurs sur la variante${t.plan ? ` · échantillon prévu : ${Math.max(t.plan.controle, t.plan.variante).toLocaleString("fr-FR")} visiteurs par version` : ""}</p></div>
+<div class="card verdict"><b>${b ? esc(b.titre) : "Pas encore de résultats"}</b>
+<p>${esc(b ? b.detail + "." : "GA4 n'a pas encore renvoyé de mesures pour ce test.")}</p>${b?.stats ? `<p class="muted">Écart probable entre ${pc(b.stats!.ic.lo)} et ${pc(b.stats!.ic.hi)} (intervalle à 95 %).</p>` : ""}
 <p><b>Recommandation.</b> ${esc(reco)}</p></div>
 ${o && v ? `<h2>Les chiffres</h2><div class="card"><table><tr><th>Version</th><th>Visiteurs</th><th>Conversions</th><th>Taux</th>${ctx?.cpc ? "<th>Coût par conversion</th>" : ""}</tr>${ligne("Original", o)}${ligne("Variante", v)}</table>
 <p class="muted" style="margin:10px 0 0">Source : ${res!.source === "exemple" ? "réponse GA4 d'exemple (démonstration)" : "Google Analytics 4"}, lu le ${date(res!.luLe)}.${ctx?.cpc ? ` Coût par conversion calculé au CPC moyen de ${eur(ctx.cpc)}.` : ""}</p></div>` : ""}
 ${imgO || imgV ? `<h2>Les deux versions</h2><div class="duo">${imgO ? `<figure><img src="${imgO}" alt="Original"><figcaption>Original</figcaption></figure>` : ""}${imgV ? `<figure><img src="${imgV}" alt="Variante"><figcaption>Variante</figcaption></figure>` : ""}</div>` : ""}
-${memoire.length ? `<h2>Les tests précédents</h2><div class="card"><table><tr><th>Test</th><th>Fin</th><th>Résultat</th></tr>${memoire.map((e) => `<tr><td>${esc(e.titre)}</td><td>${date(e.finLe ?? e.consigneLe)}</td><td>${esc({ gagnant: "gagnant", perdant: "original meilleur", neutre: "non concluant", jamais: "non concluant", repartition: "répartition faussée", attendre: "arrêté tôt", "sans-mesure": "sans mesure", refusee: "écarté avant test" }[e.verdict])}${e.lift !== undefined && e.verdict !== "refusee" ? ` (${e.lift >= 0 ? "+" : ""}${pc(e.lift)})` : ""}</td></tr>`).join("")}</table></div>` : ""}
+${memoire.length ? `<h2>Les tests précédents</h2><div class="card"><table><tr><th>Test</th><th>Fin</th><th>Résultat</th></tr>${memoire.map((e) => `<tr><td>${esc(e.titre)}</td><td>${date(e.arreteLe)}</td><td>${esc(e.conclusion)}${e.hausse ? ` (${e.hausse.mid >= 0 ? "+" : ""}${pc(e.hausse.mid)})` : ""}</td></tr>`).join("")}</table></div>` : ""}
 <footer>${blanche ? esc(compte.marque.nom) : "Préparé avec LPWS : diagnostic et tests de landing page pour media buyers."} Données de performance traitées pour le seul compte de ce client.</footer>
 </main></body></html>`
 }

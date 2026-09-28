@@ -12,7 +12,7 @@
  *   GET  /api/jobs/<id>                     suivre un job (lignes, état)
  *   GET  /api/clients/<c>/<camp>/textes     les textes de la page qu'un test peut changer
  *   POST /api/clients/<c>/<camp>/tests      {titre, pourquoi, edits:[{anchor,text}]} → variante + tag (job)
- *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop', part}  → config republiée (job)
+ *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop'|'gagnant', part} → config republiée (job) ; archivée dans experiences.json à l'arrêt
  *   POST /api/clients/<c>/<camp>/verifier   la balise est-elle posée sur la vraie page ? (job)
  *   POST /api/clients/<c>/<camp>/audit      l'audit tracking de la vraie page (job)
  *   POST /api/clients/<c>/<camp>/surveiller un relevé de surveillance maintenant (job)
@@ -46,14 +46,14 @@ import { lireJson, ecrireJson } from "../engine/shared/json.ts"
 import { envoyerFichier, envoyerJson as json } from "../engine/shared/http.ts"
 import { mimeDe } from "../engine/shared/mime.ts"
 import { campagne as fichiersDe } from "../engine/shared/campagne.ts"
+import { pageAvecStats } from "./stats-embarque.ts"
 import { ROOT, DIST, BASE_TAGS, dossier } from "./server/config.ts"
 import { jobs } from "./server/jobs.ts"
 import { etat, nomDuSite } from "./server/etat.ts"
 import { FICHIER_COMPTE, FACTURATION, resumeCompte } from "./server/compte.ts"
 import { lancerAudit, lancerSurveillance, tourDeSurveillance } from "./server/suivi.ts"
 import { dossierAudit } from "../engine/audit/audit.ts"
-import { planifier } from "../engine/measure/puissance.ts"
-import { consigner } from "../engine/measure/memoire.ts"
+import { planifier, mdePour } from "../engine/measure/stats.ts"
 import { rapportHtml } from "../engine/rapport/rapport.ts"
 import { lireCompte, ecrireCompte, demarrerEssai, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
 import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/compte/stripe.ts"
@@ -93,7 +93,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
     const seg = p.split("/").filter(Boolean)
-    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await readFile(UI)); return }
+    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await pageAvecStats(await readFile(UI, "utf8"))); return }
     if (p === "/api/etat") return json(res, 200, await etat())
     if (p === "/api/clients" && req.method === "POST") {
       const { url: u } = await body(req)
@@ -123,7 +123,8 @@ createServer(async (req, res) => {
       const q = url.searchParams
       const taux = Number(q.get("taux")?.replace(",", ".")) / 100, visiteursJour = Number(q.get("visiteurs"))
       if (!(taux > 0 && taux < 1) || !(visiteursJour > 0)) return json(res, 400, { erreur: "Il faut un taux de conversion (en %) et des visiteurs par jour." })
-      return json(res, 200, planifier({ taux, visiteursJour, hausse: q.get("hausse") ? Number(q.get("hausse")!.replace(",", ".")) / 100 : undefined, part: q.get("part") ? Number(q.get("part")) / 100 : undefined }))
+      const hausse = Number(q.get("hausse")?.replace(",", ".")) / 100, part = Number(q.get("part")) / 100
+      return json(res, 200, planifier({ tauxBase: taux, visiteursJour, mde: hausse > 0 ? hausse : mdePour(visiteursJour * 30.4), part: part > 0 && part < 1 ? part : 0.5 }))
     }
     if (p === "/api/audit" && req.method === "POST") {
       const { url: u } = await body(req)
@@ -144,7 +145,7 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
         const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" ? "live" : "stop", Number(b.part) || 50, b.plan)
+        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
@@ -172,7 +173,7 @@ createServer(async (req, res) => {
         const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
         // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
         p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = String((await body(req)).raison ?? "")
-        await ecrireJson(f, props); await consigner(dossier(c, camp)); return json(res, 200, { ok: true })
+        await ecrireJson(f, props); return json(res, 200, { ok: true })
       }
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }

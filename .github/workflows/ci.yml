@@ -17,6 +17,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run ui
       - name: smoke — clone de la démo (fidèle, diff 0/0)
