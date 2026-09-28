@@ -52,12 +52,19 @@ export async function planAuLancement(dir: string, part: number): Promise<NonNul
   return { tauxBase: p.tauxBase, tauxSuppose: p.tauxSuppose, mde: p.mde, part, controle: p.controle, variante: p.variante, jours: p.jours }
 }
 
+/** L'original et la variante d'un test, comptés sur sa fenêtre quand la mesure l'a fournie. */
+export function comptes(res: Resultats | null, id: string): { o: Compte | null; v: Compte | null } {
+  const p = res?.parTest?.[id]
+  if (p) return { o: p.controle, v: p.variante }
+  return { o: res?.versions?.controle ?? null, v: res?.versions?.[id] ?? null }
+}
+
 /** Le verdict d'un test à partir des fichiers de la campagne : le même au serveur et au journal. */
 export async function verdictDe(dir: string, t: Test, maintenant = new Date().toISOString()): Promise<{ verdict: Verdict; o: Compte | null; v: Compte | null; res: Resultats | null }> {
   const f = fichiersDe(dir)
   const res = await lireJson<Resultats | null>(f.resultats, null)
   const ctx = await lireJson<Ctx>(f.contexte, null)
-  const o = res?.versions?.controle ?? null, v = res?.versions?.[t.id] ?? null
+  const { o, v } = comptes(res, t.id)
   const verdict = juger({
     o, v, jours: t.lanceLe ? joursEntre(t.lanceLe, t.finLe ?? maintenant) : 0,
     // la part pendant la collecte : celle du plan, pas les 100 % d'un gagnant déployé

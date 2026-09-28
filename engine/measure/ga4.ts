@@ -4,8 +4,11 @@
  *
  * C'est le maillon qui manquait à toute la chaîne : la balise dit à GA4 quelle version chaque
  * visiteur a vue (propriété utilisateur `lpws_variante`, cf. deploy/tag/loader.ts), et ici on
- * relit GA4 pour compter, par version, les sessions et les conversions (« key events » dans le
- * vocabulaire GA4 depuis 2024).
+ * relit GA4 pour compter, par version, les sessions et les sessions qui ont converti.
+ *
+ * Une conversion ici = une SESSION avec au moins un « key event » (`sessionKeyEventRate` ×
+ * `sessions`), pas le nombre de key events : une session peut en déclencher plusieurs, et le
+ * verdict compare des proportions de sessions (binomiales), qui ne peuvent pas dépasser 1.
  *
  * Pourquoi une propriété UTILISATEUR et pas un simple paramètre d'événement : l'achat ou
  * l'inscription est un autre événement, plus tard, qui ne porte pas notre paramètre. Une
@@ -62,7 +65,7 @@ export async function rapportParVersion(
   const corps = {
     dateRanges: [{ startDate: depuis, endDate: jusqua }],
     dimensions: [{ name: "customUser:lpws_variante" }],
-    metrics: [{ name: "sessions" }, { name: "keyEvents" }],
+    metrics: [{ name: "sessions" }, { name: "sessionKeyEventRate" }],
     limit: 50,
   }
   const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propriete}:runReport`, {
@@ -77,9 +80,9 @@ export async function rapportParVersion(
 /** Le format brut de GA4 → nos lignes. Séparé pour être testable sans réseau. */
 export function lireRapport(brut: unknown): LigneVersion[] {
   const rep = brut as { rows?: Array<{ dimensionValues: { value: string }[]; metricValues: { value: string }[] }> }
-  return (rep.rows ?? []).map((row) => ({
-    version: row.dimensionValues[0]?.value ?? "",
-    sessions: Number(row.metricValues[0]?.value ?? 0),
-    conversions: Number(row.metricValues[1]?.value ?? 0),
-  })).filter((l) => l.version && l.version !== "(not set)")
+  return (rep.rows ?? []).map((row) => {
+    const sessions = Number(row.metricValues[0]?.value ?? 0)
+    const taux = Math.min(1, Math.max(0, Number(row.metricValues[1]?.value ?? 0)))
+    return { version: row.dimensionValues[0]?.value ?? "", sessions, conversions: Math.round(sessions * taux) }
+  }).filter((l) => l.version && l.version !== "(not set)")
 }

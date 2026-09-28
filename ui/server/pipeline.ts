@@ -223,10 +223,12 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     await ecrireJson(fichiersDe(d).tests, all)
     // publié : ce qui a cessé de collecter entre dans le journal du client
     if (code === 0) {
-      for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
-        dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
-      for (const o of all.filter((x) => deployes.has(x.id))) await marquerDeploye(d, o)
-      if (reprend && !autreVivant && cible) await retirerExperience(d, cible)
+      try {
+        for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
+          dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
+        for (const o of all.filter((x) => deployes.has(x.id))) await marquerDeploye(d, o)
+        if (reprend && !autreVivant && cible) await retirerExperience(d, cible)
+      } catch (e) { dire(job, `journal : non écrit (${(e as Error).message.split("\n")[0]}) — la mise en ligne, elle, est faite`) }
     } else {
       // la config fusionnée du client a déjà été écrite pour la tentative : elle repart de l'état restauré
       await appliquerParts(c, camp)

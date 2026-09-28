@@ -14,9 +14,13 @@ npm run measure -- clients/<client>/<campagne> --exemple    # rejoue une répons
 | | |
 |---|---|
 | **Entrée** | `tests.json` (la date de lancement) + `mesure.json` : `{ "propriete": "<id numérique GA4>", "compteDeService": "<chemin du JSON>" }` |
-| **Sortie** | `resultats.json` : `{ luLe, depuis, source, versions: { controle: {n, c}, <nom-du-test>: {n, c} } }` |
+| **Sortie** | `resultats.json` : `{ luLe, depuis, source, versions: { controle: {n, c}, <nom-du-test>: {n, c} }, parTest: { <nom-du-test>: { depuis, jusqua, controle, variante } } }` |
 
-`n` = sessions, `c` = conversions (« key events » dans GA4).
+`n` = sessions, `c` = sessions qui ont converti (`sessions × sessionKeyEventRate`, jamais plus que
+`n`). `parTest` compte l'original sur la fenêtre de chaque test (lancement → arrêt) : des tests
+successifs ne partagent pas le même contrôle, et le verdict et le journal lisent cette fenêtre.
+Un test arrêté est ré-archivé à chaque mesure tant que sa lecture précède l'arrêt + 48 h
+(le délai de GA4).
 
 ## Le droit de conclure — `stats.ts`
 
@@ -78,4 +82,4 @@ d'écrire « conversions par version » sans tricher.
   développeur de l'API Google Ads (des semaines).
 - **Jamais éprouvé sur une vraie propriété** : le chemin complet est vérifié avec
   `--exemple`. La première propriété réelle dira si les noms de dimension et de métrique
-  sont les bons (`customUser:lpws_variante`, `keyEvents`).
+  sont les bons (`customUser:lpws_variante`, `sessionKeyEventRate`).
