@@ -105,3 +105,31 @@ export function markDom(): { elements: number; sections: number } {
 
   return { elements: n, sections: s }
 }
+
+/**
+ * Les bandes de haut niveau d'une page DÉJÀ marquée, avec leur boîte en coordonnées de page :
+ * ce que le juge compare section par section. Même géométrie que la passe structurelle de
+ * `markDom` (recopiée : page.evaluate n'embarque que ce corps), mais on garde aussi les bandes
+ * sémantiques (<section>, <header>…) qui portent une ancre `e<n>` et non `s<n>`.
+ */
+export function bandesDuRendu(): Array<{ anchor: string; y: number; h: number; titre: string }> {
+  const MIN_H = 120, LARGEUR_MIN = 0.8
+  let c: Element = document.querySelector("main") ?? document.body
+  for (let i = 0; i < 10; i++) {
+    const hauts = [...c.children].map((k) => ({ el: k, h: k.getBoundingClientRect().height })).filter((k) => k.h > MIN_H).sort((a, b) => b.h - a.h)
+    if (hauts.length === 0) break
+    if (hauts.length === 1) { c = hauts[0].el; continue }
+    const total = c.getBoundingClientRect().height || 1
+    if (!(hauts[0].h > total * 0.6 && hauts[0].h > hauts[1].h * 2)) break
+    c = hauts[0].el
+  }
+  const largeurRef = c.getBoundingClientRect().width || window.innerWidth
+  return [...c.children]
+    .filter((b) => b.hasAttribute("data-lpws"))
+    .map((b) => ({ b, r: b.getBoundingClientRect() }))
+    .filter(({ r }) => r.height >= MIN_H && r.width >= largeurRef * LARGEUR_MIN)
+    .map(({ b, r }) => {
+      const t = b.querySelector("h1,h2,h3")?.textContent || b.textContent || ""
+      return { anchor: b.getAttribute("data-lpws")!, y: Math.round(r.top + scrollY), h: Math.round(r.height), titre: t.trim().replace(/\s+/g, " ").slice(0, 48) }
+    })
+}
