@@ -7,10 +7,10 @@ import { marque, slugify } from "../../engine/shared/paths.ts"
 import { Contexte } from "../../engine/variant/contexte.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
-import { enregistrerExperiences, planAuLancement } from "../../engine/measure/experience.ts"
+import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience } from "../../engine/measure/experience.ts"
 import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
 import { type Job, nouveauJob, dire, finir, lancer } from "./jobs.ts"
-import { construireTag, appliquerParts, publierTag, sonderBalise } from "./tag.ts"
+import { construireTag, appliquerParts, publierTag, sonderBalise, ecrireConfigClient } from "./tag.ts"
 
 /* ---------- onboarder une page : la capture, en sous-processus ---------- */
 export async function capturer(url: string): Promise<{ job: Job; client: string; campagne: string }> {
@@ -158,7 +158,7 @@ export async function creerTestDepuisProposition(c: string, camp: string, nom: s
   return { job, id: nom }
 }
 
-export async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop" | "gagnant", part: number) {
+export async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop" | "gagnant", part: number, reprise = false) {
   const d = dossier(c, camp)
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
@@ -178,19 +178,28 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
   const deploye = tests.find((o) => o !== t && o.etat === "gagnant")
   if (etat === "live" && deploye)
     throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
+  // les visiteurs déjà comptés l'ont été à cette part : l'horizon et le contrôle de répartition en dépendent
+  if (etat === "live" && t.etat === "live")
+    throw Object.assign(new Error(`La part d’un test en cours ne change pas : les visiteurs déjà comptés l’ont été à ${t.part} %. Arrêtez le test puis relancez-le à la nouvelle part.`), { code: 409 })
   if (etat === "gagnant" && t.etat !== "live" && t.etat !== "stop")
     throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
   const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan] as const)
   const maintenant = new Date().toISOString()
-  // un test qui cesse de collecter : sa date de fin fige le verdict qu'on archivera
-  const arretes = new Set<string>()
-  const cesse = (o: Test) => { if (o.etat === "live") o.finLe = maintenant; if (o.lanceLe) arretes.add(o.id) }
-  if (etat === "live") {
+  // seul un test qui collectait entre au journal : un test déjà arrêté a ses chiffres, on n'y touche plus
+  const arretes = new Set<string>(), deployes = new Set<string>()
+  const cesse = (o: Test) => { if (o.etat === "live") { o.finLe = maintenant; arretes.add(o.id) } }
+  // annuler un arrêt reprend la MÊME expérience (même lancement, même horizon), sans repartir de zéro
+  const reprend = etat === "live" && reprise && t.etat === "stop" && !!t.lanceLe && !!t.plan && !!t.finLe
+  const autreVivant = tests.some((o) => o !== t && o.etat === "live")
+  if (reprend && !autreVivant) {
+    t.etat = "live"; delete t.finLe
+  } else if (etat === "live") {
     // l'horizon se fixe AVANT de regarder : c'est lui qui donne le droit de conclure
     t.etat = "live"; t.part = part || 50; t.lanceLe = maintenant; delete t.finLe
     t.plan = await planAuLancement(d, t.part / 100)
     for (const o of tests) if (o !== t && o.etat === "live") { cesse(o); o.etat = "stop" }
   } else if (etat === "gagnant") {
+    if (t.etat === "stop") deployes.add(t.id)
     cesse(t); t.etat = "gagnant"; t.part = 100
     for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant")) { cesse(o); o.etat = "stop"; o.part = 0 }
   } else {
@@ -213,10 +222,16 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)
     // publié : ce qui a cessé de collecter entre dans le journal du client
-    if (code === 0)
+    if (code === 0) {
       for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
         dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
-    if (code !== 0) await appliquerParts(c, camp)
+      for (const o of all.filter((x) => deployes.has(x.id))) await marquerDeploye(d, o)
+      if (reprend && !autreVivant && cible) await retirerExperience(d, cible)
+    } else {
+      // la config fusionnée du client a déjà été écrite pour la tentative : elle repart de l'état restauré
+      await appliquerParts(c, camp)
+      await ecrireConfigClient(c, camp)
+    }
     finir(job, code === 0)
   })()
   return job

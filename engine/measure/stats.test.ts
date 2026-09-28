@@ -87,3 +87,13 @@ test("juger : répartition faussée prime sur tout", () => {
   const v = juger({ o: { n: 16_500, c: 450 }, v: { n: 13_500, c: 545 }, part: 0.5, jours: 21, mde: 0.2 })
   assert.equal(v.k, "srm")
 })
+
+test("juger : l'échantillon figé au lancement gouverne, pas le taux observé", () => {
+  // taux réel ~11 % au lieu des 3 % prévus : ré-estimé, ~3 300 par version suffiraient
+  const e = { o: { n: 5000, c: 500 }, v: { n: 5000, c: 570 }, part: 0.5, jours: 12, tauxBase: 0.03, mde: 0.2 }
+  assert.equal(juger(e).k, "gagnant")
+  const f = juger({ ...e, cible: { controle: 13_911, variante: 13_911 } })
+  assert.equal(f.k, "collecte")
+  assert.equal(f.plan.controle, 13_911)
+  assert.ok(!f.jalons.vol)
+})

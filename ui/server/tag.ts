@@ -33,14 +33,11 @@ export async function appliquerParts(c: string, camp: string) {
   for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0 }
   await ecrireJson(f, cfg)
 }
-/** copie loader + config dans ui/dist et pousse sur Vercel : l'URL que GTM connaît */
-export async function publierTag(job: Job, c: string, camp: string): Promise<number> {
-  const d = dossier(c, camp)
-  const meta = await lireJson<any>(fichiersDe(d).meta, {})
+/** ui/dist/v/<client>.json : la config servie, reconstruite depuis les tests.json de toutes les pages du client */
+export async function ecrireConfigClient(c: string, camp: string) {
+  const meta = await lireJson<any>(fichiersDe(dossier(c, camp)).meta, {})
   const slug = slugify(meta.client ?? c)
-  await mkdir(join(DIST, "t"), { recursive: true }); await mkdir(join(DIST, "v"), { recursive: true })
-  await copyFile(fichiersDe(d).loader, join(DIST, "t", `${slug}.js`))
-
+  await mkdir(join(DIST, "v"), { recursive: true })
   /* UN CLIENT, PLUSIEURS PAGES, UNE SEULE CONFIG.
    * La balise est par client (t/<client>.js) et sa config aussi (v/<client>.json), mais chaque
    * page construit la sienne dans son dossier : publier la config d'une page écrasait les
@@ -68,6 +65,16 @@ export async function publierTag(job: Job, c: string, camp: string): Promise<num
   if (!fusion.delaiMasque) fusion.delaiMasque = 1200
   if (!fusion.delaiMax) fusion.delaiMax = fusion.delaiMasque + 2000
   await ecrireJson(join(DIST, "v", `${slug}.json`), fusion)
+}
+/** copie loader + config dans ui/dist et pousse sur Vercel : l'URL que GTM connaît */
+export async function publierTag(job: Job, c: string, camp: string): Promise<number> {
+  const d = dossier(c, camp)
+  const meta = await lireJson<any>(fichiersDe(d).meta, {})
+  const slug = slugify(meta.client ?? c)
+  await mkdir(join(DIST, "t"), { recursive: true }); await mkdir(join(DIST, "v"), { recursive: true })
+  await copyFile(fichiersDe(d).loader, join(DIST, "t", `${slug}.js`))
+
+  await ecrireConfigClient(c, camp)
 
   // le même dossier sert AUSSI la démo statique (ui:deploy) : déployer l'un sans l'autre
   // efface l'autre en production : c'est ainsi que t/<client>.js est passé en 404 sur Vercel.
