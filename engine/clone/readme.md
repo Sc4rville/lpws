@@ -8,6 +8,7 @@ npm run clone -- <url> [--client acme] [--campaign printemps] [--seuil 0.03]
 npm run styles -- clients/acme/printemps/baseline        # relocaliser le CSS seul
 npm run assets -- clients/acme/printemps/baseline        # relocaliser les assets seuls
 npm run verify -- clients/acme/printemps/baseline        # rejuger sans recapturer
+npm run corpus [-- --recapturer]                          # repasser tout le corpus, tableau de verdicts
 ```
 
 ## Généalogie des étapes
@@ -18,7 +19,7 @@ npm run verify -- clients/acme/printemps/baseline        # rejuger sans recaptur
 | [`2_styles/`](2_styles/) | ✅ | CSS self-contained : feuilles réécrites vers `assets/` (fonts locales comprises), `<link>`/`<style>` localisés, le non-capturé absolutisé et compté |
 | [`3_assets/`](3_assets/) | ✅ | Images/vidéos locales (src, srcset, posters, styles inline), le reste absolutisé, `<base>` retirée → clone autonome |
 | [`4_structure/`](4_structure/) | 🔜 | `page.json` — segmentation + typage des sections, slots ancrés. **Le schéma est déjà posé** ([`schema.ts`](4_structure/schema.ts)) : c'est le contrat de tout l'aval |
-| [`5_verify/`](5_verify/) | ✅ | **Le juge** : rendu http local (origine synthétique), diff visuel vs live, métriques de santé, preuves à l'œil |
+| [`5_verify/`](5_verify/) | ✅ | **Le juge** : rendu http local (origine synthétique), diff visuel vs live (page entière, puis par section recalée), métriques de santé, preuves à l'œil |
 
 [`run.ts`](run.ts) orchestre ; chaque étape reste utilisable seule.
 
@@ -59,7 +60,7 @@ original.png(.mobile) le site LIVE gelé au moment de la capture — la référe
 clone.png(.mobile)    le clone rendu — la preuve
 diff.png(.mobile)     pixels qui diffèrent
 resources.json        tout ce que le live a réellement chargé (`local` → assets/)
-verify.json           le verdict complet du juge
+verify.json           le verdict complet du juge, dont `sections` : chaque section recalée, son décalage, son ratio
 meta.json             source, date, stats, rapports styles/assets, verdict + honnêteté
 ```
 

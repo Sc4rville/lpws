@@ -12,6 +12,10 @@
  *     erreurs console. Non bloquantes seules (l'original peut lui-même déborder), mais
  *     elles DISENT POURQUOI un diff est mauvais.
  *
+ *  1bis. PAR SECTION (diagnostic) — chaque bande de haut niveau (mark.ts, bandesDuRendu) est recalée sur le live puis
+ *     comparée seule (diff.ts, diffParSection) : dit QUELLE section a cassé, et sépare un simple
+ *     décalage vertical d'une vraie casse. Non bloquant : le verdict reste celui de la page.
+ *
  *  3. PREUVES — clone.png / clone.mobile.png / diff.png : à REGARDER, pas seulement à
  *     lire. Un ratio peut mentir (page presque vide → diff faible) ; l'œil non.
  *
@@ -23,13 +27,17 @@ import { type Page } from "playwright"
 import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { visualDiff, type DiffResult } from "./diff.ts"
+import { diffParSection, visualDiff, type Bande, type DiffResult, type DiffSections } from "./diff.ts"
 import { DESKTOP, MOBILE, autoScroll } from "../1_acquire/render.ts"
+import { bandesDuRendu } from "../1_acquire/mark.ts"
 import { step, timed, fail } from "../../shared/log.ts"
 import { estLance, lireArgs } from "../../shared/cli.ts"
 
 const SCOPE = "clone/5_verify"
 export const SEUIL_DEFAUT = 0.03 // 3% de pixels différents tolérés (fonts/antialiasing)
+// une section est petite : un titre réécrit n'y pèse que 2 %. Le bruit de rendu mesuré sur une
+// page fidèle reste sous 0,2 % ; 1 % désigne une vraie différence sans crier au moindre pixel.
+export const SEUIL_SECTION = 0.01
 
 type Sante = {
   overflowX: boolean
@@ -46,8 +54,8 @@ type Sante = {
 type Verdict = {
   fidele: boolean
   seuil: number
-  desktop: { diff: DiffResult; sante: Sante; screenshot: string }
-  mobile: { diff: DiffResult; sante: Sante; screenshot: string }
+  desktop: { diff: DiffResult; sections: DiffSections; sante: Sante; screenshot: string }
+  mobile: { diff: DiffResult; sections: DiffSections; sante: Sante; screenshot: string }
 }
 
 // au-delà, Chromium ne sait plus capturer, et une telle hauteur est déjà un diagnostic :
@@ -91,7 +99,7 @@ function measureHealth(): Omit<Sante, "consoleErrors" | "hauteurRendu" | "screen
 // le clone est rendu depuis une origine http synthétique (cf. servirDossiers), pas en file://
 const ORIGIN = "http://clone.lpws"
 
-async function inspect(page: Page, dir: string, file: string, shotPath: string): Promise<Sante & { screenshot: string }> {
+async function inspect(page: Page, dir: string, file: string, shotPath: string): Promise<Sante & { screenshot: string; bandes: Bande[] }> {
   await neutraliserNom(page)
   const consoleErrors: string[] = []
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()) })
@@ -102,6 +110,7 @@ async function inspect(page: Page, dir: string, file: string, shotPath: string):
   await page.waitForTimeout(2000) // laisse charger fonts locales + éventuel reliquat distant
   const sante = await page.evaluate(measureHealth)
   const hauteurRendu = await page.evaluate(() => document.documentElement.scrollHeight)
+  const b = await page.evaluate(bandesDuRendu)
   const screenshotTronque = hauteurRendu > HAUTEUR_MAX_SCREENSHOT
   if (screenshotTronque) {
     step(SCOPE, `hauteur de rendu aberrante (${hauteurRendu}px) : scroll-jack probable — ` +
@@ -111,7 +120,7 @@ async function inspect(page: Page, dir: string, file: string, shotPath: string):
   } else {
     await page.screenshot({ path: shotPath, fullPage: true })
   }
-  return { ...sante, consoleErrors, hauteurRendu, screenshotTronque, screenshot: shotPath }
+  return { ...sante, consoleErrors, hauteurRendu, screenshotTronque, screenshot: shotPath, bandes: b }
 }
 
 export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise<Verdict> {
@@ -130,12 +139,17 @@ export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise
       const shot = join(dir, label === "desktop" ? "clone.png" : "clone.mobile.png")
       const file = label === "mobile" && existsSync(join(dir, "capture.mobile.html"))
         ? "capture.mobile.html" : "capture.html"
-      const { screenshot, ...sante } = await timed(SCOPE, `rendu du clone (${label})`, () =>
+      const { screenshot, bandes: b, ...sante } = await timed(SCOPE, `rendu du clone (${label})`, () =>
         inspect(page, dir, file, shot))
       const diff = await visualDiff(join(dir, ref), shot,
         join(dir, label === "desktop" ? "diff.png" : "diff.mobile.png"))
-      step(SCOPE, `${label} : diff ${(diff.ratio * 100).toFixed(2)}% · Δhauteur ${diff.heightDelta}px`)
-      out[label] = { diff, sante: { ...sante, consoleErrors: sante.consoleErrors }, screenshot }
+      const sections = await diffParSection(join(dir, ref), shot, b, Math.min(seuil, SEUIL_SECTION))
+      const cassees = sections.sections.filter((x) => !x.fidele).sort((x, y) => y.ratio - x.ratio)
+      step(SCOPE, `${label} : diff ${(diff.ratio * 100).toFixed(2)}% · Δhauteur ${diff.heightDelta}px · ` +
+        `${sections.sections.length - cassees.length}/${sections.sections.length} sections fidèles` +
+        (sections.ratioAligne !== null ? ` (recalées : ${(sections.ratioAligne * 100).toFixed(2)}%)` : "") +
+        (cassees.length ? ` · à revoir : ${cassees.slice(0, 3).map((x) => `${x.anchor} « ${x.titre} » ${(x.ratio * 100).toFixed(1)}%`).join(", ")}` : ""))
+      out[label] = { diff, sections, sante: { ...sante, consoleErrors: sante.consoleErrors }, screenshot }
       await page.close()
     }))
     const verdict: Verdict = {

@@ -71,9 +71,9 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ✅ Rendu en http local *(en `file://` Chromium refuse les polices locales)*
 - ✅ Métriques de santé : débordement, images cassées, blocs restés invisibles, titres rognés
 - ✅ Hauteur aberrante : preuve tronquée au lieu d'un plantage (le drapeau ne dit plus « scroll-jack », il ne le savait pas)
-- 🔴 Mesure la page **entière** : un titre qui passe à trois lignes décale tout et fait exploser le score
-- ⬜ Juge v2 : diff **par section ancrée**
-- ⬜ Verdict par section (savoir *laquelle* a cassé)
+- ✅ Un titre qui passe à trois lignes ne fait plus exploser le score : chaque section est recalée sur le live avant d'être comparée *(le verdict bloquant reste celui de la page ; le recalé dit si ce n'est qu'un décalage)*
+- ✅ Juge v2 : diff **par section ancrée** *(diff.ts, diffParSection — sections de mark.ts, bandesDuRendu)*
+- ✅ Verdict par section (savoir *laquelle* a cassé) *(verify.json `sections`, seuil 1 % par section)*
 - ⬜ Même découpage appliqué au delta de variante
 - ⬜ Round-trip à vide : page.json → apply → re-rendu → pixel identique
 
@@ -85,7 +85,7 @@ d'identité (1.1.3) qui invalidait silencieusement tout l'aval est comblé et pr
 - ⬜ Ajouter un advertorial / pre-lander
 - ⬜ Ajouter un quiz funnel
 - ⬜ Relancer le clone Asana interrompu
-- ⬜ Une commande qui repasse tout le corpus et sort un tableau de verdicts
+- ✅ Une commande qui repasse tout le corpus et sort un tableau de verdicts *(`npm run corpus`, `--recapturer` pour refaire les captures)*
 
 ## 1.2 · Modeler la page
 
@@ -312,5 +312,5 @@ maintenant et qui coûteront très cher à rattraper.
 1. ~~**L'identité des ancres** (1.1.3)~~ — **fait** : empreinte, re-liage, refus d'`apply`, preuve rejouable. Reste le versionnage des captures et le remplissage automatique d'`attendu`.
 2. **La boutique de dev Shopify** (1.3) — débloque le gros de l'e-commerce, et c'est du côté de Yann.
 3. **La recherche v2** (2.3) — tourne en parallèle, livre la moitié manquante de la KB.
-4. **Le juge par section** (1.1.4) — sans lui on ne sait pas *quoi* a cassé, ni côté clone ni côté variante.
+4. **Le juge par section** (1.1.4) — fait côté clone ; reste le même découpage sur le delta de variante.
 5. **Le jeu de test annoté** (2.7) — petit à produire, et c'est la condition pour avoir le droit d'afficher une confiance.

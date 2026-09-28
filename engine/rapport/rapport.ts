@@ -15,7 +15,7 @@ import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { lireJson } from "../shared/json.ts"
 import { campagne as fichiersDe, type Test } from "../shared/campagne.ts"
-import { historique, verdictDe } from "../measure/experience.ts"
+import { comptes, historique, verdictDe } from "../measure/experience.ts"
 import type { Resultats } from "../measure/run.ts"
 import type { Compte } from "../compte/compte.ts"
 import { palierEnVigueur } from "../compte/compte.ts"
@@ -44,7 +44,7 @@ export async function rapportHtml(campagneDir: string, testId: string, compte: C
   const marque = blanche ? compte.marque.nom : "LPWS"
   const couleur = blanche ? compte.marque.couleur : "#111214"
 
-  const o = res?.versions.controle, v = res?.versions[t.id]
+  const { o, v } = comptes(res, t.id)
   const jours = t.lanceLe ? Math.max(0, Math.floor((Date.parse(t.finLe ?? new Date().toISOString()) - Date.parse(t.lanceLe)) / 86_400_000)) : 0
   const b = o && v && o.n && v.n ? (await verdictDe(campagneDir, t)).verdict : null
   const reco = !b ? (t.etat === "live" ? "Pas encore de résultats mesurés : le test continue, aucune conclusion n'est tirée." : "Test arrêté sans résultats mesurés : aucune conclusion n'est tirée.")
