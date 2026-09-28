@@ -227,6 +227,7 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 .toast.on{opacity:1}
 .toast.act{pointer-events:auto;padding-right:8px}
 .toast .undo{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s}
+.toast .undo[hidden]{display:none}
 .toast .undo:hover{background:rgba(255,255,255,.26)}
 .toast .undo kbd{background:transparent;color:var(--pill-muted);box-shadow:none;padding:0}
 [tabindex="-1"]:focus{outline:none}
@@ -292,6 +293,7 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 /* ---------- le haut de l'accueil : trois chiffres ---------- */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:-12px 0 28px}
 .kpis .stat{background:var(--paper);box-shadow:var(--shadow)}
+.nt{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
 
 /* ---------- tableau de score ---------- */
 .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -368,6 +370,8 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
   .tbl{overflow-x:auto}.tr{min-width:760px}
   .kx{padding-top:10vh}
   .kf{display:none}
+  .nt{grid-template-columns:1fr}
+  .btn,.go{white-space:normal;max-width:100%;text-align:left}
   .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-16px 0 24px}
   .kpis .stat{padding:14px}
   .kpis .stat .v{font-size:24px}
@@ -1177,7 +1181,7 @@ function vNouveau(c) {
   const genre = choix ? (choix.tag.startsWith('h') ? 'titre' : choix.tag === 'p' ? 'texte' : 'bouton') : '';
   return `
     <div class="hd"><div><h2>Nouveau test</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez un texte de la page, écrivez celui que vous voulez tester. L’original reste tel quel pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
-    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start">
+    <div class="grid nt">
       <div class="card"><h3>1 · Le texte à changer</h3>${rows}</div>
       <div class="card"><h3>2 · La nouvelle version</h3>
         ${choix ? `<p class="muted" style="margin-bottom:12px">Aujourd’hui : « ${esc(choix.text)} »</p>` : '<p class="muted">Choisissez d’abord un texte à gauche.</p>'}
@@ -1369,7 +1373,7 @@ function ouvrirK() {
   document.getElementById('cmdk').hidden = false;
   const q = document.getElementById('k-q'); q.value = ''; dessinerK(); q.focus();
 }
-function fermerK() { document.getElementById('cmdk').hidden = true; if (K.avant && K.avant.focus) K.avant.focus(); }
+function fermerK() { document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur(); if (K.avant && K.avant.isConnected && K.avant.focus) K.avant.focus(); }
 function dessinerK() {
   const mots = norm(K.q).split(/\s+/).filter(Boolean);
   K.list = entrees().filter(e => { const h = norm(`${e.g} ${e.l} ${e.d}`); return mots.every(m => h.includes(m)); }).slice(0, 40);
@@ -1381,7 +1385,7 @@ function dessinerK() {
   if (K.list.length) q.setAttribute('aria-activedescendant', 'k-' + K.i); else q.removeAttribute('aria-activedescendant');
   const on = document.getElementById('k-' + K.i); if (on) on.scrollIntoView({ block: 'nearest' });
 }
-function choisirK(n) { const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; go(e.go); render(); }
+function choisirK(n) { const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; document.getElementById('k-q').blur(); go(e.go); render(); }
 document.addEventListener('keydown', e => {
   const ouverte = !document.getElementById('cmdk').hidden;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ouverte ? fermerK() : ouvrirK(); return; }
@@ -1421,6 +1425,8 @@ function go(spec) {
     else if (k === 'guide') { S.view = 'guide'; S.mode = v; S.openMode = v; }
   }
 }
+/** un double-clic ne doit pas arrêter puis relancer : le bouton suivant apparaît sous le pointeur */
+const ACTES_ETAT = ['launch', 'stop', 'deploy', 'restore']; let dernierActe = -Infinity;
 document.addEventListener('click', e => {
   if (e.target.id === 'cmdk') { fermerK(); return; }
   const kk = e.target.closest('[data-k]');
@@ -1437,6 +1443,7 @@ document.addEventListener('click', e => {
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
   if (!act) return;
+  if (ACTES_ETAT.includes(act.dataset.act)) { if (e.timeStamp - dernierActe < 600) return; dernierActe = e.timeStamp; }
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
   const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
   switch (act.dataset.act) {
@@ -1512,7 +1519,9 @@ document.addEventListener('change', e => {
   if (e.target.id !== 'part') return;
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
   if (!t || t.etat !== 'live') return;
-  if (c.live) publier(c, t, 'live', t.part, false); else toast(`${t.part} % des visiteurs voient maintenant la variante`);
+  if (c.live) { publier(c, t, 'live', t.part, false); return; }
+  const m = document.getElementById('main'), y = m.scrollTop;
+  toast(`${t.part} % des visiteurs voient maintenant la variante`); render(); m.scrollTop = y;
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
