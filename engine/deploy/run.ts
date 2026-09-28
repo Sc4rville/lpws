@@ -10,13 +10,15 @@
  *
  * Usage : npm run deploy -- <dossier-variante> <config.json>
  */
-import { readFile, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { DeployConfig } from "./config.ts"
 import { prepareVariant } from "./prepare.ts"
 import { checkDeploy } from "./check.ts"
 import { step, fail } from "../shared/log.ts"
+import { estLance, lireArgs } from "../shared/cli.ts"
+import { lireValide } from "../shared/json.ts"
 
 const SCOPE = "deploy"
 
@@ -25,11 +27,7 @@ export async function deployVariant(variante: string, configPath: string) {
     fail(SCOPE, `${variante}/variant.html introuvable — appliquer une spec d'abord`)
 
   // le contrat d'abord : une config invalide ne produit aucun fichier
-  const parsed = DeployConfig.safeParse(JSON.parse(await readFile(configPath, "utf8")))
-  if (!parsed.success)
-    fail(SCOPE, `config de livraison invalide (${configPath}) :\n` +
-      parsed.error.issues.map((i) => `  · ${i.path.join(".") || "(racine)"} : ${i.message}`).join("\n"))
-  const cfg = parsed.data
+  const cfg = await lireValide(DeployConfig, configPath).catch((e: Error) => fail(SCOPE, `config de livraison invalide : ${e.message}`))
 
   // variants/<nom> → ../../publish/<nom> : la publication est voisine de la donnée, pas dedans
   const nom = resolve(variante).split("/").pop()!
@@ -54,8 +52,8 @@ export async function deployVariant(variante: string, configPath: string) {
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("deploy/run.ts")) {
-  const [v, c] = process.argv.slice(2).filter((a) => !a.startsWith("--"))
+if (estLance(import.meta.url)) {
+  const [v, c] = lireArgs().libres
   if (!v || !c) fail(SCOPE, "usage : npm run deploy -- <dossier-variante> <config.json>")
   await deployVariant(v, c)
 }

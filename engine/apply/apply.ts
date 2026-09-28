@@ -16,7 +16,7 @@
  * qui contournerait la règle des ancres.
  */
 import { recopieOmbre } from "../clone/1_acquire/ombre.ts"
-import { lancerNavigateur } from "../shared/navigateur.ts"
+import { lancerNavigateur, neutraliserNom, horsLigne } from "../shared/navigateur.ts"
 import { type Browser } from "playwright"
 import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -298,10 +298,8 @@ export async function applyEdits(
       const src = join(baselineDir, source)
       if (!existsSync(src)) continue
       const page = await browser.newPage()
-      // cf. note __name dans 1_acquire/render.ts
-      await page.addInitScript({ content: "window.__name = (f) => f" })
-      await page.route("**/*", (r) =>
-        r.request().url().startsWith("file://") ? r.continue() : r.abort())
+      await neutraliserNom(page)
+      await horsLigne(page)
       await page.goto("file://" + resolve(src), { waitUntil: "domcontentloaded", timeout: 60_000 })
 
       // le design system se récolte sur CE document : la grille du mobile n'est pas celle

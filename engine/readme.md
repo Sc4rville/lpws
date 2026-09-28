@@ -6,7 +6,10 @@ dans l'arborescence).
 
 ```
 engine/
-  shared/     socle transverse : chemins de sortie, logs uniformes
+  shared/     socle transverse, un seul exemplaire de chaque mécanique commune :
+                paths · campagne (disposition sur disque + Test) · log · cli (args)
+                json (lecture validée zod) · modele (claude -p au contrat) · mime · http
+                navigateur (Chromium, shim __name, origine synthétique, hors ligne)
   viewer/     le cockpit local — comparer live/clone, suivre les captures, voir les variantes
   clone/      FAMILLE 1 — url du client → baseline fidèle, marquée, jugée   ← en cours
   apply/      FAMILLE 2 — hypothèse + éditions ancrées → variante prouvée   ← en cours

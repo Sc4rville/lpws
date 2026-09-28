@@ -12,16 +12,17 @@
  *
  * Usage : npm run measure -- clients/<client>/<campagne> [--exemple]
  */
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
-import { join } from "node:path"
 import { rapportParVersion, lireRapport, type CompteDeService, type LigneVersion } from "./ga4.ts"
 import { step, fail } from "../shared/log.ts"
+import { estLance, lireArgs } from "../shared/cli.ts"
+import { ecrireJson, lireJson } from "../shared/json.ts"
+import { campagne as fichiersDe, type Test } from "../shared/campagne.ts"
 
 const SCOPE = "measure"
 
 type Mesure = { propriete: string; compteDeService: string }
-type Test = { id: string; etat: string; lanceLe?: string }
 
 export type Resultats = {
   luLe: string
@@ -31,7 +32,8 @@ export type Resultats = {
 }
 
 export async function mesurer(campagne: string, exemple = false): Promise<Resultats> {
-  const tests: Test[] = JSON.parse(await readFile(join(campagne, "tests.json"), "utf8").catch(() => "[]"))
+  const f = fichiersDe(campagne)
+  const tests = await lireJson<Test[]>(f.tests, [])
   const vivants = tests.filter((t) => t.etat === "live" || t.etat === "stop" || t.etat === "gagnant")
   if (!vivants.length && !exemple) fail(SCOPE, `aucun test lancé dans ${campagne} : rien à mesurer`)
   const depuis = vivants.map((t) => t.lanceLe).filter((d): d is string => !!d).sort()[0]?.slice(0, 10)
@@ -42,12 +44,11 @@ export async function mesurer(campagne: string, exemple = false): Promise<Result
     lignes = lireRapport(JSON.parse(await readFile(new URL("./exemple-reponse.json", import.meta.url), "utf8")))
     step(SCOPE, `réponse GA4 d'exemple rejouée (${lignes.length} versions)`)
   } else {
-    const f = join(campagne, "mesure.json")
-    if (!existsSync(f))
-      fail(SCOPE, `${f} manquant. Il faut : { "propriete": "<id numérique GA4>", "compteDeService": "<chemin du JSON du compte de service> " }\n` +
+    if (!existsSync(f.mesure))
+      fail(SCOPE, `${f.mesure} manquant. Il faut : { "propriete": "<id numérique GA4>", "compteDeService": "<chemin du JSON du compte de service> " }\n` +
         `  → le buyer ajoute l'adresse du compte de service en LECTEUR sur la propriété GA4 du client,\n` +
         `    et crée la dimension personnalisée lpws_variante (portée UTILISATEUR) dans Admin → Définitions personnalisées.`)
-    const m: Mesure = JSON.parse(await readFile(f, "utf8"))
+    const m: Mesure = JSON.parse(await readFile(f.mesure, "utf8"))
     const sa: CompteDeService = JSON.parse(await readFile(m.compteDeService, "utf8"))
     lignes = await rapportParVersion(sa, m.propriete, depuis)
     step(SCOPE, `GA4 propriété ${m.propriete}, depuis le ${depuis} : ${lignes.length} version(s)`)
@@ -56,16 +57,16 @@ export async function mesurer(campagne: string, exemple = false): Promise<Result
   const versions: Resultats["versions"] = {}
   for (const l of lignes) versions[l.version] = { n: l.sessions, c: l.conversions }
   const res: Resultats = { luLe: new Date().toISOString(), depuis, source: exemple ? "exemple" : "ga4", versions }
-  await writeFile(join(campagne, "resultats.json"), JSON.stringify(res, null, 2))
+  await ecrireJson(f.resultats, res)
   for (const [v, x] of Object.entries(versions))
     step(SCOPE, `  ${v.padEnd(28)} ${String(x.n).padStart(6)} sessions  ${String(x.c).padStart(5)} conversions`)
   return res
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("measure/run.ts")) {
-  const args = process.argv.slice(2)
-  const campagne = args.find((a) => !a.startsWith("--"))
+if (estLance(import.meta.url)) {
+  const args = lireArgs(["--exemple"])
+  const [campagne] = args.libres
   if (!campagne) fail(SCOPE, "usage : npm run measure -- clients/<client>/<campagne> [--exemple]")
-  await mesurer(campagne, args.includes("--exemple"))
+  await mesurer(campagne, args.drapeau("--exemple"))
 }

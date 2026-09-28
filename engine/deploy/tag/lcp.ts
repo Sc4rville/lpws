@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { buildTag } from "./build.ts"
 import { step, fail } from "../../shared/log.ts"
+import { estLance, lireArgs } from "../../shared/cli.ts"
 
 const SCOPE = "deploy/tag/lcp"
 const BASE = "https://cfg.lpws.test"
@@ -66,11 +67,9 @@ export async function mesurerLcp(baseline: string, specPath: string, tirs = 5) {
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("tag/lcp.ts")) {
-  const args = process.argv.slice(2)
-  const libres = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))
-  const [baseline, spec] = libres
-  const i = args.indexOf("--tirs")
+if (estLance(import.meta.url)) {
+  const args = lireArgs()
+  const [baseline, spec] = args.libres
   if (!baseline || !spec) fail(SCOPE, "usage : npm run lcp -- <dossier-baseline> <spec.json> [--tirs 5]")
-  await mesurerLcp(baseline, spec, i >= 0 ? Number(args[i + 1]) : 5)
+  await mesurerLcp(baseline, spec, args.option("--tirs") ? Number(args.option("--tirs")) : 5)
 }

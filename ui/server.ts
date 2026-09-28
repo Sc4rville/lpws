@@ -28,13 +28,17 @@
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
 import { spawn } from "node:child_process"
-import { readFile, writeFile, readdir, stat, mkdir, copyFile, rm } from "node:fs/promises"
+import { readFile, readdir, stat, mkdir, copyFile, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
-import { join, resolve, extname, normalize } from "node:path"
+import { join, resolve } from "node:path"
 import { lancerNavigateur, UA } from "../engine/shared/navigateur.ts"
 import { CLIENTS_ROOT, marque, slugify } from "../engine/shared/paths.ts"
 import { Contexte } from "../engine/variant/contexte.ts"
 import { step } from "../engine/shared/log.ts"
+import { lireJson, ecrireJson } from "../engine/shared/json.ts"
+import { envoyerFichier, envoyerJson as json } from "../engine/shared/http.ts"
+import { mimeDe } from "../engine/shared/mime.ts"
+import { campagne as fichiersDe, type Test, type Express } from "../engine/shared/campagne.ts"
 
 const SCOPE = "ui"
 const PORT = Number(process.env.PORT ?? 4700)
@@ -44,10 +48,6 @@ const UI = join(ROOT, "ui", "index.html")
 const TSX = join(ROOT, "node_modules", ".bin", "tsx")
 /** l'adresse publique des fichiers du tag : celle que le buyer colle dans GTM */
 const BASE_TAGS = process.env.LPWS_BASE ?? "https://lpws.vercel.app"
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8", ".png": "image/png", ".json": "application/json; charset=utf-8",
-  ".css": "text/css", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2",
-}
 
 /* ---------- jobs : ce qui prend du temps se suit, ligne par ligne ---------- */
 type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown; campagne?: string }
@@ -80,7 +80,7 @@ async function nomDuSite(d: string, c: string): Promise<string> {
   if (nomsDeSites.has(d)) return nomsDeSites.get(d)!
   let nom = cap(c)
   try {
-    const html = (await readFile(join(d, "baseline", "capture.html"), "utf8")).slice(0, 80_000)
+    const html = (await readFile(fichiersDe(d).capture, "utf8")).slice(0, 80_000)
     const og = html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']{1,60})["']/i)?.[1]
       ?? html.match(/<meta[^>]+content=["']([^"']{1,60})["'][^>]+property=["']og:site_name["']/i)?.[1]
     const segments = (html.match(/<title[^>]*>([^<]{1,200})<\/title>/i)?.[1] ?? "").split(/\s+[|·•:–-]\s+/).map((x) => x.trim())
@@ -93,13 +93,6 @@ async function nomDuSite(d: string, c: string): Promise<string> {
   return nom
 }
 
-type Test = {
-  id: string; titre: string; teste: string; pourquoi: string; etat: "prep" | "pret" | "live" | "stop" | "echec"
-  part: number; creeLe: string; lanceLe?: string; edits: Array<{ anchor: string; text: string; avant: string }>; erreur?: string; job?: string
-}
-type Express = { installe: boolean; verifieLe?: string; version?: string; mode?: string; detail?: string }
-const lireJson = async <T>(f: string, defaut: T): Promise<T> => { try { return JSON.parse(await readFile(f, "utf8")) } catch { return defaut } }
-const ecrireJson = (f: string, v: unknown) => writeFile(f, JSON.stringify(v, null, 2))
 const dossier = (c: string, camp: string) => join(ROOT, CLIENTS_ROOT, c, camp)
 const dateFr = (iso?: string) => iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : undefined
 /** BASE_TAGS/t/<client>.js répond-il ? true / false, ou null si BASE_TAGS est injoignable. Mémoire 60 s. */
@@ -128,23 +121,23 @@ async function etat() {
     for (const camp of await readdir(cdir)) {
       const d = join(cdir, camp)
       if (!(await stat(d)).isDirectory()) continue
-      const base = join(d, "baseline")
-      const encours = await lireJson<{ url: string; job: string; debut: string } | null>(join(d, "capture.json"), null)
-      if (!existsSync(join(base, "capture.html")) && !encours) continue
-      const meta = await lireJson<any>(join(base, "meta.json"), null)
-      const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
-      const express = await lireJson<Express>(join(d, "express.json"), { installe: false })
+      const base = fichiersDe(d).baseline
+      const encours = await lireJson<{ url: string; job: string; debut: string } | null>(fichiersDe(d).enCours, null)
+      if (!existsSync(fichiersDe(d).capture) && !encours) continue
+      const meta = await lireJson<any>(fichiersDe(d).meta, null)
+      const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+      const express = await lireJson<Express>(fichiersDe(d).express, { installe: false })
       // le brain : ce que le buyer a dit de la campagne, ce que la machine en a conclu, ce qu'elle propose
-      const contexte = await lireJson<any>(join(d, "context.json"), null)
-      const diag = await lireJson<any>(join(d, "diagnostic.json"), null)
+      const contexte = await lireJson<any>(fichiersDe(d).contexte, null)
+      const diag = await lireJson<any>(fichiersDe(d).diagnostic, null)
       // un test en échec libère sa proposition : le buyer peut la retenter après correction
       const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
-      const propositions = (await lireJson<any[]>(join(d, "propositions.json"), [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
+      const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
-      const resultats = await lireJson<{ luLe: string; source?: string; versions: Record<string, { n: number; c: number }> } | null>(join(d, "resultats.json"), null)
+      const resultats = await lireJson<{ luLe: string; source?: string; versions: Record<string, { n: number; c: number }> } | null>(fichiersDe(d).resultats, null)
       const resDe = (id: string) => {
         const o = resultats?.versions?.controle, v = resultats?.versions?.[id]
         return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
@@ -193,7 +186,7 @@ async function etat() {
           id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe), potentiel: "Moyen",
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
-          imgUrl: existsSync(join(d, "variants", t.id, "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
+          imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
           res: resDe(t.id),
         })),
       })
@@ -214,13 +207,13 @@ async function capturer(url: string): Promise<{ job: Job; client: string; campag
   const d = dossier(client, campagne)
   await mkdir(d, { recursive: true })
   const job = nouveauJob("capture")
-  await ecrireJson(join(d, "capture.json"), { url, job: job.id, debut: job.debut })
+  await ecrireJson(fichiersDe(d).enCours, { url, job: job.id, debut: job.debut })
   ;(async () => {
     const code = await lancer(job, TSX, [join(ROOT, "engine/clone/run.ts"), url, "--client", client, "--campaign", campagne])
     // exit 1 = capture faite mais pas fidèle : la page existe, le juge a dit non : c'est un résultat
-    const meta = existsSync(join(d, "baseline", "meta.json"))
+    const meta = existsSync(fichiersDe(d).meta)
     finir(job, code === 0 || meta, { client, campagne, fidele: code === 0 })
-    if (meta) { try { await rm(join(d, "capture.json")) } catch {} }
+    if (meta) { try { await rm(fichiersDe(d).enCours) } catch {} }
   })()
   return { job, client, campagne }
 }
@@ -228,7 +221,7 @@ async function capturer(url: string): Promise<{ job: Job; client: string; campag
 /* ---------- les textes qu'un test peut changer ---------- */
 type Texte = { anchor: string; tag: string; text: string; top: number }
 async function textes(c: string, camp: string): Promise<Texte[]> {
-  const base = join(dossier(c, camp), "baseline")
+  const base = fichiersDe(dossier(c, camp)).baseline
   const cache = join(base, "textes-v2.json")
   const deja = await lireJson<Texte[] | null>(cache, null)
   if (deja) return deja
@@ -265,9 +258,9 @@ async function textes(c: string, camp: string): Promise<Texte[]> {
 async function pipelineTest(job: Job, c: string, camp: string, id: string, base: string, specPath: string) {
   const d = dossier(c, camp)
     const maj = async (patch: Partial<Test>) => {
-      const all = await lireJson<Test[]>(join(d, "tests.json"), [])
+      const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
       const t = all.find((x) => x.id === id); if (t) Object.assign(t, patch)
-      await ecrireJson(join(d, "tests.json"), all)
+      await ecrireJson(fichiersDe(d).tests, all)
     }
     dire(job, "1 · la variante : on applique le changement sur la copie et on la photographie")
     let code = await lancer(job, TSX, [join(ROOT, "engine/apply/run.ts"), base, specPath])
@@ -283,18 +276,18 @@ async function pipelineTest(job: Job, c: string, camp: string, id: string, base:
 }
 
 async function creerTest(c: string, camp: string, entree: { titre: string; pourquoi: string; edits: Array<{ anchor: string; text: string }> }) {
-  const d = dossier(c, camp); const base = join(d, "baseline")
-  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
+  const d = dossier(c, camp); const base = fichiersDe(d).baseline
+  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   let id = slugify(entree.titre).slice(0, 40) || "test"
   while (tests.some((t) => t.id === id)) id += "-2"
-  const empreintes = await lireJson<Array<{ a: string; role: string; text: string }>>(join(base, "anchors.json"), [])
+  const empreintes = await lireJson<Array<{ a: string; role: string; text: string }>>(fichiersDe(d).ancres, [])
   const txt = await textes(c, camp)
   const edits = entree.edits.map((e) => ({ anchor: e.anchor, text: e.text, avant: txt.find((t) => t.anchor === e.anchor)?.text ?? "" }))
   const job = nouveauJob("test")
   const teste = edits.map((e) => `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »`).join(" · ")
   const test: Test = { id, titre: entree.titre, teste, pourquoi: entree.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id }
   tests.push(test)
-  await ecrireJson(join(d, "tests.json"), tests)
+  await ecrireJson(fichiersDe(d).tests, tests)
 
   const spec = {
     nom: id,
@@ -307,8 +300,7 @@ async function creerTest(c: string, camp: string, entree: { titre: string; pourq
       return { anchor: e.anchor, op: "set", text: e.text, pourquoi: entree.pourquoi, ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
     }),
   }
-  await mkdir(join(d, "specs"), { recursive: true })
-  const specPath = join(d, "specs", `${id}.json`)
+  const specPath = fichiersDe(d).spec(id)
   await ecrireJson(specPath, spec)
 
   pipelineTest(job, c, camp, id, base, specPath)
@@ -320,7 +312,7 @@ async function lancerBrain(c: string, camp: string, contexte: unknown): Promise<
   const d = dossier(c, camp)
   const v = Contexte.safeParse(contexte)
   if (!v.success) throw Object.assign(new Error("Il manque au moins ce que promet l’annonce et comment se conclut la vente : " + v.error.issues.map((i) => i.path.join(".")).join(", ")), { code: 400 })
-  await ecrireJson(join(d, "context.json"), v.data)
+  await ecrireJson(fichiersDe(d).contexte, v.data)
   const job = nouveauJob("brain")
   job.campagne = d
   ;(async () => {
@@ -335,32 +327,32 @@ async function lancerBrain(c: string, camp: string, contexte: unknown): Promise<
 
 /** Une proposition du brain devient un test : même pipeline qu'un test écrit à la main. */
 async function creerTestDepuisProposition(c: string, camp: string, nom: string) {
-  const d = dossier(c, camp); const base = join(d, "baseline")
-  const props = await lireJson<Array<{ nom: string; titre: string; teste: string; pourquoi: string; regle: string }>>(join(d, "propositions.json"), [])
+  const d = dossier(c, camp); const base = fichiersDe(d).baseline
+  const props = await lireJson<Array<{ nom: string; titre: string; teste: string; pourquoi: string; regle: string }>>(fichiersDe(d).propositions, [])
   const p = props.find((x) => x.nom === nom)
   if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
-  const specPath = join(d, "specs", `${nom}.json`)
+  const specPath = fichiersDe(d).spec(nom)
   if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
   const spec = await lireJson<any>(specPath, {})
-  let tests = await lireJson<Test[]>(join(d, "tests.json"), [])
+  let tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
   tests = tests.filter((t) => t.id !== nom)
   const txt = await textes(c, camp)
   const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
   const job = nouveauJob("test")
   tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id })
-  await ecrireJson(join(d, "tests.json"), tests)
+  await ecrireJson(fichiersDe(d).tests, tests)
   pipelineTest(job, c, camp, nom, base, specPath)
   return { job, id: nom }
 }
 
 /** reconstruit loader + config avec TOUTES les specs des tests vivants de la page */
 async function construireTag(job: Job, c: string, camp: string): Promise<number> {
-  const d = dossier(c, camp); const base = join(d, "baseline")
-  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
-  const specs = tests.filter((t) => t.etat !== "echec").map((t) => join(d, "specs", `${t.id}.json`)).filter((p) => existsSync(p))
+  const d = dossier(c, camp); const base = fichiersDe(d).baseline
+  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+  const specs = tests.filter((t) => t.etat !== "echec").map((t) => fichiersDe(d).spec(t.id)).filter((p) => existsSync(p))
   if (!specs.length) return 0
-  const meta = await lireJson<any>(join(base, "meta.json"), {})
+  const meta = await lireJson<any>(fichiersDe(d).meta, {})
   const code = await lancer(job, TSX, [join(ROOT, "engine/deploy/tag/build.ts"), base, ...specs, "--base", BASE_TAGS, "--url", meta.source])
   if (code !== 0) return code
   await appliquerParts(c, camp)
@@ -369,9 +361,9 @@ async function construireTag(job: Job, c: string, camp: string): Promise<number>
 /** la part de trafic de chaque variante vient de tests.json, pas du build (qui met la même partout) */
 async function appliquerParts(c: string, camp: string) {
   const d = dossier(c, camp)
-  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
-  const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
-  const f = join(d, "tags", "v", `${slugify(meta.client ?? c)}.json`)
+  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+  const meta = await lireJson<any>(fichiersDe(d).meta, {})
+  const f = fichiersDe(d).configTag(slugify(meta.client ?? c))
   const cfg = await lireJson<any>(f, null)
   if (!cfg) return
   cfg.actif = true
@@ -381,10 +373,10 @@ async function appliquerParts(c: string, camp: string) {
 /** copie loader + config dans ui/dist et pousse sur Vercel : l'URL que GTM connaît */
 async function publierTag(job: Job, c: string, camp: string): Promise<number> {
   const d = dossier(c, camp)
-  const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
+  const meta = await lireJson<any>(fichiersDe(d).meta, {})
   const slug = slugify(meta.client ?? c)
   await mkdir(join(DIST, "t"), { recursive: true }); await mkdir(join(DIST, "v"), { recursive: true })
-  await copyFile(join(d, "tags", "loader.js"), join(DIST, "t", `${slug}.js`))
+  await copyFile(fichiersDe(d).loader, join(DIST, "t", `${slug}.js`))
 
   /* UN CLIENT, PLUSIEURS PAGES, UNE SEULE CONFIG.
    * La balise est par client (t/<client>.js) et sa config aussi (v/<client>.json), mais chaque
@@ -394,13 +386,13 @@ async function publierTag(job: Job, c: string, camp: string): Promise<number> {
   const cdir = join(CLIENTS_ROOT, c)
   const fusion: any = { actif: true, delaiMasque: 0, delaiMax: 0, variantes: [] as any[] }
   for (const camp of await readdir(cdir)) {
-    const f = join(cdir, camp, "tags", "v", `${slug}.json`)
+    const f = fichiersDe(join(cdir, camp)).configTag(slug)
     const cfg = await lireJson<any>(f, null)
     if (!cfg) continue
     // seule tests.json fait foi : une config construite par un outil (tag:check, un essai à la
     // main) sans test derrière est un reste, pas une variante à servir : constaté : une variante
     // de Jira partait à 100 % du trafic sans qu'aucun test n'existe
-    const testsCamp = await lireJson<Test[]>(join(cdir, camp, "tests.json"), [])
+    const testsCamp = await lireJson<Test[]>(fichiersDe(join(cdir, camp)).tests, [])
     fusion.delaiMasque = Math.max(fusion.delaiMasque, Math.round(cfg.delaiMasque ?? 0))
     fusion.delaiMax = Math.max(fusion.delaiMax, Math.round(cfg.delaiMax ?? 0))
     for (const v of cfg.variantes ?? []) {
@@ -440,7 +432,7 @@ function VERCEL(args: string[]): [string, string[]] {
 
 async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number) {
   const d = dossier(c, camp)
-  const tests = await lireJson<Test[]>(join(d, "tests.json"), [])
+  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
   if (!t) throw new Error("test inconnu")
   /* PAS DE MISE EN LIGNE SANS BALISE.
@@ -449,7 +441,7 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
    * donc la vraie page au moment de lancer (il vient peut-être de publier GTM sans cliquer
    * « Vérifier »), et on refuse franchement si elle ne répond pas. */
   if (etat === "live") {
-    const ex = await lireJson<Express>(join(d, "express.json"), { installe: false })
+    const ex = await lireJson<Express>(fichiersDe(d).express, { installe: false })
     const sonde = ex.installe ? ex : await sonderBalise(c, camp)
     if (!sonde.installe)
       throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
@@ -457,20 +449,20 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
   const avant = tests.map((o) => [o.id, o.etat, o.part] as const)
   if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
   else { t.etat = "stop" }
-  await ecrireJson(join(d, "tests.json"), tests)
+  await ecrireJson(fichiersDe(d).tests, tests)
   await appliquerParts(c, camp)
   const job = nouveauJob("config")
   ;(async () => {
     dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : "arrêt : l’original reprend 100 % du trafic")
     const code = await publierTag(job, c, camp)
     // l'état affiché doit être l'état EN LIGNE : si la publication rate, on revient en arrière et on dit pourquoi
-    const all = await lireJson<Test[]>(join(d, "tests.json"), [])
+    const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
     const cible = all.find((x) => x.id === id)
     if (code !== 0) {
       for (const [oid, oetat, opart] of avant) { const o = all.find((x) => x.id === oid); if (o) { o.etat = oetat; o.part = opart } }
       if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
     } else if (cible) delete cible.erreur
-    await ecrireJson(join(d, "tests.json"), all)
+    await ecrireJson(fichiersDe(d).tests, all)
     if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()
@@ -481,7 +473,7 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
 /** Ouvre la vraie page et cherche la balise. Le résultat est écrit dans express.json. */
 async function sonderBalise(c: string, camp: string, job?: Job): Promise<Express> {
   const d = dossier(c, camp)
-  const meta = await lireJson<any>(join(d, "baseline", "meta.json"), {})
+  const meta = await lireJson<any>(fichiersDe(d).meta, {})
   const browser = await lancerNavigateur()
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
@@ -493,7 +485,7 @@ async function sonderBalise(c: string, camp: string, job?: Job): Promise<Express
     const info = await page.evaluate(() => (window as any).__lpws ?? null)
     const ex: Express = { installe: !!info || demande, verifieLe: new Date().toISOString(), version: info?.version, mode: info?.mode,
       detail: info ? `balise active (${info.mode}), version servie : ${info.version}` : demande ? "balise demandée par la page, mais pas encore exécutée au moment de la lecture" : "aucune trace de la balise sur la page : GTM ne l’a pas encore publiée" }
-    await ecrireJson(join(d, "express.json"), ex)
+    await ecrireJson(fichiersDe(d).express, ex)
     return ex
   } finally { await browser.close() }
 }
@@ -511,13 +503,7 @@ async function verifier(c: string, camp: string): Promise<Job> {
 }
 
 /* ---------- http ---------- */
-const json = (res: ServerResponse, code: number, v: unknown) => { res.writeHead(code, { "content-type": MIME[".json"] }); res.end(JSON.stringify(v)) }
 const body = (req: IncomingMessage) => new Promise<any>((ok, ko) => { let s = ""; req.on("data", (d) => s += d); req.on("end", () => { try { ok(s ? JSON.parse(s) : {}) } catch (e) { ko(e) } }) })
-async function fichier(res: ServerResponse, f: string, cors = false) {
-  if (!existsSync(f) || (await stat(f)).isDirectory()) { res.writeHead(404); res.end("introuvable"); return }
-  res.writeHead(200, { "content-type": MIME[extname(f)] ?? "application/octet-stream", ...(cors ? { "access-control-allow-origin": "*", "cache-control": "no-cache" } : {}) })
-  res.end(await readFile(f))
-}
 
 /** Hébergée en ligne, l'interface est derrière un mot de passe (LPWS_MOT_DE_PASSE) : un seul,
  *  partagé entre Yann et kabylesystem, le navigateur le retient. Sans la variable : rien ne change en local. */
@@ -538,7 +524,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
     const seg = p.split("/").filter(Boolean)
-    if (p === "/") { res.writeHead(200, { "content-type": MIME[".html"] }); res.end(await readFile(UI)); return }
+    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await readFile(UI)); return }
     if (p === "/api/etat") return json(res, 200, await etat())
     if (p === "/api/clients" && req.method === "POST") {
       const { url: u } = await body(req)
@@ -566,7 +552,7 @@ createServer(async (req, res) => {
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
       if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST") {
-        const f = join(dossier(c, camp), "propositions.json")
+        const f = fichiersDe(dossier(c, camp)).propositions
         const props = await lireJson<any[]>(f, [])
         const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
         // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
@@ -575,17 +561,10 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
-    if (p.startsWith("/assets/")) {
-      const rel = normalize(decodeURIComponent(p.slice(8)))
-      if (rel.startsWith("..")) { res.writeHead(403); res.end(); return }
-      return fichier(res, join(ROOT, "ui", "assets", rel))
-    }
-    if (p.startsWith("/files/")) {
-      const rel = normalize(decodeURIComponent(p.slice(7)))
-      if (rel.startsWith("..")) { res.writeHead(403); res.end(); return }
-      return fichier(res, join(ROOT, CLIENTS_ROOT, rel))
-    }
-    if ((seg[0] === "t" || seg[0] === "v") && seg[1]) return fichier(res, join(DIST, seg[0], normalize(seg[1])), true)
+    if (p.startsWith("/assets/")) return envoyerFichier(res, join(ROOT, "ui", "assets"), decodeURIComponent(p.slice(8)))
+    if (p.startsWith("/files/")) return envoyerFichier(res, join(ROOT, CLIENTS_ROOT), decodeURIComponent(p.slice(7)))
+    if ((seg[0] === "t" || seg[0] === "v") && seg[1])
+      return envoyerFichier(res, join(DIST, seg[0]), decodeURIComponent(seg[1]), { "access-control-allow-origin": "*", "cache-control": "no-cache" })
     res.writeHead(404); res.end()
   } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e) }) }
 }).listen(PORT, process.env.LPWS_HOTE ?? "127.0.0.1", () => step(SCOPE, `interface → http://${process.env.LPWS_HOTE ?? "localhost"}:${PORT} · tag publié sur ${BASE_TAGS}`))

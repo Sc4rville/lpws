@@ -8,28 +8,19 @@
  *   capture B  → re-marquage complet, donc numérotation décalée
  *   relier(A,B) → doit retrouver les mêmes éléments malgré le décalage
  */
-import { lancerNavigateur } from "../../shared/navigateur.ts"
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { lancerNavigateur, nouvellePage, servirDossiers } from "../../shared/navigateur.ts"
+import { lireArgs } from "../../shared/cli.ts"
 import { markDom } from "./mark.ts"
 import { fingerprintDom, type Empreinte } from "./fingerprint.ts"
 import { relier } from "./relink.ts"
 import { fail } from "../../shared/log.ts"
 
 const SCOPE = "clone/1_acquire/relink-check"
-const dir = process.argv.slice(2).find((a) => !a.startsWith("--"))
+const [dir] = lireArgs().libres
 if (!dir) fail(SCOPE, "usage : npm run relink:check -- <dossier-baseline>")
 
-// même origine synthétique que le juge : en file:// Chromium refuse les fonts locales,
-// et sans fonts la géométrie change, donc les sections aussi
+// même origine synthétique que le juge : sans fonts la géométrie change, donc les sections aussi
 const ORIGIN = "http://clone.lpws"
-const MIME: Record<string, string> = {
-  html: "text/html", css: "text/css",
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-  gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon", avif: "image/avif",
-  woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
-  mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", json: "application/json",
-}
 
 function nettoieMarquage(): void {
   const racines: (Document | ShadowRoot)[] = [document]
@@ -44,17 +35,8 @@ function injecteBanniere(): void {
 }
 
 const browser = await lancerNavigateur()
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-await page.addInitScript({ content: "window.__name = (f) => f" })
-await page.route(`${ORIGIN}/**`, async (route) => {
-  const chemin = decodeURIComponent(new URL(route.request().url()).pathname)
-  try {
-    if (chemin.includes("..")) throw new Error("hors du dossier")
-    const body = await readFile(join(dir, "." + chemin))
-    const ext = chemin.split(".").pop()?.toLowerCase() ?? ""
-    await route.fulfill({ body, contentType: MIME[ext] ?? "application/octet-stream" })
-  } catch { await route.fulfill({ status: 404, body: "" }) }
-})
+const page = await nouvellePage(browser, { viewport: { width: 1440, height: 900 } })
+await servirDossiers(page, ORIGIN, [dir!])
 await page.goto(`${ORIGIN}/capture.html`, { waitUntil: "load" })
 await page.waitForTimeout(600)
 

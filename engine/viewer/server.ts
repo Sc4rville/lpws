@@ -18,24 +18,17 @@
 import { createServer } from "node:http"
 import { readFile, readdir, stat } from "node:fs/promises"
 import { existsSync } from "node:fs"
-import { join, normalize, extname, dirname } from "node:path"
+import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { CLIENTS_ROOT } from "../shared/paths.ts"
 import { step } from "../shared/log.ts"
+import { envoyerFichier, envoyerJson } from "../shared/http.ts"
+import { mimeDe } from "../shared/mime.ts"
 
 const SCOPE = "viewer"
 const PORT = 4600
 const UI = join(dirname(fileURLToPath(import.meta.url)), "app.html")
 
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".png": "image/png",
-  ".json": "application/json",
-  ".css": "text/css",
-  ".js": "text/javascript",
-  ".svg": "image/svg+xml",
-  ".woff2": "font/woff2",
-}
 
 type Item = {
   path: string            // "corpus/products-marketing" (relatif à clients/)
@@ -82,19 +75,12 @@ createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? "/", "http://localhost")
     if (url.pathname === "/") {
-      res.writeHead(200, { "content-type": MIME[".html"] })
+      res.writeHead(200, { "content-type": mimeDe(UI) })
       res.end(await readFile(UI))
     } else if (url.pathname === "/api/baselines") {
-      res.writeHead(200, { "content-type": MIME[".json"] })
-      res.end(JSON.stringify(await scan()))
+      envoyerJson(res, 200, await scan())
     } else if (url.pathname.startsWith("/files/")) {
-      // anti-traversée : on normalise et on reste sous clients/
-      const rel = normalize(decodeURIComponent(url.pathname.slice("/files/".length)))
-      if (rel.startsWith("..")) { res.writeHead(403); res.end(); return }
-      const file = join(CLIENTS_ROOT, rel)
-      if (!existsSync(file)) { res.writeHead(404); res.end("introuvable : " + rel); return }
-      res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" })
-      res.end(await readFile(file))
+      await envoyerFichier(res, CLIENTS_ROOT, decodeURIComponent(url.pathname.slice("/files/".length)))
     } else {
       res.writeHead(404); res.end()
     }

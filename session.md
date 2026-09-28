@@ -138,3 +138,15 @@ le juge avant d'accuser le code.
 - Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
 - Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
 - Racine fantôme fermée : visible et éditable dans le clone, mais la balise Express ne peut pas y écrire (Intégral le pourrait).
+
+## Fait le 2026-09-28 — socle partagé (architecture, sans changement de comportement)
+- `engine/shared/` porte désormais un seul exemplaire de ce qui était copié famille par famille :
+  `cli` (args), `json` (lecture validée zod, caches), `modele` (claude -p + contrat, 2 essais),
+  `mime`, `http` (fichiers statiques anti-traversée), `campagne` (disposition d'une campagne sur
+  disque + type `Test`), `navigateur` (shim `__name`, hors ligne, origine synthétique).
+- Tout le moteur, le cockpit et `ui/server.ts` y sont branchés ; `deploy/tag/runtime.ts` (mort,
+  remplacé par `loader.ts`) retiré ; `npm run typecheck` couvre aussi `ui/` ; `esbuild` déclaré.
+- Vérifié identique avant/après : clone démo 0 %/0 %, variant.json, `/api/etat`, relink 68/68,
+  measure --exemple, tag:check (même refus sur la démo statique).
+- Reste : découper `ui/server.ts` (jobs · état · pipeline de test · tag · routes) sur ce socle.
+

@@ -11,10 +11,12 @@
  * Usage : npm run apply -- <dossier-baseline> <spec.json>
  * Sortie : clients/<client>/<campagne>/variants/<nom>/ + résumé sur stdout.
  */
-import { readFile, writeFile } from "node:fs/promises"
+import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { lancerNavigateur } from "../shared/navigateur.ts"
+import { lancerNavigateur, nouvellePage, servirDossiers } from "../shared/navigateur.ts"
+import { estLance, lireArgs } from "../shared/cli.ts"
+import { lireValide } from "../shared/json.ts"
 import { VariantSpec } from "./spec.ts"
 import { applyEdits } from "./apply.ts"
 import { visualDiff } from "../clone/5_verify/diff.ts"
@@ -24,15 +26,8 @@ import { step, timed, fail } from "../shared/log.ts"
 
 const SCOPE = "apply"
 
-// même origine synthétique que le juge : en file:// les fonts locales sont refusées (CORS)
+// même origine synthétique que le juge (cf. servirDossiers)
 const ORIGIN = "http://variant.lpws"
-const MIME: Record<string, string> = {
-  html: "text/html", css: "text/css",
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-  gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon", avif: "image/avif",
-  woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
-  mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", json: "application/json",
-}
 
 /**
  * Rend la variante et la capture. Les assets restent dans baseline/ (une variante ne
@@ -45,21 +40,8 @@ async function shoot(
 ): Promise<Record<string, number>> {
   const browser = await lancerNavigateur({ args: ["--hide-scrollbars"] })
   try {
-    const page = await browser.newPage({ viewport })
-    await page.addInitScript({ content: "window.__name = (f) => f" })
-    await page.route(`${ORIGIN}/**`, async (route) => {
-      const chemin = decodeURIComponent(new URL(route.request().url()).pathname)
-      const ext = chemin.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? ""
-      for (const base of [vdir, bdir]) {
-        if (chemin.includes("..")) break
-        try {
-          const body = await readFile(join(base, "." + chemin))
-          await route.fulfill({ body, contentType: MIME[ext] ?? "application/octet-stream" })
-          return
-        } catch { /* pas ici → on tente la baseline */ }
-      }
-      await route.fulfill({ status: 404, body: "" })
-    })
+    const page = await nouvellePage(browser, { viewport })
+    await servirDossiers(page, ORIGIN, [vdir, bdir])
     await page.goto(`${ORIGIN}/${fichier}`, { waitUntil: "load", timeout: 60_000 })
     await page.evaluate(autoScroll)
     await page.waitForTimeout(1500)
@@ -85,11 +67,7 @@ export async function applyVariant(baseline: string, specPath: string) {
     fail(SCOPE, `${baseline}/capture.html introuvable — cloner la page d'abord`)
 
   // le contrat d'abord : une spec invalide ne produit aucun fichier
-  const parsed = VariantSpec.safeParse(JSON.parse(await readFile(specPath, "utf8")))
-  if (!parsed.success)
-    fail(SCOPE, `spec invalide (${specPath}) :\n` +
-      parsed.error.issues.map((i) => `  · ${i.path.join(".")} — ${i.message}`).join("\n"))
-  const spec = parsed.data
+  const spec = await lireValide(VariantSpec, specPath).catch((e: Error) => fail(SCOPE, e.message))
 
   const vdir = await variantDir(baseline, spec.nom)
   step(SCOPE, `${spec.nom} → ${vdir}`)
@@ -126,9 +104,8 @@ export async function applyVariant(baseline: string, specPath: string) {
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("apply/run.ts")) {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"))
-  const [baseline, spec] = args
+if (estLance(import.meta.url)) {
+  const [baseline, spec] = lireArgs().libres
   if (!baseline || !spec) fail(SCOPE, "usage : npm run apply -- <dossier-baseline> <spec.json>")
   applyVariant(baseline, spec).then((r) => {
     console.log(JSON.stringify({ variante: r.vdir, hypothese: r.spec.hypothese,

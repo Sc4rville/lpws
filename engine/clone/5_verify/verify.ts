@@ -18,14 +18,15 @@
  * Usage : npm run verify -- <dossier-baseline> [--seuil 0.03]
  * Export : verifyBaseline(dir, seuil)
  */
-import { lancerNavigateur } from "../../shared/navigateur.ts"
-import { chromium, type Page } from "playwright"
-import { readFile, writeFile } from "node:fs/promises"
+import { lancerNavigateur, neutraliserNom, servirDossiers } from "../../shared/navigateur.ts"
+import { type Page } from "playwright"
+import { writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { visualDiff, type DiffResult } from "./diff.ts"
 import { DESKTOP, MOBILE, autoScroll } from "../1_acquire/render.ts"
 import { step, timed, fail } from "../../shared/log.ts"
+import { estLance, lireArgs } from "../../shared/cli.ts"
 
 const SCOPE = "clone/5_verify"
 export const SEUIL_DEFAUT = 0.03 // 3% de pixels différents tolérés (fonts/antialiasing)
@@ -87,36 +88,15 @@ function measureHealth(): Omit<Sante, "consoleErrors" | "hauteurRendu" | "screen
   }
 }
 
-// Le clone est rendu depuis une origine http synthétique servie par le juge lui-même
-// (page.route + fulfill sur le dossier baseline) — PAS en file:// : une page file:// a
-// pour origine `null` et Chromium y refuse les fonts par CORS, MÊME locales (constaté
-// sur Jira : fonts rapatriées et pourtant fallback système).
+// le clone est rendu depuis une origine http synthétique (cf. servirDossiers), pas en file://
 const ORIGIN = "http://clone.lpws"
-const MIME: Record<string, string> = {
-  html: "text/html", css: "text/css",
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-  gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon", avif: "image/avif",
-  woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
-  mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", json: "application/json",
-}
 
 async function inspect(page: Page, dir: string, file: string, shotPath: string): Promise<Sante & { screenshot: string }> {
-  // cf. note __name dans 1_acquire/render.ts
-  await page.addInitScript({ content: "window.__name = (f) => f" })
+  await neutraliserNom(page)
   const consoleErrors: string[] = []
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()) })
   page.on("pageerror", (e) => consoleErrors.push(String(e)))
-  await page.route(`${ORIGIN}/**`, async (route) => {
-    const chemin = decodeURIComponent(new URL(route.request().url()).pathname)
-    try {
-      if (chemin.includes("..")) throw new Error("hors du dossier")
-      const body = await readFile(join(dir, "." + chemin))
-      const ext = chemin.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? ""
-      await route.fulfill({ body, contentType: MIME[ext] ?? "application/octet-stream" })
-    } catch {
-      await route.fulfill({ status: 404, body: "" })
-    }
-  })
+  await servirDossiers(page, ORIGIN, [dir])
   await page.goto(`${ORIGIN}/${file}`, { waitUntil: "load", timeout: 60_000 })
   await page.evaluate(autoScroll) // même rituel que l'acquisition : tout doit s'être rendu
   await page.waitForTimeout(2000) // laisse charger fonts locales + éventuel reliquat distant
@@ -170,10 +150,10 @@ export async function verifyBaseline(dir: string, seuil = SEUIL_DEFAUT): Promise
 }
 
 /* CLI */
-if (process.argv[1]?.endsWith("verify.ts")) {
-  const args = process.argv.slice(2)
-  const dir = args.find((a) => !a.startsWith("--"))
-  const seuil = args.includes("--seuil") ? Number(args[args.indexOf("--seuil") + 1]) : SEUIL_DEFAUT
+if (estLance(import.meta.url)) {
+  const args = lireArgs()
+  const [dir] = args.libres
+  const seuil = args.option("--seuil") ? Number(args.option("--seuil")) : SEUIL_DEFAUT
   if (!dir) fail(SCOPE, "usage : npm run verify -- <dossier-baseline> [--seuil 0.03]")
   verifyBaseline(dir, seuil).then((v) => {
     console.log(JSON.stringify({ fidele: v.fidele, desktop: v.desktop.diff.ratio, mobile: v.mobile.diff.ratio }, null, 2))
