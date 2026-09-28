@@ -25,7 +25,7 @@ import { readdir } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, basename, dirname } from "node:path"
 import { createHash } from "node:crypto"
-import { auditer, type Audit } from "../audit/audit.ts"
+import { auditer, PageInjoignable, type Audit } from "../audit/audit.ts"
 import { concordance, type Concordance } from "../variant/concordance.ts"
 import { lancerNavigateur, nouvellePage, UA } from "../shared/navigateur.ts"
 import { step, fail } from "../shared/log.ts"
@@ -99,8 +99,8 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
     return { releve, nouvelles }
   }
 
-  const audit = await auditer(meta.source).catch((e: Error) => e)
-  if (audit instanceof Error) {
+  const audit = await auditer(meta.source).catch((e: Error) => { if (e instanceof PageInjoignable) return e; throw e })
+  if (audit instanceof PageInjoignable) {
     const releve: Releve = {
       quand, url: meta.source, statut: 0, erreur: audit.message, gclid: false, balises: [], lcpMs: null,
       auditResume: { grave: 0, attention: 0, aVerifier: 0, ok: 0 }, hautDePage: { titre: "", sousTitre: "", boutons: [] }, empreinte: "",

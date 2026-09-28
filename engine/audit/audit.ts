@@ -67,6 +67,9 @@ const SONDE_LCP = `(function(){ if(window.top!==window.self) return; window.__lc
   try{ new PerformanceObserver(function(l){ var e=l.getEntries(); window.__lcp=Math.round(e[e.length-1].startTime) })
     .observe({type:'largest-contentful-paint',buffered:true}) }catch(e){} })();`
 
+/** La page elle-même n'a pas répondu (DNS, refus, délai, réponse vide) : distinct d'une panne de LPWS. */
+export class PageInjoignable extends Error {}
+
 export async function auditer(url: string): Promise<Audit> {
   const depart = new URL(url)
   depart.searchParams.set("gclid", GCLID)
@@ -82,8 +85,8 @@ export async function auditer(url: string): Promise<Audit> {
     const requetes: string[] = []
     page.on("request", (r) => requetes.push(r.url()))
 
-    const rep = await page.goto(depart.href, { waitUntil: "load", timeout: 60_000 }).catch((e: Error) => { throw new Error(`la page ne répond pas : ${e.message}`) })
-    if (!rep) throw new Error("la page n'a rien renvoyé")
+    const rep = await page.goto(depart.href, { waitUntil: "load", timeout: 60_000 }).catch((e: Error) => { throw new PageInjoignable(`la page ne répond pas : ${e.message}`) })
+    if (!rep) throw new PageInjoignable("la page n'a rien renvoyé")
     await page.waitForTimeout(4_000)
 
     const redirections: string[] = []
