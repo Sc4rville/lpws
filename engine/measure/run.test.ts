@@ -116,3 +116,41 @@ test("mesurer : la relecture garde la règle archivée même si la spec a été 
   assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].regle, "prix")
   await rm(dir, { recursive: true })
 })
+
+test("mesurer : un lancement remplacé jamais archivé prend la règle du test, pas celle d'une spec régénérée", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const ancien = T()
+  await ecrireJson(f.tests, [T({ etat: "live", lanceLe: "2026-09-21T09:00:00Z", finLe: undefined, regle: "prix",
+    anciens: [{ lanceLe: ancien.lanceLe!, finLe: ancien.finLe!, part: 50 }] })])
+  await ecrireJson(f.spec(ancien.id), { diagnostic: { regle: "preuve" } })
+  await mesurer(dir, false, ga4(() => 45))
+  assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].regle, "prix")
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer : une expérience archivée sans règle n'en gagne pas une à la relecture", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const t = T()
+  await ecrireJson(f.tests, [t])
+  await enregistrerExperiences(dir, [t])
+  await ecrireJson(f.spec(t.id), { diagnostic: { regle: "preuve" } })
+  await mesurer(dir, false, ga4(() => 45))
+  assert.equal((await lireJson<Experience[]>(f.experiences, []))[0].regle, undefined)
+  await rm(dir, { recursive: true })
+})
+
+test("mesurer --exemple : un lancement remplacé ne remplace pas son expérience réelle", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-mes-"))
+  const f = campagne(dir)
+  const ancien = T()
+  await ecrireJson(f.tests, [ancien])
+  await mesurer(dir, false, ga4(() => 12))
+  const avant = await lireJson<Experience[]>(f.experiences, [])
+  await ecrireJson(f.tests, [T({ etat: "live", lanceLe: "2026-09-21T09:00:00Z", finLe: undefined,
+    anciens: [{ lanceLe: ancien.lanceLe!, finLe: ancien.finLe!, part: 50 }] })])
+  await mesurer(dir, true)
+  assert.deepEqual(await lireJson<Experience[]>(f.experiences, []), avant)
+  await rm(dir, { recursive: true })
+})
