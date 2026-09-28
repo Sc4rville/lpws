@@ -29,6 +29,8 @@ export type Diagnostic = {
   methode: Constat[]
   nonEvaluables: { id: string; signal: string }[]
   calmes: string[]
+  /** constats déclenchés mais pas re-proposés : la mémoire du client dit qu'ils ont déjà perdu ou été refusés */
+  ecartes?: { id: string; raison: string }[]
 }
 
 const versConstat = (r: Regle, c: Contexte): Constat => ({

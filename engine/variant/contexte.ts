@@ -43,6 +43,10 @@ export const Contexte = z.object({
   marge: z.number().min(0).max(100).optional(),
   /** « Combien de visiteurs par mois ? » : en dessous d'un volume, aucun petit test ne conclut */
   visiteursMois: z.number().positive().optional(),
+  /** taux de conversion actuel en % : avec visiteursMois, dit AVANT le lancement si un test peut conclure */
+  tauxConversion: z.number().positive().max(100).optional(),
+  /** coût par clic moyen, en € : le rapport client traduit le taux de conversion en coût par conversion */
+  cpc: z.number().positive().optional(),
   /** « Qu'est-ce qu'on n'a pas le droit de dire ? » : les allégations sont étayées par le client, pas inventées */
   limites: z.string().optional(),
 })

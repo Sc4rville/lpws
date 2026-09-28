@@ -235,7 +235,7 @@ reste un outil de développement, pas un produit.
 - ⬜ Assumer les limites de l'API : termes masqués, pas de colonnes personnalisées, risque de double comptage
 - ⬜ Meta Ads : lire les créas, les audiences, les conversions
 - ⬜ Shopify : commandes, produits, événements de paiement
-- ⬜ **Alerter quand la créa change et que la page ne suit plus** *(c'est ça, l'alignement continu qu'on vend)*
+- 🟡 **Alerter quand la créa change et que la page ne suit plus** *(c'est ça, l'alignement continu qu'on vend)* : la concordance annonce ↔ haut de page est mesurée à chaque relevé de surveillance ([`engine/surveille`](../engine/surveille/surveille.ts), [`concordance.ts`](../engine/variant/concordance.ts)) à partir de l'annonce saisie ; la lecture automatique des annonces attend l'API Google Ads
 
 ## 3.4 · L'interface
 - ✅ Interface web hébergée (box, mot de passe) : copie, campagne, propositions, tests, résultats
@@ -245,19 +245,22 @@ reste un outil de développement, pas un produit.
 - ✅ **Le diagnostic hiérarchisé** : « LPWS propose 3 tests » avec la raison et la source, « À transmettre au client »
 - ✅ « Créer ce test » / « Pas celui-là » (le refus est gardé)
 - ✅ Suivre les tests : part de trafic, jours, verdict dès que GA4 remonte
-- ⬜ Multi-compte : un buyer gère plusieurs clients
-- ⬜ Comptes, authentification, droits
+- ✅ Multi-compte : un buyer gère plusieurs clients (compte, palier, clients actifs du mois : [`engine/compte`](../engine/compte/compte.ts))
+- 🟡 Compte, palier, essai, mandats, code partenaire, marque du rapport ; l'authentification reste le mot de passe partagé
+- ✅ Audit tracking gratuit (gclid, redirections, balises, Consent Mode, LCP, noindex) : [`engine/audit`](../engine/audit/audit.ts), écran « Audit tracking »
+- ✅ Suivi par client : relevés, alertes, audit, mémoire des tests ; rapport client HTML (LPWS ou marque blanche) : [`engine/rapport`](../engine/rapport/rapport.ts)
 - ✅ Les deux : web sur la box de kabylesystem (seule instance qui publie), local avec `LPWS_SANS_VERCEL=1`
 
 ## 3.5 · Le modèle commercial
 > Recherche marché et grille proposée : [business-model-rapport.md](business-model-rapport.md)
-- ⬜ Trancher l'unité de facturation *(par compte et par mois — facturer à la variante invite l'objection « ce n'est qu'un titre »)*
-- ⬜ Définir ce qui est inclus
+- 🟡 Unité de facturation : le client actif / mois, codé comme hypothèse ([`paliers.ts`](../engine/compte/paliers.ts)) ; appliqué seulement avec `LPWS_FACTURATION=1`, à confirmer par les entretiens
+- 🟡 Ce qui est inclus : la grille Atelier · Solo · Agence · Régime est codée ; Stripe (abonnement + webhook signé) s'active avec les clés `STRIPE_*`, non configurées
+- ✅ Coût réel d'un diagnostic journalisé (`clients/couts.jsonl`, `npm run couts`) : la base du plafond de diagnostics
 - ⬜ Onboarding en libre-service ou accompagné
 - ⬜ Le chemin d'accès Shopify conditionne l'onboarding e-commerce
 
 ## 3.6 · Le juridique et la confiance
-- ⬜ Mandat écrit du buyer *(on clone la page du client d'un buyer mandaté, pas un site tiers)*
+- ✅ Mandat déclaré par client avant tout lancement (qui, quand, quelle déclaration) ; conditions d'utilisation acceptées dans le compte · ⬜ le contrat écrit reste humain
 - ⬜ Refus documenté des patterns illégaux — à présenter comme un argument, pas une limite
 - ⬜ Données de performance et RGPD
 - ⬜ Propriété du contenu produit
@@ -274,20 +277,20 @@ maintenant et qui coûteront très cher à rattraper.
 
 ## 4.1 · Enregistrer ce qui s'est passé
 - ✅ Chaque variante porte déjà son hypothèse, sa métrique, son risque et son diagnostic
-- ⬜ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique
-- ⬜ Un objet « expérience » durable : contrôle, variante, dates, échantillon, résultat, verdict
-- ⬜ Enregistrer aussi les tests **non concluants** *(sinon on n'apprend que des gagnants)*
-- ⬜ Enregistrer les variantes refusées par le buyer et pourquoi *(signal très précieux sur nos diagnostics)*
+- ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique
+- ✅ Un objet « expérience » durable par client (`clients/<client>/experiences.json`, [`memoire.ts`](../engine/measure/memoire.ts))
+- ✅ Enregistrer aussi les tests **non concluants** et ceux arrêtés sans mesure
+- ✅ Enregistrer les variantes refusées par le buyer et pourquoi
 
 ## 4.2 · Savoir si on a le droit de conclure
-- ⬜ Calculer l'échantillon nécessaire **avant** de lancer
-- ⬜ Dire franchement quand le trafic ne permettra jamais de conclure
-- ⬜ Se méfier d'un gagnant sur petit échantillon
-- ⬜ Surveiller les garde-fous, pas seulement la métrique principale
+- ✅ Calculer l'échantillon nécessaire **avant** de lancer ([`puissance.ts`](../engine/measure/puissance.ts), écran « Peut-on conclure ? », plan fixé au lancement)
+- ✅ Dire franchement quand le trafic ne permettra jamais de conclure
+- ✅ Se méfier d'un gagnant sur petit échantillon (gagnant précoce signalé)
+- ✅ Garde-fous : cycle de 7 jours, 25 conversions minimum, répartition anormale (SRM)
 
 ## 4.3 · Apprendre pour un client
-- ⬜ Historique par client : ce qui a marché, ce qui a échoué
-- ⬜ Ne pas re-proposer une hypothèse déjà perdue chez lui
+- ✅ Historique par client : ce qui a marché, ce qui a échoué (écran Suivi)
+- ✅ Ne pas re-proposer une hypothèse déjà perdue chez lui (le brain l'écarte et le dit)
 - ⬜ Enrichir son contexte avec ce qu'on a appris
 
 ## 4.4 · Apprendre entre clients — le pari risqué

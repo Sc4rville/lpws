@@ -24,7 +24,12 @@
     "measure": "tsx engine/measure/run.ts",
     "brain": "tsx engine/variant/run.ts",
     "brain:eval": "tsx engine/variant/eval.ts",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "audit": "tsx engine/audit/audit.ts",
+    "conclure": "tsx engine/measure/puissance.ts",
+    "memoire": "tsx engine/measure/memoire.ts",
+    "surveille": "tsx engine/surveille/surveille.ts",
+    "couts": "tsx engine/compte/couts.ts"
   },
   "dependencies": {
     "esbuild": "~0.28.2",

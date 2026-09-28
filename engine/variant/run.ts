@@ -25,12 +25,15 @@ import { step, fail, timed } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
 import { ecrireJson, lireCache, lireValide } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
+import { consigner, ecarter } from "../measure/memoire.ts"
+import { basename } from "node:path"
 
 const SCOPE = "variant"
 
 export async function brain(campagne: string, opts: { refaire?: boolean; sansJugement?: boolean; sansVariantes?: boolean } = {}) {
   const f = fichiersDe(campagne)
   const base = f.baseline
+  process.env.LPWS_CAMPAGNE = campagne // le journal des coûts range chaque appel modèle par page
   if (!existsSync(f.capture)) fail(SCOPE, `${f.capture} introuvable : cloner la page d'abord`)
 
   if (!existsSync(f.contexte))
@@ -64,6 +67,10 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
 
   // 3. joindre
   const d: Diagnostic = diagnostiquer({ m, j }, ctx)
+  // la mémoire du client : ne pas re-proposer ce qui a déjà perdu, ou que le buyer a refusé
+  const { gardes, ecartes } = ecarter(d.tests, await consigner(campagne), basename(campagne))
+  d.tests = gardes; d.ecartes = ecartes
+  for (const e of ecartes) step(SCOPE, `  ÉCARTÉ  ${e.id} : ${e.raison}`)
   await ecrireJson(f.diagnostic, d)
   step(SCOPE, `diagnostic : ${d.tests.length} test(s) possible(s), ${d.conseils.length} conseil(s), ${d.nonEvaluables.length} non évaluable(s), régime ${d.regime}`)
   for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}`)

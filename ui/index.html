@@ -593,7 +593,7 @@ const DEMO = [
     ],
   },
 ];
-let CLIENTS = DEMO; let LIVE = false; let BASE = 'https://lpws.vercel.app';
+let CLIENTS = DEMO; let LIVE = false; let BASE = 'https://lpws.vercel.app'; let COMPTE = null;
 /** l'application complète (serveur + machine) : la démo statique y renvoie quand on lui demande d'agir */
 const APP = 'https://lpws.46.225.146.226.sslip.io';
 const SANS_SERVEUR = `Cette page est une démo sans serveur : elle ne peut pas copier de page. Ouvrez l’application — en local, npm run ui:serve puis http://localhost:4700 ; en ligne, ${APP}.`;
@@ -704,8 +704,9 @@ function renderRail() {
     ${CLIENTS.map(c => { const l = c.tests.some(t => t.etat === 'live'); return `<button class="rb av ${S.ctx === c.id ? 'on' : ''}" data-go="ctx:${c.id}" data-tip="${esc(c.nom)}${l ? ' · test en ligne' : ''}" aria-label="${esc(c.nom)}${l ? ', test en ligne' : ''}" ${S.ctx === c.id ? 'aria-current="page"' : ''}>${c.ini}${l ? '<span class="live-dot"></span>' : ''}</button>`; }).join('')}
     <button class="rb plus" data-tip="Nouvelle page" aria-label="Nouvelle page" data-go="ctx:home;view:ajout">${I.plus()}</button>
     <div class="sp"></div>
-    <button class="rb" data-tip="Réglages" aria-label="Réglages">${I.sliders()}</button>
-    <button class="rb av" data-tip="Yann" aria-label="Compte">Y</button>`;
+    <button class="rb ${S.view === 'audit' ? 'on' : ''}" data-tip="Audit tracking gratuit" aria-label="Audit tracking" data-go="ctx:home;view:audit">${I.shield()}</button>
+    <button class="rb ${S.view === 'compte' ? 'on' : ''}" data-tip="Compte et offres" aria-label="Compte et offres" data-go="ctx:home;view:compte">${I.sliders()}</button>
+    <button class="rb av" data-tip="${esc((COMPTE && COMPTE.buyer.nom) || 'Compte')}" aria-label="Compte" data-go="ctx:home;view:compte">${esc(((COMPTE && COMPTE.buyer.nom) || 'Y').charAt(0).toUpperCase())}</button>`;
 }
 
 /* ---------- panneau ---------- */
@@ -733,6 +734,7 @@ function renderPanel() {
       <div class="ph"><h1>Vue d’ensemble</h1><div class="u">${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</div><button class="kbtn" data-act="cmdk" aria-label="Aller à : un client, un test, une action">${I.search(15)}<span>Aller à…</span><kbd>${MOD}K</kbd></button></div>
       <div class="pn">
         <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash" ${S.view === 'dash' ? 'aria-current="page"' : ''}>${I.home()}Aujourd’hui</button>
+        ${[['audit', 'shield', 'Audit tracking', 'gratuit'], ['conclure', 'gauge', 'Peut-on conclure ?', ''], ['compte', 'sliders', 'Compte et offres', COMPTE ? COMPTE.palierEnVigueur.nom : '']].map(([v, i, l, n]) => `<button class="ni ${S.view === v ? 'on' : ''}" data-go="view:${v}" ${S.view === v ? 'aria-current="page"' : ''}>${I[i]()}${l}${n ? `<span class="n">${esc(n)}</span>` : ''}</button>`).join('')}
         <div class="gl">Clients</div>
         <div class="sub" style="padding-left:0">${CLIENTS.map(c => `<button class="si" data-go="ctx:${c.id}"><span class="t">${esc(c.nom)}</span><span class="dot ${c.tests.some(t => t.etat === 'live') ? 'ok pulse' : c.capture.ok === false || c.capture.ok === null ? 'off' : c.shopify ? 'warn' : 'off'}"></span></button>`).join('')}</div>
         <div class="gl">Connexion</div>
@@ -750,6 +752,7 @@ function renderPanel() {
       ${c.tests.length ? `<div class="sub">${c.tests.map(t => `<button class="si ${S.view === 'test' && S.test === t.id ? 'on' : ''}" data-go="test:${t.id}"><span class="t">${esc(t.titre)}</span><span class="dot ${t.etat === 'live' ? 'ok pulse' : t.etat === 'gagnant' ? 'ok' : t.etat === 'integral' || t.etat === 'attente' ? 'warn' : 'off'}"></span></button>`).join('')}</div>` : ''}
       <button class="ni ${S.view === 'page' ? 'on' : ''}" data-go="view:page" ${S.view === 'page' ? 'aria-current="page"' : ''}>${I.page()}Landing page</button>
       <button class="ni ${S.view === 'resultats' ? 'on' : ''}" data-go="view:resultats" ${S.view === 'resultats' ? 'aria-current="page"' : ''}>${I.bars()}Résultats</button>
+      <button class="ni ${S.view === 'suivi' ? 'on' : ''}" data-go="view:suivi" ${S.view === 'suivi' ? 'aria-current="page"' : ''}>${I.shield()}Suivi${(c.alertes || []).length ? `<span class="n">${c.alertes.length} alerte${c.alertes.length > 1 ? 's' : ''}</span>` : ''}</button>
       <div class="gl">Connexion</div>
       ${(c.shopify ? ['natif', 'express', 'integral'] : ['express', 'integral', 'natif']).map(m => modeItem(c, m)).join('')}
     </div>
@@ -871,7 +874,9 @@ function vDash(c) {
   return `
     <div class="hd"><div><h2>${esc(c.nom)} <span class="muted" style="font-weight:500">· ${esc(c.marque)}</span></h2><div class="u">${esc(c.url)}</div>${c.redirigeDe ? `<div class="u muted">L’adresse collée (${esc(c.redirigeDe)}) redirige ici : c’est cette page que vos visiteurs voient, et donc celle qu’on teste.</div>` : ''}<div class="chips">${statutClient(c)}${chipConn(c)}</div></div>
       <div class="act">${c.live && c.capture.ok !== null && !c.capture.enCours ? `<button class="btn pri" data-go="view:nouveau">${I.sparkle(16)}Nouveau test</button>` : ''}${c.tests.length ? `<button class="btn" data-go="view:tests">${I.ab(16)}Tests</button>` : ''}<button class="btn" data-go="view:resultats">${I.bars(16)}Résultats</button></div></div>
+    ${alerteRecente(c)}
     ${hero}
+    ${rappelMandat(c)}
     ${brainBloc(c)}
     ${(ex.etat === 'ok' || c.shopify) ? `<div class="sec"><h3>Ce qui est garanti</h3>${guards(c)}</div>` : ''}
     ${gagnant ? `<div class="sec"><h3>Dernier gagnant</h3>${liveCard(c, gagnant)}</div>` : ''}
@@ -932,6 +937,7 @@ function vTest(c) {
       <div class="verdict"><div class="vt"><div class="b">${esc(vd.b)}</div><div class="s">${esc(vd.s)}</div>${jalons(vd)}</div>
         <div class="act">${vd.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}<button class="btn glow" data-act="report">${I.dl(15)}Rapport pour le client</button></div>
         <div class="vf">${vueFourchette(t.res)}<p class="fxs">${phraseFourchette(t.res)}</p></div></div>
+      ${t.bilan && (t.bilan.gardes.length || t.bilan.k === 'repartition' || t.bilan.k === 'jamais') ? `<div class="card" style="margin-top:12px;${t.bilan.k === 'repartition' ? 'border-color:var(--bad)' : ''}"><h3>Garde-fous</h3><p>${esc(t.bilan.phrase)}</p></div>` : ''}
     </div>`;
   }
   const ic = ch => ch.q && !/retir|inversé|dupliqu|nouve|ajout/i.test(ch.t) ? I.text(13) : /retir/i.test(ch.t) ? I.minus(13) : /remont|inversé|placé/i.test(ch.t) ? I.up(13) : /dupliqu/i.test(ch.t) ? I.dup(13) : /nouve|ajout|bloc|FAQ|réassurance/i.test(ch.t) ? I.plus(13) : I.text(13);
@@ -942,6 +948,7 @@ function vTest(c) {
       <p class="lede"><b>Ce qu’on teste.</b> ${esc(t.teste)}</p>
       <p class="lede" style="margin-top:8px"><b>Pourquoi.</b> ${esc(t.pourquoi)}</p>
       ${etatTest(t)}
+      ${t.plan ? `<p class="lede" style="margin-top:8px"><b>Le plan.</b> ${esc(t.plan.phrase)}</p>` : ''}
     </div></div>
     <div class="hd" style="margin-bottom:0"><div class="act" style="margin-left:0;margin-top:14px;gap:10px">
       <button class="btn lg glow" data-copy="${esc(url)}" data-msg="Lien d’aperçu copié : à envoyer au client" title="${esc(url)}">${I.eye(16)}Lien d’aperçu pour le client</button>
@@ -1117,7 +1124,7 @@ function vGuide(c, m) {
 async function chargerEtat() {
   try {
     const r = await fetch('/api/etat', { cache: 'no-store' }); if (!r.ok) throw 0;
-    const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE;
+    const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE; COMPTE = d.compte || null;
     if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
   } catch { CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; } }
 }
@@ -1125,7 +1132,7 @@ async function api(path, data) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data || {}) });
   const j = await r.json().catch(() => null);
   // un 404/405 sans JSON, c'est un serveur statique qui ne connaît pas l'API : le dire, pas le coder
-  if (!r.ok) throw new Error((j && j.erreur) || (!j && (r.status === 404 || r.status === 405) ? SANS_SERVEUR : 'Le serveur a répondu ' + r.status));
+  if (!r.ok) { const err = new Error((j && j.erreur) || (!j && (r.status === 404 || r.status === 405) ? SANS_SERVEUR : 'Le serveur a répondu ' + r.status)); err.action = j && j.action; throw err; }
   return j || {};
 }
 const ETAPES = [['clone/1_acquire', 'Copie de la page'], ['clone/2_styles', 'Styles'], ['clone/3_assets', 'Images et polices'], ['clone/5_verify', 'Vérification'], ['clone', 'Copie'], ['apply', 'Variante'], ['deploy/tag', 'Balise'], ['ui', '']];
@@ -1196,7 +1203,7 @@ function vNouveau(c) {
 /* ---------- le brain : la campagne, les propositions, les conseils ---------- */
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '' });
+  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
     <div class="hd"><div><h2>Votre campagne</h2><p class="lede">Deux réponses suffisent pour que LPWS lise la page comme votre visiteur : ce que promet l’annonce, et comment se conclut la vente. Le reste affine.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
@@ -1216,6 +1223,8 @@ function vCampagne(c) {
           ${champ('cible', 'À qui s’adresse la campagne', '', 'placeholder="équipes marketing de PME"')}
           ${champ('offre', 'Ce que vous vendez, en un mot', '', '')}
           ${champ('visiteursMois', 'Visiteurs par mois sur cette page', 'En dessous d’un certain volume, un petit test ne peut pas conclure : LPWS proposera des changements plus francs.', 'inputmode="numeric" placeholder="60000"')}
+          ${champ('tauxConversion', 'Taux de conversion actuel (%)', 'Avec les visiteurs, il dit au lancement combien de jours un test demandera.', 'inputmode="decimal" placeholder="3,2"')}
+          ${champ('cpc', 'CPC moyen (€)', 'Pour traduire chaque résultat en coût par conversion, dans le rapport client.', 'inputmode="decimal" placeholder="1,80"')}
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.sparkle(16) + 'Lancer l’analyse', 'data-act="contexte"')}<span class="muted" id="ctx-err"></span></div>
       </div>
@@ -1230,6 +1239,8 @@ function brainBloc(c) {
   if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
     <div class="tests">${props.map(p => `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div><div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${esc(p.nom)}" data-client="${c.id}"`)}<button class="btn sm" data-act="refuser" data-nom="${esc(p.nom)}" data-client="${c.id}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div></div>`).join('')}</div></div>`;
   else if (c.diagnostic) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées, ou aucun constat ne se traduit en test. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
+  const ec = (c.diagnostic && c.diagnostic.ecartes) || [];
+  if (ec.length) h += `<div class="sec"><div class="card"><h3>Pas re-proposé <span class="n">${ec.length}</span><span class="r"><button class="btn sm" data-go="view:suivi">Historique</button></span></h3>${ec.map(e => `<div class="ck off"><span class="i">${I.minus(12)}</span><div><b>${esc(nomRegle(e.id))}</b><div class="d">${esc(e.raison)}</div></div></div>`).join('')}</div></div>`;
   if (conseils.length) h += `<div class="sec"><h3>À transmettre au client <span class="n">${conseils.length}</span><span class="r"><button class="btn sm" data-act="rapport" data-client="${c.id}">${I.copy ? I.copy(14) : ''}Copier le rapport</button></span></h3>
     <div class="card"><div class="chg">${conseils.map((k, i) => `<div class="ch"><span class="i">${i + 1}</span><div><div class="t">${esc(k.action)}</div><div class="w">${esc(k.pourquoi)} <span class="mono">${esc(k.sources.join(', '))}</span></div></div></div>`).join('')}</div></div></div>`;
   return h;
@@ -1275,12 +1286,148 @@ function apresRendu() {
   if (S.view === 'test' && c) { const t = c.tests.find(x => x.id === S.test); if (t && t.etat === 'prep' && t.job) suivreJob(t.job, recharger); }
   if (S.view === 'dash' && c && c.job) suivreJob(c.job, recharger);
   if (S.view === 'nouveau' && c) chargerTextes(c);
+  if (S.view === 'audit' && S.auditJob && !S.auditRes) suivreJob(S.auditJob, j => { S.auditRes = j.resultat || null; S.auditErr = j.etat === 'ok' ? '' : (j.lignes || []).slice(-1)[0]; S.auditJob = null; if (S.view === 'audit') render(); });
 }
 async function chargerTextes(c) {
   S.textes = S.textes || {};
   if (!LIVE || S.textes[c.id]) return;
   try { const r = await fetch(`/api/clients/${c.id}/textes`); S.textes[c.id] = r.ok ? await r.json() : []; } catch { S.textes[c.id] = []; }
   if (S.view === 'nouveau' && S.ctx === c.id) render();
+}
+
+
+/* ---------- l'audit gratuit, le calculateur, le compte, le suivi ---------- */
+const NIVEAUX = { ok: ['', 'check'], attention: ['warn', 'plus'], grave: ['bad', 'stop'], 'a-verifier': ['off', 'eye'] };
+function constats(a) {
+  return a.constats.map(k => { const [cl, ic] = NIVEAUX[k.niveau] || ['off', 'eye']; return `<div class="ck ${cl === 'bad' ? '' : cl}"><span class="i" ${cl === 'bad' ? 'style="background:var(--bad-bg);color:var(--bad)"' : ''}>${I[ic](12)}</span><div><b>${esc(k.titre)}</b><div class="d">${esc(k.detail)}</div></div></div>`; }).join('');
+}
+function blocAudit(a, titre = 'Résultat') {
+  const r = a.resume;
+  return `<div class="sec"><h3>${titre} <span class="n">${[r.grave && r.grave + ' grave' + (r.grave > 1 ? 's' : ''), r.attention && r.attention + ' à surveiller', r.aVerifier && r.aVerifier + ' à vérifier'].filter(Boolean).join(' · ') || 'rien à signaler'}</span><span class="r"><span class="muted">${esc(new Date(a.faitLe).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</span></span></h3>
+    <div class="card"><div class="u mono" style="margin-bottom:12px">${esc(a.urlFinale)}</div>${constats(a)}</div></div>`;
+}
+function vAudit() {
+  const a = S.auditRes;
+  return `<div class="hd"><div><h2>Audit tracking</h2><p class="lede">Gratuit, sans compte. LPWS ouvre la page comme un clic Google Ads (gclid et UTM), sur mobile, et relève ce qui fait perdre des conversions sans que personne ne le voie.</p></div></div>
+    <div class="grid g2">
+      <div class="card"><label class="fld">Adresse de la landing page<input class="inp mono" id="au-url" placeholder="https://www.client.com/landing" autocomplete="off" value="${esc(S.auditUrl || '')}"></label>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.shield(16) + 'Auditer la page', 'data-act="auditer"')}<span class="muted" id="au-err">${esc(S.auditErr || '')}</span></div>
+        <div id="job-zone">${S.auditJob && !a ? jobBox(S.auditJob) : ''}</div></div>
+      <div class="card"><h3>Ce qui est vérifié</h3>
+        ${['Le gclid et les UTM survivent aux redirections', 'Les balises présentes : GTM, GA4, Google Ads, Meta, TikTok, LinkedIn, Microsoft', 'Le lieur de conversions (_gcl_aw) est posé', 'Consent Mode v2 : refus par défaut, déclaré avant les balises', 'Des mesures partent-elles avant le consentement ?', 'Vitesse mobile (LCP), noindex, canonical'].map(x => `<div class="ck"><span class="i">${I.check(12)}</span><div>${x}</div></div>`).join('')}
+      </div>
+    </div>
+    ${a ? blocAudit(a) + `<div class="sec"><div class="card"><h3>Et ensuite</h3><p>Copiez la page dans LPWS : l’audit repasse tout seul (surveillance), et LPWS propose trois tests avec leur raison.</p><div style="margin-top:14px">${GO(I.page(16) + 'Copier cette page', `data-act="capturer" data-url="${esc(a.url)}"`)}</div></div></div>` : ''}`;
+}
+
+const Z_PLAN = { a: 1.959964, b: 0.841621 };
+function planJs(taux, visiteursJour, hausse, part) {
+  const n = Math.ceil(2 * Math.pow(Z_PLAN.a + Z_PLAN.b, 2) * taux * (1 - taux) / Math.pow(taux * hausse, 2));
+  const moins = visiteursJour * Math.min(part, 1 - part);
+  const jours = Math.max(7, Math.ceil(n / moins));
+  const h8 = (Z_PLAN.a + Z_PLAN.b) * Math.sqrt(2 * taux * (1 - taux) / (moins * 56)) / taux;
+  return { n, jours, h8, conclura: jours <= 56 };
+}
+function vConclure() {
+  const v = id => esc((S.cc || {})[id] ?? { 'cc-taux': '3', 'cc-vis': '800', 'cc-hausse': '20', 'cc-part': '50' }[id]);
+  return `<div class="hd"><div><h2>Peut-on conclure ?</h2><p class="lede">Avant de lancer : combien de jours ce test demandera, et s’il a une chance de conclure. Quatre tests sur cinq ne concluent pas franchement : mieux vaut le savoir avant.</p></div></div>
+    <div class="grid g2">
+      <div class="card"><div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <label class="fld">Taux de conversion actuel (%)<input class="inp" id="cc-taux" inputmode="decimal" value="${v('cc-taux')}"></label>
+        <label class="fld">Visiteurs par jour sur la page<input class="inp" id="cc-vis" inputmode="numeric" value="${v('cc-vis')}"></label>
+        <label class="fld">Hausse visée (%)<input class="inp" id="cc-hausse" inputmode="decimal" value="${v('cc-hausse')}"></label>
+        <label class="fld">Part sur la variante (%)<input class="inp" id="cc-part" inputmode="numeric" value="${v('cc-part')}"></label>
+      </div></div>
+      <div class="card" id="cc-out"></div>
+    </div>`;
+}
+function calcPlan() {
+  const out = document.getElementById('cc-out'); if (!out) return;
+  const num = id => parseFloat(String(document.getElementById(id)?.value ?? '').replace(/\s/g, '').replace(',', '.'));
+  const taux = num('cc-taux') / 100, vis = num('cc-vis'), hausse = num('cc-hausse') / 100, part = num('cc-part') / 100;
+  if (!(taux > 0 && taux < 1 && vis > 0 && hausse > 0 && part > 0 && part < 1)) { out.innerHTML = '<p class="muted">Renseignez les quatre champs.</p>'; return; }
+  const p = planJs(taux, vis, hausse, part);
+  out.innerHTML = p.conclura
+    ? `<span class="chip ok"><span class="dot"></span>Concluant en ~${fr(p.jours)} jours</span><h3 style="margin-top:12px">${fr(p.n)} visiteurs par version</h3><p>Une hausse de <b>${pct(hausse, 0)}</b> sur <b>${pct(taux, 1)}</b> de conversion se voit en <b>~${fr(p.jours)} jours</b> avec ${fr(vis)} visiteurs par jour, variante à ${pct(part, 0)}.</p><p class="muted" style="margin-top:8px">Jamais moins de 7 jours : lundi et samedi ne convertissent pas pareil. Ne tranchez pas avant l’échantillon : un écart vu trop tôt est souvent exagéré.</p>`
+    : `<span class="chip warn"><span class="dot"></span>Ne conclura pas</span><h3 style="margin-top:12px">${fr(p.jours)} jours nécessaires</h3><p>À ce trafic, une hausse de ${pct(hausse, 0)} ne se verra pas en 8 semaines. En 8 semaines, seule une hausse d’au moins <b>${pct(p.h8, 0)}</b> serait visible.</p><p style="margin-top:8px"><b>Testez plus gros :</b> la structure, l’offre, la preuve, pas un mot.</p>`;
+}
+
+function vCompte() {
+  if (!COMPTE) return `<div class="hd"><div><h2>Compte et offres</h2></div></div><div class="empty"><b>Le compte vit sur le serveur</b>${esc(SANS_SERVEUR)}</div>`;
+  const k = COMPTE, p = k.palierEnVigueur, an = k.facturation === 'annuelle';
+  const prix = x => x.prixMois === null ? 'sur devis' : x.prixMois === 0 ? 'gratuit' : `${an ? x.prixAnnuelMois : x.prixMois} $<small>/mois</small>`;
+  const surv = h => !h ? '—' : h >= 168 ? 'hebdomadaire' : h >= 24 ? 'quotidienne' : 'toutes les heures';
+  const mandats = Object.entries(k.mandats || {});
+  const cout = k.couts || {};
+  return `<div class="hd"><div><h2>Compte et offres</h2><p class="lede">On paie par client actif : un client dont au moins un test a été en ligne dans le mois. Copier, auditer, diagnostiquer ne compte pas.</p></div></div>
+    <div class="live calm"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip ok"><span class="dot"></span>${esc(p.nom)}${p.enEssai ? ' · essai' : ''}</span><span class="chip">${k.actifs.length} client${k.actifs.length > 1 ? 's' : ''} actif${k.actifs.length > 1 ? 's' : ''} ce mois-ci${p.clientsActifs ? ' sur ' + p.clientsActifs : ''}</span>${k.facturationActive ? '' : '<span class="chip">instance d’équipe : paliers non appliqués</span>'}</div>
+      <h3>${esc(k.facture.detail)}</h3>
+      <div class="say">${p.enEssai ? `Encore ${p.joursEssai} jour${p.joursEssai > 1 ? 's' : ''} d’essai ${esc(p.nom)}.` : p.id === 'atelier' ? 'L’Atelier copie, audite et diagnostique. Pour mettre un test en ligne, l’essai de ' + k.essaiJours + ' jours s’ouvre sans carte.' : ''}</div>
+      <div class="act">${p.id === 'atelier' && !k.essai ? GO(I.play(16) + `Démarrer l’essai de ${k.essaiJours} jours`, 'data-act="essai"') : ''}
+        <button class="btn ${!an ? 'pri' : ''}" data-act="facturation" data-v="mensuelle">Mensuel</button><button class="btn ${an ? 'pri' : ''}" data-act="facturation" data-v="annuelle">Annuel · −20 %</button></div></div>
+    <div class="sec"><h3>Les offres</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
+      ${k.paliers.map(x => `<div class="card" style="${x.id === k.palier ? 'outline:2px solid var(--ink)' : ''}"><h3>${esc(x.nom)}</h3><div class="stat" style="padding:0;background:none"><div class="v">${prix(x)}</div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div>${x.clientsActifs === null ? 'Clients illimités' : x.clientsActifs === 0 ? '1 page, pas de mise en ligne' : x.clientsActifs + ' clients actifs' + (x.parClientEnPlus ? `, puis ${x.parClientEnPlus} $ / client` : '')}</div></div>
+        <div class="ck"><span class="i">${I.check(12)}</span><div>Copie, diagnostic, audit tracking</div></div>
+        <div class="ck ${x.surveillanceH ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>${x.surveillanceH ? `Surveillance ${surv(x.surveillanceH)}${x.alertes ? ' + alertes' : ''}` : 'Pas de surveillance'}</div></div>
+        <div class="ck ${x.marqueBlanche ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>Rapport ${x.marqueBlanche ? 'à votre marque' : 'marqué LPWS'}</div></div>
+        <div class="ck ${x.intention ? '' : 'off'}"><span class="i">${I.check(12)}</span><div>Intentions de recherche</div></div>
+        <div style="margin-top:14px">${x.id === k.palier ? '<span class="chip ok"><span class="dot"></span>Votre palier</span>' : `<button class="btn sm ${x.id === 'agence' ? 'glow' : ''}" data-act="palier" data-palier="${x.id}">${x.id === 'regime' ? 'Demander un devis' : 'Choisir ' + esc(x.nom)}</button>`}</div></div>`).join('')}
+    </div>${k.facturationActive && !k.paiementOuvert ? '<p class="muted" style="margin-top:10px">Le paiement en ligne n’est pas encore ouvert sur cette instance.</p>' : ''}</div>
+    <div class="grid g2 sec">
+      <div class="card" style="display:grid;gap:14px"><h3 style="margin:0">Vous</h3>
+        <label class="fld">Nom<input class="inp" id="cp-nom" value="${esc(k.buyer.nom)}"></label>
+        <label class="fld">E-mail<input class="inp" id="cp-email" type="email" value="${esc(k.buyer.email)}"></label>
+        <label class="fld">Code partenaire<input class="inp mono" id="cp-code" value="${esc(k.codePartenaire || '')}" placeholder="optionnel"></label>
+        <label class="fld">Marque du rapport client<input class="inp" id="cp-marque" value="${esc(k.marque.nom)}" placeholder="votre agence">${p.marqueBlanche ? '' : '<span class="muted" style="font-weight:400">Marque blanche en Agence et Régime ; en dessous, le rapport est marqué LPWS.</span>'}</label>
+        <label class="fld">Couleur<input class="inp mono" id="cp-couleur" value="${esc(k.marque.couleur)}" placeholder="#111214"></label>
+        ${k.conditions ? `<p class="muted">Conditions ${esc(k.conditions.version)} acceptées le ${esc(new Date(k.conditions.accepteesLe).toLocaleDateString('fr-FR'))}.</p>` : `<label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="cp-cgu"><span>J’accepte les conditions d’utilisation (${esc(k.versionConditions)}) : je ne teste que des pages dont le propriétaire m’a mandaté.</span></label>`}
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-act="compte-save">Enregistrer</button><span class="muted" id="cp-err"></span></div>
+      </div>
+      <div style="display:grid;gap:14px;align-content:start">
+        <div class="card"><h3>Mandats <span class="n">${mandats.length}</span></h3>${mandats.length ? mandats.map(([cl, m]) => `<div class="ck"><span class="i">${I.check(12)}</span><div><b>${esc(cl)}</b><div class="d">donné par ${esc(m.par)}, le ${esc(new Date(m.signeLe).toLocaleDateString('fr-FR'))}</div></div></div>`).join('') : '<p class="muted">Aucun. Le mandat se déclare une fois par client, depuis son écran Suivi, avant le premier lancement.</p>'}</div>
+        <div class="card"><h3>Coût d’un diagnostic</h3>${cout.appels ? `<dl class="kv"><dt>Diagnostics</dt><dd>${cout.diagnostics}</dd><dt>Coût moyen</dt><dd>${cout.coutMoyenUsd === null ? 'non rapporté' : cout.coutMoyenUsd.toFixed(3) + ' $'}</dd><dt>Durée moyenne</dt><dd>${cout.dureeMoyenneS ? Math.round(cout.dureeMoyenneS) + ' s' : '—'}</dd><dt>Total</dt><dd>${cout.totalUsd.toFixed(2)} $ · ${cout.appels} appel${cout.appels > 1 ? 's' : ''} modèle</dd></dl>` : '<p class="muted">Aucun diagnostic journalisé encore : le coût réel s’affichera ici après la première analyse.</p>'}</div>
+      </div>
+    </div>`;
+}
+
+const VERDICTS = { gagnant: ['ok', 'Gagnant'], perdant: ['bad', 'Original meilleur'], neutre: ['', 'Non concluant'], jamais: ['', 'Ne concluait pas'], repartition: ['bad', 'Répartition faussée'], attendre: ['', 'Arrêté tôt'], 'sans-mesure': ['', 'Sans mesure'], refusee: ['', 'Écarté avant test'] };
+function rappelMandat(c) {
+  if (!c.live || c.mandat || !c.tests.some(t => t.etat === 'pret' || t.etat === 'stop')) return '';
+  return `<div class="sec"><div class="card" style="border-color:var(--warn)"><h3>Mandat à déclarer avant de lancer</h3><p>LPWS ne met rien en ligne sur un site sans l’accord de son propriétaire. Une fois par client, trente secondes.</p><div style="margin-top:14px"><button class="btn pri" data-go="view:suivi">${I.shield(15)}Déclarer le mandat</button></div></div></div>`;
+}
+function alerteRecente(c) {
+  const a = (c.alertes || [])[0];
+  if (!a || !c.surveillance || a.quand !== c.surveillance.dernier) return '';
+  return `<div class="card" style="margin-bottom:14px;border-color:${a.gravite === 'grave' ? 'var(--bad)' : 'var(--warn)'}"><h3>${esc(a.titre)} <span class="r"><button class="btn sm" data-go="view:suivi">Voir le suivi</button></span></h3><p>${esc(a.detail)}</p></div>`;
+}
+function vSuivi(c) {
+  const s = c.surveillance, m = c.memoire || { experiences: [], regles: [] };
+  const mandat = c.mandat
+    ? `<div class="ck"><span class="i">${I.check(12)}</span><div><b>Mandat donné par ${esc(c.mandat.par)}</b><div class="d">le ${esc(new Date(c.mandat.signeLe).toLocaleDateString('fr-FR'))} · ${esc(c.mandat.declaration)}</div></div></div>`
+    : `<p>Avant le premier lancement : qui, chez ${esc(c.marque)}, vous a mandaté pour tester ses pages ?</p>
+      <label class="fld" style="margin-top:12px">Nom et fonction<input class="inp" id="md-par" placeholder="Claire Martin, directrice marketing" value="${esc(S.mandatPar || '')}"></label>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px"><input type="checkbox" id="md-ok"><span class="muted">Je déclare être mandaté par ${esc(c.marque)} pour tester des versions de ses pages, installer la balise LPWS sur son site et lire les données de performance nécessaires à la mesure. Je retire la balise à la fin du mandat.</span></label>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn pri" data-act="mandat">Déclarer le mandat</button><span class="muted" id="md-err"></span></div>`;
+  return `<div class="hd"><div><h2>Suivi</h2><div class="u">${esc(c.url)}</div><p class="lede">La vraie page, relue : tracking, vitesse, concordance avec l’annonce. Et ce que les tests précédents ont appris.</p></div>
+      <div class="act"><button class="btn" data-act="audit-page">${I.shield(16)}Auditer</button>${GO(I.refresh(16) + 'Relever maintenant', 'data-act="surveiller"')}</div></div>
+    <div id="job-zone"></div>
+    <div class="grid g2">
+      <div class="card"><h3>Mandat <span class="r">${c.mandat ? '<span class="chip ok"><span class="dot"></span>Déclaré</span>' : '<span class="chip warn"><span class="dot"></span>À déclarer</span>'}</span></h3>${mandat}</div>
+      <div class="card"><h3>Surveillance <span class="r">${s ? `<span class="chip">${s.releves} relevé${s.releves > 1 ? 's' : ''}</span>` : '<span class="chip">aucun relevé</span>'}</span></h3>
+        ${s ? `<dl class="kv"><dt>Dernier relevé</dt><dd>${esc(new Date(s.dernier).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</dd><dt>LCP mobile</dt><dd>${s.lcpMs ? (s.lcpMs / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' s' : '—'}</dd><dt>Annonce ↔ page</dt><dd>${s.concordance === null ? 'décrivez la campagne pour la mesurer' : pct(s.concordance, 0)}</dd></dl>
+          <div class="tbl" style="--cols:minmax(120px,1fr) 80px 110px 70px;margin-top:14px"><div class="tr h"><span>Relevé</span><span class="num">LCP</span><span class="num">Concordance</span><span>gclid</span></div>${s.serie.slice().reverse().map(r => `<div class="tr"><span>${esc(new Date(r.quand).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</span><span class="num">${r.lcpMs ? (r.lcpMs / 1000).toFixed(1) + ' s' : '—'}</span><span class="num">${r.concordance === null ? '—' : pct(r.concordance, 0)}</span><span>${r.gclid ? 'ok' : '<b style="color:var(--bad)">perdu</b>'}</span></div>`).join('')}</div>`
+          : '<p>Le premier relevé fixe la référence : ensuite, chaque changement (balise disparue, gclid perdu, page ralentie, titre modifié, annonce qui ne colle plus) devient une alerte.</p>'}
+      </div>
+    </div>
+    ${(c.alertes || []).length ? `<div class="sec"><h3>Alertes <span class="n">${c.alertes.length}</span></h3><div class="card">${c.alertes.map(a => `<div class="ck ${a.gravite === 'grave' ? '' : 'warn'}"><span class="i" ${a.gravite === 'grave' ? 'style="background:var(--bad-bg);color:var(--bad)"' : ''}>${I.stop(12)}</span><div><b>${esc(a.titre)}</b> <span class="muted">· ${esc(new Date(a.quand).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span><div class="d">${esc(a.detail)}</div></div></div>`).join('')}</div></div>` : ''}
+    ${c.audit ? blocAudit(c.audit, 'Audit tracking') : `<div class="sec"><div class="card"><h3>Audit tracking</h3><p>gclid, redirections, balises, Consent Mode, vitesse : une minute sur la vraie page.</p><div style="margin-top:14px"><button class="btn glow" data-act="audit-page">${I.shield(15)}Auditer la page</button></div></div></div>`}
+    <div class="sec"><h3>Ce que ce client a appris <span class="n">${m.experiences.length}</span></h3>
+      ${m.experiences.length ? `<div class="card"><div class="tbl" style="--cols:minmax(200px,2fr) minmax(130px,1fr) 90px 110px"><div class="tr h"><span>Test</span><span>Résultat</span><span class="num">Écart</span><span>Fin</span></div>
+        ${m.experiences.map(e => { const [cl, l] = VERDICTS[e.verdict] || ['', e.verdict]; return `<div class="tr"><span class="t ell" title="${esc(e.hypothese || '')}">${esc(e.titre)} <span class="muted">· ${esc(nomRegle(e.regle))}</span></span><span><span class="chip ${cl}">${l}</span></span><span class="num">${e.lift === undefined || e.verdict === 'refusee' ? '—' : signed(e.lift, 1)}</span><span>${esc(new Date(e.finLe || e.consigneLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span></div>`; }).join('')}</div>
+        <p class="muted" style="margin-top:12px">Ce qui a perdu, ce qui n’a pas conclu à échantillon atteint, ce que vous avez refusé : LPWS ne le re-propose pas.</p></div>`
+      : '<div class="empty"><b>Rien encore</b>Chaque test arrêté et chaque proposition refusée s’inscrit ici, et le prochain diagnostic en tient compte.</div>'}
+    </div>`;
 }
 
 function renderMain() {
@@ -1291,6 +1438,10 @@ function renderMain() {
   else if (S.view === 'nouveau' && c) html = vNouveau(c);
   else if (S.view === 'campagne' && c) html = vCampagne(c);
   else if (S.view === 'guide') html = vGuide(c, S.mode);
+  else if (S.view === 'audit') html = vAudit();
+  else if (S.view === 'conclure') html = vConclure();
+  else if (S.view === 'compte') html = vCompte();
+  else if (S.view === 'suivi' && c) html = vSuivi(c);
   else if (!c) html = vHome();
   else if (S.view === 'tests') html = vTests(c);
   else if (S.view === 'test') html = vTest(c);
@@ -1299,6 +1450,7 @@ function renderMain() {
   else html = vDash(c);
   m.innerHTML = html; m.scrollTop = 0;
   if (S.view === 'resultats') calcSS();
+  if (S.view === 'conclure') calcPlan();
   apresRendu();
 }
 function calcSS() {
@@ -1312,9 +1464,11 @@ function calcSS() {
 function render() { renderRail(); renderPanel(); renderMain(); save(); synchroniserUrl(); }
 
 /* ---------- l'adresse : chaque écran a la sienne, précédent / suivant marchent, un lien se partage ---------- */
-const VUES = ['tests', 'page', 'resultats', 'nouveau', 'campagne'];
+const VUES = ['tests', 'page', 'resultats', 'nouveau', 'campagne', 'suivi'];
+const VUES_ACCUEIL = { audit: 'audit', conclure: 'peut-on-conclure', compte: 'compte' };
 function hashDe() {
   if (S.view === 'ajout') return '#/nouvelle-page';
+  if (S.ctx === 'home' && VUES_ACCUEIL[S.view]) return '#/' + VUES_ACCUEIL[S.view];
   const p = S.ctx === 'home' ? [] : [S.ctx];
   if (S.view === 'guide' && S.mode) p.push('guide', S.mode);
   else if (S.view === 'test' && S.test) p.push('test', S.test);
@@ -1325,6 +1479,8 @@ function lireHash() {
   if (!location.hash) return false;
   const p = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   if (p[0] === 'nouvelle-page') { S.ctx = 'home'; S.view = 'ajout'; return true; }
+  const acc = Object.keys(VUES_ACCUEIL).find(k => VUES_ACCUEIL[k] === p[0]);
+  if (acc) { S.ctx = 'home'; S.view = acc; S.test = null; return true; }
   let ctx = p[0] && p[0] !== 'guide' ? p.shift() : 'home';
   if (ctx !== 'home' && !byId(ctx)) { ctx = 'home'; p.length = 0; }
   S.ctx = ctx; S.view = 'dash'; S.test = null;
@@ -1336,7 +1492,7 @@ function lireHash() {
 function titreEcran() {
   const c = S.ctx === 'home' ? null : byId(S.ctx);
   const t = c && S.view === 'test' ? c.tests.find(x => x.id === S.test) : null;
-  const vue = { dash: c ? '' : 'Aujourd’hui', tests: 'Tests', page: 'Landing page', resultats: 'Résultats', ajout: 'Nouvelle page', nouveau: 'Nouveau test', campagne: 'Campagne', guide: S.mode && MODES[S.mode] ? MODES[S.mode].nom : '' }[S.view];
+  const vue = { dash: c ? '' : 'Aujourd’hui', tests: 'Tests', page: 'Landing page', resultats: 'Résultats', ajout: 'Nouvelle page', nouveau: 'Nouveau test', campagne: 'Campagne', suivi: 'Suivi', audit: 'Audit tracking', conclure: 'Peut-on conclure ?', compte: 'Compte et offres', guide: S.mode && MODES[S.mode] ? MODES[S.mode].nom : '' }[S.view];
   return [t ? t.titre : vue, c && c.nom, 'LPWS'].filter(Boolean).join(' · ');
 }
 let urlRendue = null;
@@ -1361,6 +1517,10 @@ function entrees() {
     E.push({ g, l: 'Tableau de bord', d: c.url, go: 'view:dash', i: 'home' }, { g, l: 'Tests', d: c.tests.length + ' test' + (c.tests.length > 1 ? 's' : ''), go: 'view:tests', i: 'ab' },
       { g, l: 'Résultats', d: 'conversions, coût par conversion', go: 'view:resultats', i: 'bars' }, { g, l: 'Landing page', d: 'la copie et ce qu’on peut tester', go: 'view:page', i: 'page' });
   }
+  if (c) E.push({ g: c.nom, l: 'Suivi', d: 'audit, surveillance, alertes, historique', go: 'view:suivi', i: 'shield' });
+  E.push({ g: 'Aller à', l: 'Audit tracking', d: 'gratuit : gclid, redirections, consentement, vitesse', go: 'ctx:home;view:audit', i: 'shield' },
+    { g: 'Aller à', l: 'Peut-on conclure ?', d: 'combien de jours pour un test', go: 'ctx:home;view:conclure', i: 'gauge' },
+    { g: 'Aller à', l: 'Compte et offres', d: 'palier, essai, mandats, marque', go: 'ctx:home;view:compte', i: 'sliders' });
   E.push({ g: 'Aller à', l: 'Vue d’ensemble', d: 'aujourd’hui, tous clients', go: 'ctx:home', i: 'home' }, { g: 'Aller à', l: 'Nouvelle page', d: 'onboarder la LP d’un client', go: 'ctx:home;view:ajout', i: 'plus' });
   CLIENTS.forEach(k => E.push({ g: 'Clients', l: k.nom, d: k.url, go: `ctx:${k.id}`, i: 'page' }));
   CLIENTS.forEach(k => k.tests.forEach(t => E.push({ g: 'Tests', l: t.titre, d: `${k.nom} · ${ETATS[t.etat][1]}`, go: `ctx:${k.id};test:${t.id}`, i: 'ab' })));
@@ -1412,7 +1572,11 @@ function publier(c, t, etat, part, annulable = true) {
     toast(on ? 'Mise en ligne : la balise se met à jour, ~15 s' : 'Arrêt demandé : l’original reprend 100 %, ~15 s', inverse);
     await chargerEtat(); render();
     suivreJob(r.job, j => toast(on ? (j.etat === 'ok' ? `En ligne : ${part} % des visiteurs voient la variante` : 'La mise en ligne a échoué') : (j.etat === 'ok' ? 'Arrêté : l’original reprend 100 % du trafic' : 'L’arrêt n’a pas été publié'), j.etat === 'ok' ? inverse : null));
-  }).catch(e => toast(e.message));
+  }).catch(e => {
+    if (e.action === 'mandat') { S.ctx = cid; S.view = 'suivi'; render(); }
+    else if (e.action === 'palier' || e.action === 'limite') { S.ctx = 'home'; S.view = 'compte'; render(); }
+    toast(e.message);
+  });
 }
 
 /* ---------- interactions ---------- */
@@ -1438,7 +1602,7 @@ document.addEventListener('click', e => {
     go(g.dataset.go); render(); return;
   }
   const pk = e.target.closest('[data-pick]');
-  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
+  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois','tauxConversion','cpc']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
   const cp = e.target.closest('[data-copy]');
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
@@ -1463,7 +1627,7 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined };
+      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
@@ -1483,6 +1647,7 @@ document.addEventListener('click', e => {
     case 'report': {
       const tt = t || (c && c.tests.find(x => x.id === S.test));
       if (!c || !tt) { toast('Ouvrez un test pour en faire le rapport'); break; }
+      if (LIVE) { window.open(`/api/clients/${c.id}/rapport/${encodeURIComponent(tt.id)}`, '_blank', 'noopener'); break; }
       const txt = rapportTest(c, tt); copier(txt, 'Rapport copié');
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' })); a.download = `lpws-${tt.id}.txt`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       break;
@@ -1493,6 +1658,46 @@ document.addEventListener('click', e => {
       const u = act.dataset.url || document.getElementById('url')?.value || ''; S.urlSaisie = u;
       api('/api/clients', { url: u }).then(async r => { S.urlSaisie = ''; await chargerEtat(); S.ctx = r.id; S.view = 'dash'; render(); })
         .catch(e => { const z = document.getElementById('url-err'); if (z) z.textContent = e.message; else toast(e.message); });
+      break;
+    }
+    case 'auditer': {
+      if (!LIVE) { toast(SANS_SERVEUR); break; }
+      const u = document.getElementById('au-url')?.value.trim() || ''; S.auditUrl = u;
+      api('/api/audit', { url: u }).then(r => { S.auditJob = r.job; S.auditRes = null; S.auditErr = ''; render(); })
+        .catch(e => { const z = document.getElementById('au-err'); if (z) z.textContent = e.message; else toast(e.message); });
+      break;
+    }
+    case 'audit-page': case 'surveiller': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const quoi = act.dataset.act === 'audit-page' ? 'audit' : 'surveiller';
+      api(`/api/clients/${c.id}/${quoi}`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? (quoi === 'audit' ? 'Audit terminé' : 'Relevé enregistré') : 'Ça n’a pas marché'); await chargerEtat(); render(); }); }).catch(e => toast(e.message));
+      break;
+    }
+    case 'mandat': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const par = document.getElementById('md-par')?.value.trim() || '';
+      const ok = document.getElementById('md-ok')?.checked;
+      const err = document.getElementById('md-err');
+      if (!ok) { if (err) err.textContent = 'Cochez la déclaration pour continuer.'; break; }
+      api(`/api/clients/${c.id}/mandat`, { par }).then(async () => { S.mandatPar = ''; toast('Mandat enregistré : vous pouvez lancer'); await chargerEtat(); render(); }).catch(e => { if (err) err.textContent = e.message; });
+      break;
+    }
+    case 'essai': api('/api/compte/essai').then(async () => { toast('Essai ouvert : 14 jours, sans carte'); await chargerEtat(); render(); }).catch(e => toast(e.message)); break;
+    case 'palier': {
+      if (!COMPTE) { toast(SANS_SERVEUR); break; }
+      const pal = act.dataset.palier;
+      if (pal === 'regime') { copier('Bonjour, je souhaite un devis LPWS Régime pour mon agence.', 'Demande de devis copiée'); break; }
+      if (COMPTE.paiementOuvert && COMPTE.facturationActive) { api('/api/compte/abonnement', { palier: pal }).then(r => { location.href = r.url; }).catch(e => toast(e.message)); break; }
+      if (!COMPTE.facturationActive) { api('/api/compte', { palier: pal }).then(async () => { toast('Palier changé'); await chargerEtat(); render(); }).catch(e => toast(e.message)); break; }
+      toast('Le paiement en ligne n’est pas encore ouvert sur cette instance');
+      break;
+    }
+    case 'facturation': api('/api/compte', { facturation: act.dataset.v }).then(async () => { await chargerEtat(); render(); }).catch(e => toast(e.message)); break;
+    case 'compte-save': {
+      const v = id => document.getElementById(id)?.value.trim() ?? '';
+      const corps = { buyer: { nom: v('cp-nom'), email: v('cp-email') }, marque: { nom: v('cp-marque'), couleur: v('cp-couleur') || '#111214' }, codePartenaire: v('cp-code') };
+      if (document.getElementById('cp-cgu')?.checked && !(COMPTE && COMPTE.conditions)) corps.conditions = true;
+      api('/api/compte', corps).then(async () => { toast('Compte enregistré'); await chargerEtat(); render(); }).catch(e => { const z = document.getElementById('cp-err'); if (z) z.textContent = e.message; else toast(e.message); });
       break;
     }
     case 'choisir': S.choix = act.dataset.anchor; S.ntText = undefined; render(); break;
@@ -1527,6 +1732,9 @@ document.addEventListener('input', e => {
   if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
   if (e.target.id === 'part') { const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test); if (t) t.part = +e.target.value; document.getElementById('partv').textContent = e.target.value + ' %'; return; }
   if (e.target.id?.startsWith('ss-')) calcSS();
+  if (e.target.id?.startsWith('cc-')) { S.cc = S.cc || {}; S.cc[e.target.id] = e.target.value; calcPlan(); }
+  if (e.target.id === 'au-url') S.auditUrl = e.target.value;
+  if (e.target.id === 'md-par') S.mandatPar = e.target.value;
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
   if (e.target.id === 'nt-text') S.ntText = e.target.value;
   if (e.target.id === 'nt-why') S.ntWhy = e.target.value;

@@ -21,6 +21,15 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   compact sur mobile, curseur de trafic qui s'applique vraiment à un test en ligne.
   Détail dans design.md (composants, navigation).
 
+## Fait le 2026-09-28 (modules du business model)
+- `engine/audit` (audit tracking gratuit), `engine/surveille` (relevés + alertes, dont annonce ↔ page),
+  `engine/measure/puissance.ts` (peut-on conclure ?), `memoire.ts` (mémoire client, le brain n'y
+  revient pas), `engine/compte` (paliers, essai, mandat, code partenaire, Stripe optionnel, coûts
+  modèle), `engine/rapport` (rapport client HTML). Écrans : Audit, Peut-on conclure ?, Compte et
+  offres, Suivi. Scripts : `audit`, `conclure`, `memoire`, `surveille`, `couts`.
+- Non branché faute d'accès : Stripe (clés `STRIPE_*`), annonces Google Ads/AI Max, Shopify, Intégral.
+  Paliers appliqués seulement avec `LPWS_FACTURATION=1` ; surveillance auto avec `LPWS_SURVEILLANCE=1`.
+
 ## Fait le 2026-09-28 (business model)
 - Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
   actif / mois », grille Atelier · Solo · Agence · Régime, modules reliés aux tâches, décisions `3.5`).

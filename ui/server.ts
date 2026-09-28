@@ -14,6 +14,14 @@
  *   POST /api/clients/<c>/<camp>/tests      {titre, pourquoi, edits:[{anchor,text}]} → variante + tag (job)
  *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop', part}  → config republiée (job)
  *   POST /api/clients/<c>/<camp>/verifier   la balise est-elle posée sur la vraie page ? (job)
+ *   POST /api/clients/<c>/<camp>/audit      l'audit tracking de la vraie page (job)
+ *   POST /api/clients/<c>/<camp>/surveiller un relevé de surveillance maintenant (job)
+ *   POST /api/clients/<c>/<camp>/mandat     {par} le mandat du client, déclaré par le buyer
+ *   GET  /api/clients/<c>/<camp>/rapport/<id>  le rapport client (HTML autonome)
+ *   POST /api/audit              {url}      l'audit gratuit d'une page quelconque (job)
+ *   GET  /api/conclure?taux&visiteurs&hausse&part   « peut-on conclure ? »
+ *   GET  /api/compte · POST /api/compte · POST /api/compte/essai · POST /api/compte/abonnement
+ *   POST /api/stripe/webhook                 événements Stripe (signés, hors mot de passe)
  *   GET  /files/<chemin>                    clients/ en statique (captures)
  *   GET  /t/<client>.js · /v/<client>.json  les fichiers du tag, tels que Vercel les sert
  *
@@ -39,6 +47,15 @@ import { lireJson, ecrireJson } from "../engine/shared/json.ts"
 import { envoyerFichier, envoyerJson as json } from "../engine/shared/http.ts"
 import { mimeDe } from "../engine/shared/mime.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../engine/shared/campagne.ts"
+import { auditer, dossierAudit, type Audit } from "../engine/audit/audit.ts"
+import { surveiller, historique, type Alerte } from "../engine/surveille/surveille.ts"
+import { planifier, bilan } from "../engine/measure/puissance.ts"
+import { consigner, lireMemoire, bilanDesRegles } from "../engine/measure/memoire.ts"
+import { rapportHtml } from "../engine/rapport/rapport.ts"
+import { lireCompte, ecrireCompte, palierEnVigueur, demarrerEssai, clientsActifs, peutLancer, factureDuMois, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
+import { PALIERS, ESSAI_JOURS } from "../engine/compte/paliers.ts"
+import { sessionPaiement, signatureValide, appliquerEvenement, stripeConfigure } from "../engine/compte/stripe.ts"
+import { lireCouts, bilanCouts } from "../engine/compte/couts.ts"
 
 const SCOPE = "ui"
 const PORT = Number(process.env.PORT ?? 4700)
@@ -48,6 +65,9 @@ const UI = join(ROOT, "ui", "index.html")
 const TSX = join(ROOT, "node_modules", ".bin", "tsx")
 /** l'adresse publique des fichiers du tag : celle que le buyer colle dans GTM */
 const BASE_TAGS = process.env.LPWS_BASE ?? "https://lpws.vercel.app"
+/** SaaS : les paliers limitent la mise en ligne. Sans la variable (l'instance d'équipe), tout est ouvert : seul le mandat est exigé. */
+const FACTURATION = !!process.env.LPWS_FACTURATION
+const FICHIER_COMPTE = join(ROOT, CLIENTS_ROOT, "compte.json")
 
 /* ---------- jobs : ce qui prend du temps se suit, ligne par ligne ---------- */
 type Job = { id: string; type: string; etat: "en cours" | "ok" | "échec"; lignes: string[]; debut: string; fin?: string; resultat?: unknown; campagne?: string }
@@ -111,10 +131,20 @@ async function tagPublie(slug: string): Promise<boolean | null> {
 const joursDepuis = (iso?: string) => iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)) : 0
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+async function resumeCompte() {
+  const compte = await lireCompte(FICHIER_COMPTE)
+  const p = palierEnVigueur(compte)
+  const actifs = await clientsActifs(join(ROOT, CLIENTS_ROOT))
+  return { ...compte, facturationActive: FACTURATION, paiementOuvert: stripeConfigure(), palierEnVigueur: p, actifs,
+    facture: factureDuMois(compte, actifs.length), paliers: Object.values(PALIERS), essaiJours: ESSAI_JOURS, versionConditions: VERSION_CONDITIONS,
+    couts: bilanCouts(await lireCouts(join(ROOT, CLIENTS_ROOT, "couts.jsonl"))) }
+}
+
 async function etat() {
   const clients: unknown[] = []
   const root = join(ROOT, CLIENTS_ROOT)
-  if (!existsSync(root)) return { clients, base: BASE_TAGS }
+  const compte = await resumeCompte()
+  if (!existsSync(root)) return { clients, base: BASE_TAGS, compte }
   for (const c of await readdir(root)) {
     const cdir = join(root, c)
     if (!(await stat(cdir)).isDirectory() || c.startsWith("_")) continue
@@ -142,6 +172,10 @@ async function etat() {
         const o = resultats?.versions?.controle, v = resultats?.versions?.[id]
         return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
       }
+      const audit = await lireJson<Audit | null>(fichiersDe(d).audit, null)
+      const alertes = (await lireJson<Alerte[]>(fichiersDe(d).alertes, [])).slice(0, 10)
+      const releves = await historique(d)
+      const memoire = await lireMemoire(d)
       const url = (meta?.source ?? encours?.url ?? "").replace(/^https?:\/\//, "")
       const site = url.split("/")[0].replace(/^www\./, "")
       const clientSlug = slugify(meta?.client ?? c)
@@ -169,7 +203,12 @@ async function etat() {
         capture,
         job: captureEnCours ? encours!.job : undefined,
         contexte,
-        diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0 } : null,
+        diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0, ecartes: diag.ecartes ?? [] } : null,
+        audit, alertes,
+        surveillance: releves[0] ? { dernier: releves[0].quand, releves: releves.length, concordance: releves[0].concordance?.score ?? null, lcpMs: releves[0].lcpMs,
+          serie: releves.slice(0, 12).reverse().map((r) => ({ quand: r.quand, lcpMs: r.lcpMs, concordance: r.concordance?.score ?? null, gclid: r.gclid })) } : null,
+        memoire: { experiences: memoire.filter((e) => e.campagne === camp || e.verdict !== "refusee").slice(0, 30), regles: bilanDesRegles(memoire) },
+        mandat: compte.mandats[c] ?? null,
         propositions,
         brainEnCours, brainJob: brainJob?.id,
         connexion: {
@@ -188,6 +227,8 @@ async function etat() {
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
           res: resDe(t.id),
+          plan: t.plan ?? null, lanceLe: t.lanceLe, finLe: t.finLe, regle: t.regle,
+          bilan: (() => { const r = resDe(t.id); return r ? bilan(r.o, r.v, { jours: joursDepuis(t.lanceLe), part: (t.part || 50) / 100, plan: t.plan }) : null })(),
         })),
       })
     }
@@ -197,7 +238,7 @@ async function etat() {
   const lettres = new Map<string, number>()
   for (const x of clients as any[]) lettres.set(x.client[0], (lettres.get(x.client[0]) ?? 0) + 1)
   for (const x of clients as any[]) if ((lettres.get(x.client[0]) ?? 0) > 1) x.ini = cap(x.client.slice(0, 2))
-  return { clients, base: BASE_TAGS }
+  return { clients, base: BASE_TAGS, compte }
 }
 
 /* ---------- onboarder une page : la capture, en sous-processus ---------- */
@@ -340,7 +381,7 @@ async function creerTestDepuisProposition(c: string, camp: string, nom: string) 
   const txt = await textes(c, camp)
   const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
   const job = nouveauJob("test")
-  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id })
+  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, regle: p.regle })
   await ecrireJson(fichiersDe(d).tests, tests)
   pipelineTest(job, c, camp, nom, base, specPath)
   return { job, id: nom }
@@ -430,11 +471,19 @@ function VERCEL(args: string[]): [string, string[]] {
   return global ? ["vercel", args] : ["npx", ["--yes", "vercel@latest", ...args]]
 }
 
-async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number) {
+async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number, plan?: { taux?: number; visiteursJour?: number; hausse?: number }) {
   const d = dossier(c, camp)
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
   if (!t) throw new Error("test inconnu")
+  /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
+   * mandaté le buyer (docs/business-model-rapport.md §7). Le palier ne limite qu'en SaaS. */
+  if (etat === "live") {
+    const compte = await lireCompte(FICHIER_COMPTE)
+    const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))
+      : compte.mandats[c] ? { ok: true as const } : { ok: false as const, action: "mandat" as const, raison: "Aucun mandat déclaré pour ce client : LPWS ne met rien en ligne sur un site sans l’accord écrit de son propriétaire. Déclarez-le une fois, puis lancez." }
+    if (!droit.ok) throw Object.assign(new Error(droit.raison), { code: 402, action: droit.action })
+  }
   /* PAS DE MISE EN LIGNE SANS BALISE.
    * Constaté en rejouant le parcours : le test passait « En ligne · 50 % » alors que la balise
    * n'était sur aucune page. Le buyer croyait tester, personne ne voyait la variante. On sonde
@@ -447,8 +496,25 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
       throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
   }
   const avant = tests.map((o) => [o.id, o.etat, o.part] as const)
-  if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
-  else { t.etat = "stop" }
+  if (etat === "live") {
+    const relance = t.etat === "stop" && !!t.lanceLe
+    t.etat = "live"; t.part = part || 50
+    // une relance après arrêt continue le même test (mêmes visiteurs, même plan) ; sinon c'est un départ
+    if (!relance) t.lanceLe = new Date().toISOString()
+    delete t.finLe
+    for (const o of tests) if (o !== t && o.etat === "live") { o.etat = "stop"; o.finLe = new Date().toISOString() }
+    // le plan : combien de visiteurs, combien de jours : dit au lancement, pas découvert après
+    const ctx = await lireJson<{ tauxConversion?: number; visiteursMois?: number } | null>(fichiersDe(d).contexte, null)
+    const res = await lireJson<{ versions?: Record<string, { n: number; c: number }> } | null>(fichiersDe(d).resultats, null)
+    const o = res?.versions?.controle
+    const taux = plan?.taux ? plan.taux / 100 : ctx?.tauxConversion ? ctx.tauxConversion / 100 : o && o.n >= 200 ? o.c / o.n : undefined
+    const visiteursJour = plan?.visiteursJour ?? (ctx?.visiteursMois ? ctx.visiteursMois / 30 : undefined)
+    if (taux && visiteursJour) {
+      const pl = planifier({ taux, visiteursJour, part: t.part / 100, hausse: plan?.hausse ? plan.hausse / 100 : undefined })
+      if (Number.isFinite(pl.nParVersion)) t.plan = pl
+    }
+  }
+  else { t.etat = "stop"; t.finLe = new Date().toISOString() }
   await ecrireJson(fichiersDe(d).tests, tests)
   await appliquerParts(c, camp)
   const job = nouveauJob("config")
@@ -464,9 +530,62 @@ async function changerEtat(c: string, camp: string, id: string, etat: "live" | "
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)
     if (code !== 0) await appliquerParts(c, camp)
+    // ce qui a été appris reste : le test arrêté entre dans la mémoire du client
+    if (code === 0) await consigner(d).catch((e) => dire(job, `mémoire : ${(e as Error).message}`))
     finir(job, code === 0)
   })()
   return job
+}
+
+/* ---------- audit, surveillance : la vraie page, relue ---------- */
+function lancerAudit(url: string, cible: string): Job {
+  const job = nouveauJob("audit")
+  ;(async () => {
+    try {
+      dire(job, `ouverture de ${url} comme un clic Google Ads (gclid + UTM), sur mobile`)
+      const a = await auditer(url)
+      await ecrireJson(fichiersDe(cible).audit, a)
+      for (const k of a.constats) dire(job, `${k.niveau === "ok" ? "✓" : k.niveau === "grave" ? "✗" : "!"} ${k.titre}`)
+      finir(job, true, a)
+    } catch (e) { dire(job, (e as Error).message); finir(job, false) }
+  })()
+  return job
+}
+function lancerSurveillance(d: string, job = nouveauJob("surveillance")): Job {
+  ;(async () => {
+    try {
+      dire(job, "relevé : audit tracking, haut de page, balise, concordance avec l’annonce")
+      const { releve, nouvelles } = await surveiller(d)
+      dire(job, `${releve.statut} · gclid ${releve.gclid ? "ok" : "perdu"} · LCP ${releve.lcpMs ?? "?"} ms · ${nouvelles.length} alerte(s)`)
+      for (const a of nouvelles) dire(job, a.titre)
+      finir(job, true, { releve, nouvelles })
+    } catch (e) { dire(job, (e as Error).message); finir(job, false) }
+  })()
+  return job
+}
+
+/** La surveillance passe toute seule, au rythme du palier (Solo hebdo, Agence quotidien). LPWS_SURVEILLANCE=1 pour l'activer. */
+async function tourDeSurveillance() {
+  const compte = await lireCompte(FICHIER_COMPTE)
+  const h = FACTURATION ? palierEnVigueur(compte).surveillanceH : Number(process.env.LPWS_SURVEILLANCE_H ?? 24)
+  if (!h) return
+  const root = join(ROOT, CLIENTS_ROOT)
+  if (!existsSync(root)) return
+  for (const c of await readdir(root)) {
+    const cdir = join(root, c)
+    if (c.startsWith("_") || !(await stat(cdir)).isDirectory()) continue
+    for (const camp of await readdir(cdir)) {
+      const d = join(cdir, camp)
+      if (!existsSync(fichiersDe(d).meta)) continue
+      const dernier = (await historique(d))[0]
+      if (dernier && Date.now() - Date.parse(dernier.quand) < h * 3_600_000) continue
+      if ([...jobs.values()].some((j) => j.type === "surveillance" && j.etat === "en cours" && j.campagne === d)) continue
+      const job = nouveauJob("surveillance"); job.campagne = d
+      lancerSurveillance(d, job)
+      while (job.etat === "en cours") await new Promise((r) => setTimeout(r, 2_000))
+      step(SCOPE, `surveillance ${c}/${camp} : ${job.lignes.at(-1) ?? ""}`)
+    }
+  }
 }
 
 /* ---------- la balise est-elle vraiment posée ? on ouvre la vraie page ---------- */
@@ -520,6 +639,13 @@ function autorise(req: IncomingMessage, res: ServerResponse): boolean {
 
 createServer(async (req, res) => {
   try {
+    // Stripe n'a pas le mot de passe : sa requête est authentifiée par sa signature
+    if (req.url === "/api/stripe/webhook" && req.method === "POST") {
+      const brut = await new Promise<string>((ok) => { let s = ""; req.on("data", (d) => s += d); req.on("end", () => ok(s)) })
+      if (!signatureValide(brut, req.headers["stripe-signature"] as string | undefined)) return json(res, 400, { erreur: "signature Stripe invalide" })
+      await ecrireCompte(appliquerEvenement(await lireCompte(FICHIER_COMPTE), JSON.parse(brut)), FICHIER_COMPTE)
+      return json(res, 200, { recu: true })
+    }
     if (!autorise(req, res)) return
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
@@ -532,6 +658,35 @@ createServer(async (req, res) => {
       try { cible = new URL(String(u ?? "").trim()) ; if (!/^https?:$/.test(cible.protocol)) throw 0 } catch { return json(res, 400, { erreur: "Collez l’adresse complète de la page, avec https://" }) }
       const r = await capturer(cible.toString())
       return json(res, 202, { job: r.job.id, client: r.client, campagne: r.campagne, id: `${r.client}/${r.campagne}` })
+    }
+    if (p === "/api/compte" && req.method === "GET") return json(res, 200, await resumeCompte())
+    if (p === "/api/compte" && req.method === "POST") {
+      const b = await body(req); const c0 = await lireCompte(FICHIER_COMPTE)
+      const r = Compte.safeParse({ ...c0, ...(b.buyer ? { buyer: { ...c0.buyer, ...b.buyer } } : {}), ...(b.marque ? { marque: { ...c0.marque, ...b.marque } } : {}),
+        ...(b.facturation ? { facturation: b.facturation } : {}), ...(b.codePartenaire !== undefined ? { codePartenaire: String(b.codePartenaire).trim() || undefined } : {}),
+        ...(b.conditions ? { conditions: { version: VERSION_CONDITIONS, accepteesLe: new Date().toISOString() } } : {}),
+        // sans paiement en SaaS, le palier se change à la main (instance d'équipe, Régime sur devis)
+        ...(b.palier && !FACTURATION ? { palier: b.palier } : {}) })
+      if (!r.success) return json(res, 400, { erreur: r.error.issues.map((i) => `${i.path.join(".")} : ${i.message}`).join(" ; ") })
+      await ecrireCompte(r.data, FICHIER_COMPTE); return json(res, 200, await resumeCompte())
+    }
+    if (p === "/api/compte/essai" && req.method === "POST") { await ecrireCompte(demarrerEssai(await lireCompte(FICHIER_COMPTE)), FICHIER_COMPTE); return json(res, 200, await resumeCompte()) }
+    if (p === "/api/compte/abonnement" && req.method === "POST") {
+      const b = await body(req)
+      const retour = String(req.headers.origin ?? `http://${req.headers.host}`)
+      return json(res, 200, { url: await sessionPaiement(await lireCompte(FICHIER_COMPTE), b.palier, retour) })
+    }
+    if (p === "/api/conclure") {
+      const q = url.searchParams
+      const taux = Number(q.get("taux")?.replace(",", ".")) / 100, visiteursJour = Number(q.get("visiteurs"))
+      if (!(taux > 0 && taux < 1) || !(visiteursJour > 0)) return json(res, 400, { erreur: "Il faut un taux de conversion (en %) et des visiteurs par jour." })
+      return json(res, 200, planifier({ taux, visiteursJour, hausse: q.get("hausse") ? Number(q.get("hausse")!.replace(",", ".")) / 100 : undefined, part: q.get("part") ? Number(q.get("part")) / 100 : undefined }))
+    }
+    if (p === "/api/audit" && req.method === "POST") {
+      const { url: u } = await body(req)
+      let cible: URL
+      try { cible = new URL(String(u ?? "").trim()); if (!/^https?:$/.test(cible.protocol)) throw 0 } catch { return json(res, 400, { erreur: "Collez l’adresse complète de la page, avec https://" }) }
+      return json(res, 202, { job: lancerAudit(cible.toString(), join(ROOT, dossierAudit(cible.toString()))).id })
     }
     if (seg[0] === "api" && seg[1] === "jobs" && seg[2]) { const j = jobs.get(seg[2]); return j ? json(res, 200, j) : json(res, 404, { erreur: "job inconnu" }) }
     if (seg[0] === "api" && seg[1] === "clients" && seg[2] && seg[3]) {
@@ -546,10 +701,27 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
         const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" ? "live" : "stop", Number(b.part) || 50)
+        const job = await changerEtat(c, camp, seg[5], b.etat === "live" ? "live" : "stop", Number(b.part) || 50, b.plan)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
+      if (seg[4] === "audit" && req.method === "POST") {
+        const meta = await lireJson<any>(fichiersDe(dossier(c, camp)).meta, null)
+        if (!meta?.source) return json(res, 409, { erreur: "La page n’est pas encore copiée." })
+        return json(res, 202, { job: lancerAudit(meta.source, dossier(c, camp)).id })
+      }
+      if (seg[4] === "surveiller" && req.method === "POST") { const job = nouveauJob("surveillance"); job.campagne = dossier(c, camp); return json(res, 202, { job: lancerSurveillance(dossier(c, camp), job).id }) }
+      if (seg[4] === "mandat" && req.method === "POST") {
+        const par = String((await body(req)).par ?? "").trim()
+        if (par.length < 2) return json(res, 400, { erreur: "Qui, chez le client, a donné le mandat ? (nom et fonction)" })
+        const compte = await lireCompte(FICHIER_COMPTE)
+        compte.mandats[c] = { par, signeLe: new Date().toISOString(), declaration: DECLARATION_MANDAT(await nomDuSite(dossier(c, camp), c), par) }
+        await ecrireCompte(compte, FICHIER_COMPTE); return json(res, 200, compte.mandats[c])
+      }
+      if (seg[4] === "rapport" && seg[5] && req.method === "GET") {
+        const html = await rapportHtml(dossier(c, camp), decodeURIComponent(seg[5]), await lireCompte(FICHIER_COMPTE))
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-disposition": `inline; filename="rapport-${slugify(seg[5])}.html"` }); res.end(html); return
+      }
       if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST") {
         const f = fichiersDe(dossier(c, camp)).propositions
@@ -557,7 +729,7 @@ createServer(async (req, res) => {
         const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
         // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
         p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = String((await body(req)).raison ?? "")
-        await ecrireJson(f, props); return json(res, 200, { ok: true })
+        await ecrireJson(f, props); await consigner(dossier(c, camp)); return json(res, 200, { ok: true })
       }
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
@@ -566,5 +738,12 @@ createServer(async (req, res) => {
     if ((seg[0] === "t" || seg[0] === "v") && seg[1])
       return envoyerFichier(res, join(DIST, seg[0]), decodeURIComponent(seg[1]), { "access-control-allow-origin": "*", "cache-control": "no-cache" })
     res.writeHead(404); res.end()
-  } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e) }) }
+  } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e), action: (e as { action?: string })?.action }) }
 }).listen(PORT, process.env.LPWS_HOTE ?? "127.0.0.1", () => step(SCOPE, `interface → http://${process.env.LPWS_HOTE ?? "localhost"}:${PORT} · tag publié sur ${BASE_TAGS}`))
+
+if (process.env.LPWS_SURVEILLANCE) {
+  let enCours = false
+  const tour = async () => { if (enCours) return; enCours = true; try { await tourDeSurveillance() } catch (e) { step(SCOPE, `surveillance : ${(e as Error).message}`) } finally { enCours = false } }
+  setInterval(tour, 3_600_000); setTimeout(tour, 30_000)
+  step(SCOPE, "surveillance automatique active (LPWS_SURVEILLANCE)")
+}
