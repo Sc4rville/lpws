@@ -31,7 +31,7 @@ import { step, fail, timed } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
 import { ecrireJson, lireCache, lireJson, lireValide } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
-import { aEviter, historique } from "../measure/experience.ts"
+import { aEviter, bilanRegles, historique } from "../measure/experience.ts"
 
 const SCOPE = "variant"
 
@@ -71,13 +71,15 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   }
 
   // 3. joindre
-  const d: Diagnostic = diagnostiquer({ m, j }, ctx)
+  const d: Diagnostic = diagnostiquer({ m, j }, ctx, await bilanRegles(dirname(dirname(campagne))))
   const eviter = aEviter(await historique(dirname(campagne)))
   d.ecartes = d.tests.filter((k) => eviter.has(k.id)).map((k) => ({ id: k.id, signal: k.signal, raison: eviter.get(k.id)! }))
   d.tests = d.tests.filter((k) => !eviter.has(k.id))
   await ecrireJson(f.diagnostic, d)
   step(SCOPE, `diagnostic : ${d.tests.length} test(s) possible(s), ${d.conseils.length} conseil(s), ${d.nonEvaluables.length} non évaluable(s), régime ${d.regime}`)
-  for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}`)
+  const bilan = (k: { bilan?: { gagnes: number; perdus: number; nuls: number } }) =>
+    k.bilan ? ` (nos tests : ${k.bilan.gagnes} gagné(s), ${k.bilan.perdus} perdu(s), ${k.bilan.nuls} nul(s))` : ""
+  for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}${bilan(k)}`)
   for (const k of d.conseils) step(SCOPE, `  CONSEIL ${String(k.score).padStart(3)}   [${FAMILLES[k.famille]}] ${k.signal}`)
   for (const k of d.ecartes) step(SCOPE, `  ÉCARTÉ  ${k.id} : ${k.raison}`)
   if (d.nonEvaluables.length) step(SCOPE, `  non évaluables : ${d.nonEvaluables.map((x) => x.id).join(", ")}`)
@@ -90,7 +92,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   const propositions = variantes.map((v) => {
     const k = d.tests.find((x) => x.id === v.regle)
     return { nom: v.nom, titre: v.titre, teste: v.teste, regle: v.regle, score: k?.score ?? 0,
-      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], fichier: v.fichier, proposeLe: new Date().toISOString() }
+      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString() }
   })
   // les refus du buyer restent : ils sont la mémoire de ce qu'il ne veut pas (feuille de route 4.1)
   const refusees = (await lireJson<Array<{ nom: string; refusee?: boolean }>>(f.propositions, [])).filter((p) => p.refusee && !propositions.some((n) => n.nom === p.nom))

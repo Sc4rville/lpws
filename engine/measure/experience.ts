@@ -14,6 +14,10 @@
  *
  * `aEviter` lit toutes les pages d'un client et rend les règles à ne plus reproposer : celles
  * dont la variante a PERDU, et celles que le buyer a refusées. Le brain les écarte et le dit.
+ *
+ * `bilanRegles` lit tous les clients et compte, règle par règle, les tests conclus : c'est la
+ * confiance de la base de connaissances (4.5). Seuls des COMPTES en sortent — ni texte, ni page,
+ * ni chiffre d'un client — et seules les conclusions tranchées pèsent : « trop tôt » ne dit rien.
  */
 import { existsSync } from "node:fs"
 import { readdir, stat } from "node:fs/promises"
@@ -128,6 +132,28 @@ export async function retirerExperience(dir: string, t: Test): Promise<void> {
 }
 
 export type Refus = { regle: string; raison: string; le?: string }
+
+export type Bilan = { gagnes: number; perdus: number; nuls: number; clients: number }
+
+/** Ce que chaque règle a donné, tous clients confondus : des comptes, rien d'autre. */
+export async function bilanRegles(racine: string): Promise<Map<string, Bilan>> {
+  const m = new Map<string, Bilan & { vus: Set<string> }>()
+  if (!existsSync(racine)) return new Map()
+  for (const client of await readdir(racine)) {
+    const d = join(racine, client)
+    if (!(await stat(d)).isDirectory()) continue
+    for (const e of (await historique(d)).experiences) {
+      if (!e.regle || !(e.conclusion === "gagnant" || e.conclusion === "perdant" || e.conclusion === "non concluant")) continue
+      const b = m.get(e.regle) ?? { gagnes: 0, perdus: 0, nuls: 0, clients: 0, vus: new Set<string>() }
+      if (e.conclusion === "gagnant") b.gagnes++
+      else if (e.conclusion === "perdant") b.perdus++
+      else b.nuls++
+      b.vus.add(client)
+      m.set(e.regle, b)
+    }
+  }
+  return new Map([...m].map(([r, { vus, ...b }]) => [r, { ...b, clients: vus.size }]))
+}
 
 /** Tout ce qu'on sait déjà d'un client, toutes pages confondues. */
 export async function historique(clientDir: string): Promise<{ experiences: Array<Experience & { campagne: string }>; refus: Refus[] }> {
