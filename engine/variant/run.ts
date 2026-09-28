@@ -28,7 +28,7 @@ import { dirname } from "node:path"
 import { Contexte } from "./contexte.ts"
 import { extraireSignaux, SignauxMecaniques } from "./signaux.ts"
 import { corpsDe, juger, SignauxJuges } from "./jugement.ts"
-import { diagnostiquer, type Diagnostic } from "./diagnostic.ts"
+import { diagnostiquer, type Constat, type Diagnostic } from "./diagnostic.ts"
 import { ecrireVariantes, type VarianteProduite } from "./variantes.ts"
 import { langueDe } from "./garde.ts"
 import { FAMILLES } from "./regles.ts"
@@ -36,13 +36,13 @@ import { step, fail, timed } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
 import { ecrireJson, lireCache, lireJson, lireValide } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
-import { aEviter, historique } from "../measure/experience.ts"
+import { aEviter, bilanRegles, historique } from "../measure/experience.ts"
 
 const SCOPE = "variant"
 
 export type Proposition = {
   nom: string; titre: string; teste: string; regle: string; score: number; pourquoi: string; signal: string
-  sources: string[]; fichier: string; proposeLe: string; refusee?: boolean; declineDe?: string; consigne?: string
+  sources: string[]; bilan?: Constat["bilan"]; fichier: string; proposeLe: string; refusee?: boolean; declineDe?: string; consigne?: string
 }
 
 /** ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit */
@@ -50,7 +50,7 @@ const versPropositions = (variantes: VarianteProduite[], tests: Diagnostic["test
   variantes.map((v) => {
     const k = tests.find((x) => x.id === v.regle)
     return { nom: v.nom, titre: v.titre, teste: v.teste, regle: v.regle, score: k?.score ?? 0,
-      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], fichier: v.fichier, proposeLe: new Date().toISOString(), ...plus }
+      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString(), ...plus }
   })
 
 export async function brain(campagne: string, opts: { refaire?: boolean; sansJugement?: boolean; sansVariantes?: boolean } = {}) {
@@ -89,13 +89,15 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   }
 
   // 3. joindre
-  const d: Diagnostic = diagnostiquer({ m, j }, ctx)
+  const d: Diagnostic = diagnostiquer({ m, j }, ctx, await bilanRegles(dirname(dirname(campagne))))
   const eviter = aEviter(await historique(dirname(campagne)))
   d.ecartes = d.tests.filter((k) => eviter.has(k.id)).map((k) => ({ id: k.id, signal: k.signal, raison: eviter.get(k.id)! }))
   d.tests = d.tests.filter((k) => !eviter.has(k.id))
   await ecrireJson(f.diagnostic, d)
   step(SCOPE, `diagnostic : ${d.tests.length} test(s) possible(s), ${d.conseils.length} conseil(s), ${d.nonEvaluables.length} non évaluable(s), régime ${d.regime}`)
-  for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}`)
+  const bilan = (k: { bilan?: { gagnes: number; perdus: number; nuls: number } }) =>
+    k.bilan ? ` (nos tests : ${k.bilan.gagnes} gagné(s), ${k.bilan.perdus} perdu(s), ${k.bilan.nuls} nul(s))` : ""
+  for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}${bilan(k)}`)
   for (const k of d.conseils) step(SCOPE, `  CONSEIL ${String(k.score).padStart(3)}   [${FAMILLES[k.famille]}] ${k.signal}`)
   for (const k of d.ecartes) step(SCOPE, `  ÉCARTÉ  ${k.id} : ${k.raison}`)
   if (d.nonEvaluables.length) step(SCOPE, `  non évaluables : ${d.nonEvaluables.map((x) => x.id).join(", ")}`)

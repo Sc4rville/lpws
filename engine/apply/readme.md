@@ -6,6 +6,7 @@ Le jugement (quoi changer et pourquoi) a lieu ailleurs ; ici, tout est détermin
 ```bash
 npm run apply -- <dossier-baseline> <spec.json>
 npm run aller-retour -- <dossier-baseline>   # zéro édition → pixel identique, sinon la mécanique fait du bruit
+npm run rejouer -- <dossier-baseline> <spec.json> [--depuis <captures/date>]   # traduit les ancres d'une spec écrite sur une capture archivée
 ```
 
 Le delta se lit **section par section** ([`delta.ts`](delta.ts)) : chaque section de la variante est
