@@ -21,6 +21,10 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
   compact sur mobile, curseur de trafic qui s'applique vraiment à un test en ligne.
   Détail dans design.md (composants, navigation).
 
+## Fait le 2026-09-28 (refonte visuelle)
+- Couleurs en OKLCH + `light-dark()`, thème sombre et apparence Auto/Clair/Sombre, accueil en
+  bento, View Transitions entre écrans, ressort `linear()`. Détail dans design.md.
+
 ## Fait le 2026-09-28 (business model)
 - Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
   actif / mois », grille Atelier · Solo · Agence · Régime, modules reliés aux tâches, décisions `3.5`).
