@@ -30,7 +30,7 @@ import { step, fail, timed } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
 import { ecrireJson, lireCache, lireJson, lireValide } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
-import { aEviter, historique } from "../measure/experiences.ts"
+import { aEviter, historique } from "../measure/experience.ts"
 
 const SCOPE = "variant"
 

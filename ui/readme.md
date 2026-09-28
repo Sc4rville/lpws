@@ -61,7 +61,8 @@ temps d'une capture). Jamais dans le repo.
 
 - `index.html` — la source, un seul fichier, sans dépendance. Marqueur `/*THUMBS*/` pour la
   démo statique.
-- `server.ts` — la v1.
+- `server.ts` — la v1 : les routes et le mot de passe ; le reste dans `server/` (config · jobs ·
+  etat · pipeline des tests · tag).
 - `build.ts` — la démo statique : injecte les captures lues dans `clients/`, réduites en JPEG
   dans Chromium.
 - `dist/` — la sortie déployée (ignorée), avec `t/` et `v/` du tag et le lien Vercel.

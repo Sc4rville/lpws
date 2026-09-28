@@ -19,7 +19,7 @@
  *   express.json         ui         la balise est-elle posée ?
  *   mesure.json          buyer      propriété GA4 + compte de service
  *   resultats.json       measure    sessions et conversions par version
- *   experiences.json     measure    chaque test terminé, son horizon, son issue : la mémoire du client
+ *   experiences.json     measure    le journal : chaque test arrêté, son échantillon, sa conclusion
  */
 import { join } from "node:path"
 import { z } from "zod"
@@ -63,10 +63,13 @@ export const Test = z.object({
   part: z.number(),
   creeLe: z.string(),
   lanceLe: z.string().optional(),
-  /** arrêt ou déploiement : la date à laquelle le test a cessé de collecter */
+  /** la fin de la collecte (arrêt ou déploiement) : le verdict archivé se lit à cette date */
   finLe: z.string().optional(),
-  /** l'horizon fixé au lancement (stats.ts) : on s'engage avant de regarder */
-  plan: z.object({ tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(), controle: z.number(), variante: z.number(), jours: z.number().nullable() }).optional(),
+  /** l'horizon fixé AU LANCEMENT (engine/measure/stats.ts) : on ne le recalcule pas en regardant */
+  plan: z.object({
+    tauxBase: z.number(), tauxSuppose: z.boolean(), mde: z.number(), part: z.number(),
+    controle: z.number(), variante: z.number(), jours: z.number().nullable(),
+  }).optional(),
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),
@@ -75,3 +78,31 @@ export type Test = z.infer<typeof Test>
 
 /** La balise Express vue sur la vraie page. */
 export type Express = { installe: boolean; verifieLe?: string; version?: string; mode?: string; detail?: string }
+
+const Compte = z.object({ n: z.number(), c: z.number() })
+
+/** Une expérience terminée : ce qui a été testé, sur qui, et ce qu'on a le droit d'en dire. */
+export const Experience = z.object({
+  test: z.string(),
+  titre: z.string(),
+  teste: z.string(),
+  pourquoi: z.string(),
+  edits: Test.shape.edits,
+  part: z.number(),
+  lanceLe: z.string().optional(),
+  arreteLe: z.string(),
+  controle: Compte.nullable(),
+  variante: Compte.nullable(),
+  luLe: z.string().nullable(),
+  source: z.enum(["ga4", "exemple"]).nullable(),
+  hausse: z.object({ lo: z.number(), mid: z.number(), hi: z.number() }).nullable(),
+  conclusion: z.enum(["gagnant", "perdant", "non concluant", "trop tôt", "sans données", "répartition faussée"]),
+  /** la règle du brain qui a produit la variante (absente pour un test écrit à la main) */
+  regle: z.string().optional(),
+  /** l'horizon fixé au lancement, et le verdict rendu à l'arrêt contre lui */
+  plan: Test.shape.plan,
+  verdict: z.string().optional(),
+  /** la variante a été déployée à 100 % (reste vrai si l'original est remis ensuite) */
+  deploye: z.boolean().optional(),
+})
+export type Experience = z.infer<typeof Experience>

@@ -32,12 +32,18 @@ serveur rendent le même verdict.
   plus de huit semaines au rythme observé.
 - **Répartition faussée** (SRM, p < 0,001 dès 200 visiteurs) : le verdict est suspendu.
 
-## La mémoire — `experiences.ts`
+## Le journal des expériences — `experience.ts`
 
-À l'arrêt ou au déploiement, le test devient une expérience dans `experiences.json` : règle,
-dates, plan, comptes, issue (`gagnant`, `perdant`, `nul`, `interrompu`, `sans-donnees`, `srm`),
-verdict. `historique` relit toutes les pages du client ; `aEviter` en tire les règles perdues
-ou refusées par le buyer, que le brain ne repropose plus.
+Quand un test cesse de collecter (bouton Arrêter, un autre test lancé à sa place, ou le
+gagnant déployé), `experience.ts` écrit une ligne dans `experiences.json` : éditions, règle du
+brain, dates, part de trafic, horizon fixé au lancement, échantillon lu dans `resultats.json`,
+fourchette à 95 % de la hausse, verdict et conclusion — `gagnant`, `perdant`, `non concluant`,
+`trop tôt` (arrêté avant l'horizon), `sans données` ou `répartition faussée`. Une ligne par
+lancement : remettre l'original après un déploiement met la ligne à jour sans effacer
+`deploye`. Les non-concluants restent : c'est ce qu'on apprendra de plus utile.
+
+`historique` relit toutes les pages du client ; `aEviter` en tire les règles perdues ou
+refusées par le buyer, que le brain ne repropose plus.
 
 ## Ce que le buyer fait, une fois par client (3 minutes)
 

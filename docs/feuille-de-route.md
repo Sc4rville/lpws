@@ -274,9 +274,9 @@ maintenant et qui coûteront très cher à rattraper.
 
 ## 4.1 · Enregistrer ce qui s'est passé
 - ✅ Chaque variante porte déjà son hypothèse, sa métrique, son risque et son diagnostic
-- ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique *(engine/measure/experiences.ts, à l'arrêt ou au déploiement)*
-- ✅ Un objet « expérience » durable : contrôle, variante, dates, échantillon, résultat, verdict *(experiences.json par page)*
-- ✅ Enregistrer aussi les tests **non concluants** *(sinon on n'apprend que des gagnants)* — issues `nul`, `interrompu`, `sans-donnees`, `srm`
+- ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique *(y compris au déploiement du gagnant, avec l'horizon fixé au lancement)*
+- ✅ Un objet « expérience » durable : contrôle, variante, dates, échantillon, résultat, verdict *(`experiences.json`, écrit à chaque arrêt)*
+- ✅ Enregistrer aussi les tests **non concluants** *(sinon on n'apprend que des gagnants)*
 - ✅ Enregistrer les variantes refusées par le buyer et pourquoi *(signal très précieux sur nos diagnostics)* — gardées dans propositions.json même quand le brain repasse
 
 ## 4.2 · Savoir si on a le droit de conclure
