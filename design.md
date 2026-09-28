@@ -19,6 +19,12 @@ moments d'accueil. Une seule idée décorative : la trame d'impression. Rien d'a
   et serré, la trame bichrome.
 - **Growcode** (capture jointe) : paysage tramé vert dans un grand rectangle arrondi, titre
   en deux lignes. On en garde : l'illustration dans un cadre arrondi pleine largeur.
+- **Statsig Pulse / Eppo** (2026-09-28) : un résultat se lit comme une fourchette autour de
+  zéro, verte si elle est toute au-dessus, rouge si elle est toute en dessous, grise sinon ;
+  et un test avance par jalons cochés plutôt que par un pourcentage abstrait. On en garde :
+  la fourchette et les trois jalons.
+- **Linear** (2026-09-28) : clavier d'abord (palette ⌘K), annuler plutôt que confirmer. On
+  en garde : la palette et l'annulation dans le toast.
 
 ## Typographie (Google Fonts, gratuit)
 
@@ -62,6 +68,24 @@ Pas de jaune, pas de crème, pas de rose. Le dégradé n'existe que dans la lumi
 - **Carte d'un test en ligne** (`.live`) : aurore très douce bleu + menthe, animée lentement.
 - **Illustration tramée** (`ui/assets/hero-halftone.webp`) : accueil et « Nouvelle page »,
   dans un cadre arrondi pleine largeur, texte blanc par-dessus.
+- **Fourchette** (`.fx`) : l'intervalle à 95 % de la hausse, un trait gris, un repère noir
+  pour l'original (zéro), une bande et un point. Vert, rouge ou gris selon ce que la bande
+  couvre. Une phrase dessous la dit en mots. Version `mini` dans le tableau des résultats.
+- **Jalons** (`.jal`) : assez de conversions, assez de visiteurs, écart net. Trois ronds
+  qui se cochent en vert : le verdict est mûr quand les trois le sont.
+- **Trois chiffres d'accueil** (`.kpis`) : en ligne, conversions en plus, à décider.
+- **Palette** (`.kx`) : ⌘K / Ctrl K ou `/`, depuis n'importe quel écran. Groupes en mono
+  (l'écran courant d'abord, puis clients, tests, connexion), la ligne choisie en pilule noire.
+- **Toast avec Annuler** : lancer, arrêter, déployer, remettre l'original se rattrapent
+  pendant 7 s (bouton ou ⌘Z). Pas de boîte « êtes-vous sûr ? ».
+- **Nom au survol du rail** (`data-tip`) : pilule noire en mono, pas d'infobulle navigateur.
+
+## Navigation
+
+Chaque écran a son adresse (`#/atlassian/test/message-match`, `#/hubspot/resultats`,
+`#/nouvelle-page`) : précédent / suivant marchent, un lien se partage, le titre de l'onglet
+dit où l'on est. Après un changement d'écran, le focus va au titre. Sur mobile, le panneau se
+réduit à une rangée de pilules défilante et le rail reste collé en haut.
 
 ## Copie
 

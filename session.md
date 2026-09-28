@@ -15,6 +15,12 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
+## Fait le 2026-09-28 (ui)
+- Interface « décider d'abord » : fourchette + jalons sur chaque résultat, trois chiffres
+  d'accueil, palette ⌘K, Annuler au lieu de confirmer, une adresse par écran, panneau
+  compact sur mobile, curseur de trafic qui s'applique vraiment à un test en ligne.
+  Détail dans design.md (composants, navigation).
+
 ## Fait récemment (2026-09-17)
 - `apply` : cinq verbes (set · remove · move · swap · duplicate), ancres de section `s<n>` posées
   par géométrie, journal avant/après de chaque changement. Variantes Jira + HubSpot rendues dans

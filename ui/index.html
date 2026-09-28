@@ -42,22 +42,29 @@ svg{flex:none}
 .rail,.panel,.main{background:var(--glass);backdrop-filter:blur(24px) saturate(1.15);-webkit-backdrop-filter:blur(24px) saturate(1.15);box-shadow:var(--shadow)}
 
 /* ---------- rail ---------- */
-.rail{border-radius:999px;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;min-height:0}
+.rail{position:relative;z-index:3;border-radius:999px;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;min-height:0}
 .rail .sp{flex:1}
 .rail .sep{width:18px;border:0;border-top:1px solid var(--line);margin:6px 0}
-.rb{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font-weight:600;font-size:12.5px;font-family:var(--mono);transition:background .2s,color .2s,transform .2s}
+.rb{position:relative;width:40px;height:40px;border-radius:999px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font-weight:600;font-size:12.5px;font-family:var(--mono);transition:background .2s,color .2s,transform .2s}
 .rb:hover{background:var(--paper-2);color:var(--ink);transform:translateY(-1px)}
 .rb.av{background:var(--paper-2);color:var(--ink);width:36px;height:36px;position:relative}
 .rb.av.on{background:var(--pill);color:var(--pill-ink)}
 .rb.av .live-dot{position:absolute;right:-1px;top:-1px;width:9px;height:9px;border-radius:999px;background:var(--ok);border:2px solid var(--paper)}
 .rb.mark{color:var(--ink);font-family:var(--sans);font-weight:800;letter-spacing:-.06em;font-size:15px}
 .rb.plus{color:var(--muted)}
+/* le nom au survol : une pilule noire, sans délai de navigateur */
+.rb[data-tip]::after{content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translate(-4px,-50%);background:var(--pill);color:var(--pill-ink);font:500 12px/1.4 var(--mono);letter-spacing:0;padding:6px 11px;border-radius:999px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;box-shadow:var(--shadow-lg)}
+.rb[data-tip]:hover::after,.rb[data-tip]:focus-visible::after{opacity:1;transform:translate(0,-50%)}
 
 /* ---------- panneau ---------- */
 .panel{border-radius:var(--r-panel);display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .ph{padding:24px 24px 10px}
 .ph h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.02em}
 .ph .u{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:5px;word-break:break-all}
+.kbtn{display:flex;align-items:center;gap:8px;width:100%;margin-top:16px;padding:9px 12px;border:0;border-radius:14px;background:var(--paper-2);color:var(--muted);font:500 13px var(--mono);cursor:pointer;text-align:left;transition:background .2s,color .2s}
+.kbtn:hover{background:var(--paper-3);color:var(--ink)}
+.kbtn kbd{margin-left:auto}
+kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);background:var(--paper);border-radius:6px;padding:2px 6px;box-shadow:inset 0 -1px 0 var(--line),0 0 0 1px var(--line-2);white-space:nowrap}
 .pn{padding:4px 12px 12px;overflow:auto;flex:1;min-height:0}
 .ni{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:14px;border:0;background:transparent;cursor:pointer;text-align:left;font-family:var(--mono);font-size:13.5px;font-weight:500;transition:background .2s,transform .2s}
 .ni:hover{background:var(--paper-2);transform:translateX(2px)}
@@ -216,8 +223,30 @@ svg{flex:none}
 .range{display:flex;align-items:center;gap:10px}
 .range input{width:150px;accent-color:var(--pill);margin:0}
 .range .v{font-variant-numeric:tabular-nums;font-weight:600;min-width:42px;text-align:right;font-family:var(--mono)}
-.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--pill);color:var(--pill-ink);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:9;box-shadow:var(--shadow-lg)}
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:14px;max-width:calc(100vw - 32px);background:var(--pill);color:var(--pill-ink);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:9;box-shadow:var(--shadow-lg)}
 .toast.on{opacity:1}
+.toast.act{pointer-events:auto;padding-right:8px}
+.toast .undo{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s}
+.toast .undo:hover{background:rgba(255,255,255,.26)}
+.toast .undo kbd{background:transparent;color:var(--pill-muted);box-shadow:none;padding:0}
+[tabindex="-1"]:focus{outline:none}
+
+/* ---------- la palette : aller partout au clavier ---------- */
+.kx{position:fixed;inset:0;z-index:20;background:rgba(236,236,234,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px;animation:fade .16s ease}
+.kx[hidden]{display:none}
+.kbox{width:min(640px,100%);max-height:70vh;display:flex;flex-direction:column;background:var(--paper);border-radius:var(--r-card);box-shadow:var(--shadow-lg),0 0 0 1px rgba(17,18,20,.06);overflow:hidden}
+.kin{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line-2);color:var(--muted)}
+.kin input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:17px;color:var(--ink)}
+.kl{overflow:auto;padding:4px 8px 10px}
+.kg{font-family:var(--mono);font-size:12px;color:var(--muted);padding:12px 12px 6px}
+.ki{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:12px;background:transparent;color:var(--ink-2);font:inherit;text-align:left;cursor:pointer}
+.ki:hover{background:var(--paper-2)}
+.ki .t{font-weight:600;color:var(--ink);min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ki .d{margin-left:auto;padding-left:12px;min-width:0;flex:0 1 auto;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ki.on{background:var(--pill);color:var(--pill-ink)} .ki.on .t{color:var(--pill-ink)} .ki.on .d{color:var(--pill-muted)}
+.ke{padding:28px 16px;text-align:center;color:var(--muted)}
+.kf{display:flex;gap:8px 18px;flex-wrap:wrap;padding:10px 20px;border-top:1px solid var(--line-2);font-size:12.5px;color:var(--muted)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
 .bar{height:8px;border-radius:999px;background:var(--paper-3);overflow:hidden;margin-top:10px}
 .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--mint),var(--sky))}
 .bar i.ok{background:var(--ok)}
@@ -240,14 +269,39 @@ svg{flex:none}
 .live .say{font-size:15.5px;color:var(--ink-2);margin-top:14px;max-width:60ch}
 .live .act{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
 
+/* ---------- les jalons d'un test : trois cases, le verdict quand elles sont cochées ---------- */
+.jal{display:flex;gap:6px 16px;flex-wrap:wrap;list-style:none;margin:14px 0 0;padding:0;font-size:13px;color:var(--muted)}
+.jal li{display:flex;align-items:center;gap:7px}
+.jal .k{width:16px;height:16px;border-radius:999px;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line);background:var(--paper)}
+.jal li.done{color:var(--ink)}
+.jal li.done .k{background:var(--ok);box-shadow:none;color:#fff}
+
+/* ---------- la fourchette : où se situe probablement la vraie hausse ---------- */
+.fx .ax{position:relative;height:28px}
+.fx .ax::before{content:"";position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;border-radius:2px;background:var(--line)}
+.fx .z{position:absolute;left:50%;top:3px;bottom:3px;width:2px;margin-left:-1px;border-radius:2px;background:var(--ink-2)}
+.fx .bd{position:absolute;top:8px;bottom:8px;border-radius:999px;background:var(--paper-3);box-shadow:inset 0 0 0 1px rgba(17,18,20,.1)}
+.fx.ok .bd{background:var(--ok-bg);box-shadow:inset 0 0 0 1px rgba(28,148,87,.4)}
+.fx.bad .bd{background:var(--bad-bg);box-shadow:inset 0 0 0 1px rgba(210,65,58,.4)}
+.fx .pt{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:999px;background:var(--ink-2);box-shadow:0 0 0 3px var(--paper)}
+.fx.ok .pt{background:var(--ok)} .fx.bad .pt{background:var(--bad)}
+.fx .lg{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:2px}
+.fx.mini .ax{height:18px}.fx.mini .bd{top:5px;bottom:5px}.fx.mini .pt{width:8px;height:8px;margin:-4px 0 0 -4px;box-shadow:0 0 0 2px var(--paper)}
+.fxs{margin:8px 0 0;font-size:14px;color:var(--ink-2)}
+
+/* ---------- le haut de l'accueil : trois chiffres ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:-12px 0 28px}
+.kpis .stat{background:var(--paper);box-shadow:var(--shadow)}
+
 /* ---------- tableau de score ---------- */
 .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .score .stat{background:var(--paper)}
 .verdict{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:20px 24px;border-radius:var(--r-card);background:var(--paper);box-shadow:var(--shadow);margin-top:14px}
 .verdict .b{font-size:18px;font-weight:700;letter-spacing:-.02em}
 .verdict .s{color:var(--muted);font-size:14px;margin-top:2px}
-.verdict .bar{width:180px;margin:0;flex:none}
-.verdict .act{margin-left:auto;display:flex;gap:8px}
+.verdict .vt{flex:1 1 320px;min-width:0}
+.verdict .act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.verdict .vf{flex:1 1 100%;padding-top:16px;border-top:1px solid var(--line-2)}
 
 /* ---------- avant / après ---------- */
 .cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -299,7 +353,25 @@ svg{flex:none}
   html,body{height:auto;min-height:100%}
   .rail{flex-direction:row;padding:8px 12px;justify-content:flex-start;overflow-x:auto}
   .rail .sp{display:none}.rail .sep{width:0;height:18px;border-top:0;border-left:1px solid var(--line);margin:0 4px}
-  .panel{max-height:46vh}
+  .rail{position:sticky;top:8px;z-index:6}
+  .rb[data-tip]::after{display:none}
+  .panel{max-height:none;border-radius:22px}
+  .ph{position:relative;padding:14px 60px 4px 16px;display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap}
+  .ph .u{margin-top:0}
+  .kbtn{position:absolute;top:8px;right:10px;width:auto;margin:0;padding:9px 11px}
+  .kbtn span,.kbtn kbd{display:none}
+  .pn{display:flex;gap:6px;overflow-x:auto;padding:6px 10px 10px;scrollbar-width:none}
+  .pn::-webkit-scrollbar{display:none}
+  .pn .ni{width:auto;flex:none;padding:8px 12px}
+  .pn .ni .n{margin-left:2px}
+  .pn .sub,.pn .gl,.pn .mode,.pf{display:none}
+  .tbl{overflow-x:auto}.tr{min-width:760px}
+  .kx{padding-top:10vh}
+  .kf{display:none}
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-16px 0 24px}
+  .kpis .stat{padding:14px}
+  .kpis .stat .v{font-size:24px}
+  .kpis .stat .s{display:none}
   .main{padding:24px 18px 56px}
   .hd h2{font-size:30px}
   .hero{min-height:240px;padding:22px 20px}
@@ -319,7 +391,14 @@ svg{flex:none}
   <aside class="panel" id="panel"></aside>
   <main class="main" id="main"></main>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-t"></span><button class="undo" id="toast-undo" hidden>Annuler <kbd id="toast-k"></kbd></button></div>
+<div class="kx" id="cmdk" hidden>
+  <div class="kbox" role="dialog" aria-modal="true" aria-label="Aller à">
+    <div class="kin"><span id="k-ic"></span><input id="k-q" role="combobox" aria-expanded="true" aria-controls="k-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Un client, un test, une action…"><kbd>Échap</kbd></div>
+    <div class="kl" id="k-list" role="listbox" aria-label="Résultats"></div>
+    <div class="kf"><span><kbd>↑</kbd> <kbd>↓</kbd> choisir</span><span><kbd>Entrée</kbd> ouvrir</span><span><kbd id="k-raccourci"></kbd> ou <kbd>/</kbd> depuis n’importe quel écran</span></div>
+  </div>
+</div>
 
 <script>
 /*THUMBS*/
@@ -339,6 +418,7 @@ const I = {
   chev: s => svg('<path d="m7 8 3 3 3-3"/>', s),
   chevr: s => svg('<path d="m8 6 3 4-3 4"/>', s),
   plus: s => svg('<path d="M10 5v10M5 10h10"/>', s),
+  search: s => svg('<circle cx="9" cy="9" r="5"/><path d="m13 13 3.5 3.5"/>', s),
   check: s => svg('<path d="m5 10.5 3 3 7-7"/>', s),
   copy: s => svg('<rect x="7" y="7" width="9" height="9" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>', s),
   ext: s => svg('<path d="M9 5H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3M12 4h4v4M16 4l-6 6"/>', s),
@@ -529,7 +609,19 @@ const signed = (x, d = 0) => (x >= 0 ? '+' : '−') + pct(Math.abs(x), d);
 const img = k => (typeof IMG !== 'undefined' && IMG[k]) || null;
 const imgOf = c => c.imgUrl || img(c.img);
 const imgTest = (c, t) => t.imgUrl || img('v:' + t.id);
-const toast = t => { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1800); };
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const MOD = MAC ? '⌘' : 'Ctrl ';
+/** un message en bas ; avec `annuler`, un bouton pour revenir en arrière (et ⌘Z) plutôt qu'un « êtes-vous sûr ? » */
+const toast = (t, annuler) => {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-t').textContent = t;
+  document.getElementById('toast-undo').hidden = !annuler;
+  toast.undo = annuler || null;
+  el.classList.add('on'); el.classList.toggle('act', !!annuler);
+  clearTimeout(toast.t); toast.t = setTimeout(() => { el.classList.remove('on', 'act'); toast.undo = null; }, annuler ? 7000 : 1800);
+};
+const annulerDernier = () => { const f = toast.undo; if (!f) return; toast.undo = null; f(); };
+const aujourdhui = () => new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 async function copier(t, msg = 'Copié') { try { await navigator.clipboard.writeText(t); toast(msg); } catch { toast('Impossible de copier ici'); } }
 const GO = (label, extra = '') => `<button class="go" ${extra}><span class="halo"></span><span class="clip"><span class="sheen"></span></span>${label}</button>`;
 
@@ -543,6 +635,27 @@ function stats(r) {
   const se = Math.sqrt(p * (1 - p) * (1 / r.o.n + 1 / r.v.n)); const z = (p2 - p1) / se;
   return { p1, p2, lift: (p2 - p1) / p1, conf: 2 * normCdf(Math.abs(z)) - 1 };
 }
+/** l'intervalle à 95 % de la hausse relative : ce que « certitude » veut dire, dessiné */
+function fourchette(r) {
+  const p1 = r.o.c / r.o.n, p2 = r.v.c / r.v.n;
+  const se = Math.sqrt(p1 * (1 - p1) / r.o.n + p2 * (1 - p2) / r.v.n);
+  return { lo: (p2 - p1 - Z.a * se) / p1, hi: (p2 - p1 + Z.a * se) / p1, mid: (p2 - p1) / p1 };
+}
+function vueFourchette(r, { mini = false } = {}) {
+  const f = fourchette(r); const k = f.lo > 0 ? 'ok' : f.hi < 0 ? 'bad' : '';
+  const m = Math.max(.1, Math.abs(f.lo), Math.abs(f.hi)) * 1.15;
+  const x = v => ((v + m) / (2 * m) * 100).toFixed(2) + '%';
+  return `<div class="fx ${k} ${mini ? 'mini' : ''}" role="img" aria-label="Hausse probable entre ${signed(f.lo)} et ${signed(f.hi)}">
+    <div class="ax"><span class="bd" style="left:${x(f.lo)};right:calc(100% - ${x(f.hi)})"></span><span class="z"></span><span class="pt" style="left:${x(f.mid)}"></span></div>
+    ${mini ? '' : `<div class="lg"><span>${signed(-m, 0)}</span><span>original</span><span>${signed(m, 0)}</span></div>`}
+  </div>`;
+}
+function phraseFourchette(r) {
+  const f = fourchette(r);
+  return `La vraie hausse se situe probablement entre <b>${signed(f.lo)}</b> et <b>${signed(f.hi)}</b>.${f.lo < 0 && f.hi > 0 ? ' Zéro est dans la fourchette : on ne peut pas encore trancher.' : f.lo > 0 ? ' Toute la fourchette est au-dessus de l’original.' : ' Toute la fourchette est sous l’original.'}`;
+}
+const JALONS = [['conv', 'Assez de conversions'], ['vol', 'Assez de visiteurs'], ['net', 'Écart net']];
+const jalons = v => v.prog ? `<ol class="jal" aria-label="Avancement du test">${JALONS.map(([k, l]) => `<li class="${v.prog[k] ? 'done' : ''}"><span class="k">${v.prog[k] ? I.check(10) : ''}</span>${l}</li>`).join('')}</ol>` : '';
 /** le verdict, dans ses mots : calqué sur ce que Google Ads / VWO / AB Tasty disent */
 function verdict(c, t) {
   // un test réel n'a pas encore de résultats : ils se lisent dans GA4 (dimension lpws_variante).
@@ -551,11 +664,12 @@ function verdict(c, t) {
   const s = stats(t.res); const minConv = Math.min(t.res.o.c, t.res.v.c);
   const need = nParBranche(s.p1, Math.max(Math.abs(s.lift), 0.05)); const reste = Math.max(0, need - Math.min(t.res.o.n, t.res.v.n));
   const clicsJour = c.ads ? c.ads.clics : 800; const jours = Math.ceil(reste * 2 / clicsJour);
-  if (t.etat === 'gagnant') return { k: 'win', b: `Gagnant : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} · déployée sur 100 % du trafic le ${t.fin}`, s2: s };
-  if (minConv < 25) return { k: 'wait', b: 'Pas encore assez de données', s: `Continuez : il manque environ ${fr(25 - minConv)} conversions sur la version la moins vue`, s2: s };
-  if (s.conf >= .95 && s.lift > 0) return { k: 'win', b: `Gagnant probable : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} : vous pouvez déployer`, s2: s };
-  if (s.conf >= .95 && s.lift < 0) return { k: 'lose', b: `L’original fait mieux (${signed(s.lift)})`, s: `Certitude ${pct(s.conf, 0)} : remettez l’original et testez autre chose`, s2: s };
-  return { k: 'run', b: `Avantage variante ${signed(s.lift)}, certitude ${pct(s.conf, 0)}`, s: `Encore ~${jours} jours au rythme actuel pour être sûr à 95 %`, s2: s };
+  const R = o => ({ ...o, s2: s, prog: { conv: minConv >= 25, vol: reste === 0, net: s.conf >= .95 } });
+  if (t.etat === 'gagnant') return R({ k: 'win', b: `Gagnant : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} · déployée sur 100 % du trafic le ${t.fin}` });
+  if (minConv < 25) return R({ k: 'wait', b: 'Pas encore assez de données', s: `Continuez : il manque environ ${fr(25 - minConv)} conversions sur la version la moins vue` });
+  if (s.conf >= .95 && s.lift > 0) return R({ k: 'win', b: `Gagnant probable : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} : vous pouvez déployer` });
+  if (s.conf >= .95 && s.lift < 0) return R({ k: 'lose', b: `L’original fait mieux (${signed(s.lift)})`, s: `Certitude ${pct(s.conf, 0)} : remettez l’original et testez autre chose` });
+  return R({ k: 'run', b: `${s.lift >= 0 ? 'Avantage variante' : 'Avantage original'} ${signed(s.lift)}, certitude ${pct(s.conf, 0)}`, s: `Encore ~${jours} jour${jours > 1 ? 's' : ''} au rythme actuel pour être sûr à 95 %` });
 }
 const ETATS = {
   live: ['ok', 'En ligne · collecte', true], gagnant: ['ok', 'Gagnant · déployé', false], pret: ['', 'Prêt à lancer', false],
@@ -581,13 +695,13 @@ const previewUrl = (c, t) => `https://${c.url}${c.shopify ? '?view=lpws-pdp' : '
 /* ---------- rail ---------- */
 function renderRail() {
   document.getElementById('rail').innerHTML = `
-    <button class="rb mark" data-go="ctx:home" title="Vue d’ensemble" aria-label="Vue d’ensemble">${I.mark(20)}</button>
+    <button class="rb mark" data-go="ctx:home" data-tip="Vue d’ensemble" aria-label="Vue d’ensemble" ${S.ctx === 'home' ? 'aria-current="page"' : ''}>${I.mark(20)}</button>
     <hr class="sep">
-    ${CLIENTS.map(c => `<button class="rb av ${S.ctx === c.id ? 'on' : ''}" data-go="ctx:${c.id}" title="${esc(c.nom)}" aria-label="${esc(c.nom)}">${c.ini}${c.tests.some(t => t.etat === 'live') ? '<span class="live-dot"></span>' : ''}</button>`).join('')}
-    <button class="rb plus" title="Ajouter une page" aria-label="Ajouter une page" data-go="ctx:home;view:ajout">${I.plus()}</button>
+    ${CLIENTS.map(c => { const l = c.tests.some(t => t.etat === 'live'); return `<button class="rb av ${S.ctx === c.id ? 'on' : ''}" data-go="ctx:${c.id}" data-tip="${esc(c.nom)}${l ? ' · test en ligne' : ''}" aria-label="${esc(c.nom)}${l ? ', test en ligne' : ''}" ${S.ctx === c.id ? 'aria-current="page"' : ''}>${c.ini}${l ? '<span class="live-dot"></span>' : ''}</button>`; }).join('')}
+    <button class="rb plus" data-tip="Nouvelle page" aria-label="Nouvelle page" data-go="ctx:home;view:ajout">${I.plus()}</button>
     <div class="sp"></div>
-    <button class="rb" title="Réglages" aria-label="Réglages">${I.sliders()}</button>
-    <button class="rb av" title="Yann" aria-label="Compte">Y</button>`;
+    <button class="rb" data-tip="Réglages" aria-label="Réglages">${I.sliders()}</button>
+    <button class="rb av" data-tip="Yann" aria-label="Compte">Y</button>`;
 }
 
 /* ---------- panneau ---------- */
@@ -612,9 +726,9 @@ function renderPanel() {
   const p = document.getElementById('panel');
   if (S.ctx === 'home') {
     p.innerHTML = `
-      <div class="ph"><h1>Vue d’ensemble</h1><div class="u">18 sept. 2026</div></div>
+      <div class="ph"><h1>Vue d’ensemble</h1><div class="u">${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</div><button class="kbtn" data-act="cmdk" aria-label="Aller à : un client, un test, une action">${I.search(15)}<span>Aller à…</span><kbd>${MOD}K</kbd></button></div>
       <div class="pn">
-        <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash">${I.home()}Aujourd’hui</button>
+        <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash" ${S.view === 'dash' ? 'aria-current="page"' : ''}>${I.home()}Aujourd’hui</button>
         <div class="gl">Clients</div>
         <div class="sub" style="padding-left:0">${CLIENTS.map(c => `<button class="si" data-go="ctx:${c.id}"><span class="t">${esc(c.nom)}</span><span class="dot ${c.tests.some(t => t.etat === 'live') ? 'ok pulse' : c.capture.ok === false || c.capture.ok === null ? 'off' : c.shopify ? 'warn' : 'off'}"></span></button>`).join('')}</div>
         <div class="gl">Connexion</div>
@@ -625,17 +739,19 @@ function renderPanel() {
   const c = byId(S.ctx);
   const nLive = c.tests.filter(t => t.etat === 'live').length;
   p.innerHTML = `
-    <div class="ph"><h1>${esc(c.nom)}</h1><div class="u">${esc(c.url)}</div></div>
+    <div class="ph"><h1>${esc(c.nom)}</h1><div class="u">${esc(c.url)}</div><button class="kbtn" data-act="cmdk" aria-label="Aller à : un client, un test, une action">${I.search(15)}<span>Aller à…</span><kbd>${MOD}K</kbd></button></div>
     <div class="pn">
-      <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash">${I.home()}Tableau de bord</button>
-      <button class="ni ${S.view === 'tests' ? 'on' : ''}" data-go="view:tests">${I.ab()}Tests<span class="n">${c.tests.length}${nLive ? ' · ' + nLive + ' en ligne' : ''}</span></button>
+      <button class="ni ${S.view === 'dash' ? 'on' : ''}" data-go="view:dash" ${S.view === 'dash' ? 'aria-current="page"' : ''}>${I.home()}Tableau de bord</button>
+      <button class="ni ${S.view === 'tests' || S.view === 'test' ? 'on' : ''}" data-go="view:tests" ${S.view === 'tests' ? 'aria-current="page"' : ''}>${I.ab()}Tests<span class="n">${c.tests.length}${nLive ? ' · ' + nLive + ' en ligne' : ''}</span></button>
       ${c.tests.length ? `<div class="sub">${c.tests.map(t => `<button class="si ${S.view === 'test' && S.test === t.id ? 'on' : ''}" data-go="test:${t.id}"><span class="t">${esc(t.titre)}</span><span class="dot ${t.etat === 'live' ? 'ok pulse' : t.etat === 'gagnant' ? 'ok' : t.etat === 'integral' || t.etat === 'attente' ? 'warn' : 'off'}"></span></button>`).join('')}</div>` : ''}
-      <button class="ni ${S.view === 'page' ? 'on' : ''}" data-go="view:page">${I.page()}Landing page</button>
-      <button class="ni ${S.view === 'resultats' ? 'on' : ''}" data-go="view:resultats">${I.bars()}Résultats</button>
+      <button class="ni ${S.view === 'page' ? 'on' : ''}" data-go="view:page" ${S.view === 'page' ? 'aria-current="page"' : ''}>${I.page()}Landing page</button>
+      <button class="ni ${S.view === 'resultats' ? 'on' : ''}" data-go="view:resultats" ${S.view === 'resultats' ? 'aria-current="page"' : ''}>${I.bars()}Résultats</button>
       <div class="gl">Connexion</div>
       ${(c.shopify ? ['natif', 'express', 'integral'] : ['express', 'integral', 'natif']).map(m => modeItem(c, m)).join('')}
     </div>
     <div class="pf"><a class="site" href="https://${esc(c.url)}" target="_blank" rel="noopener">Voir la page en ligne ${I.ext(16)}</a></div>`;
+  const pn = p.querySelector('.pn'), on = p.querySelector('.pn > .ni.on');
+  if (pn && on && pn.scrollWidth > pn.clientWidth) pn.scrollLeft = on.offsetLeft - pn.offsetLeft - 10;
 }
 
 /* ---------- morceaux réutilisés ---------- */
@@ -648,7 +764,7 @@ function liveCard(c, t, { compact = false } = {}) {
     ${s ? `<div class="row">
       <div><div class="n">${signed(s.lift)}<small>de conversions</small></div></div>
       <div><div class="n">${pct(s.conf, 0)}<small>de certitude</small></div><div class="bar" style="width:180px"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div></div>
-    </div>` : `<div class="row">
+    </div>${jalons(v)}` : `<div class="row">
       <div><div class="n">${t.part} %<small>des visiteurs voient la variante</small></div></div>
       <div><div class="n"><small>conversions : en attente de GA4</small></div></div>
     </div>`}
@@ -657,7 +773,7 @@ function liveCard(c, t, { compact = false } = {}) {
     <div class="act">
       <button class="btn" data-go="ctx:${c.id};test:${t.id}">Voir le test ${I.arrow(15)}</button>
       ${v.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}
-      ${t.etat === 'live' ? `<button class="btn stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(15)}Arrêter : l’original reprend 100 %</button>` : ''}
+      ${t.etat === 'live' ? `<button class="btn stop" data-act="stop" data-test="${t.id}" data-client="${c.id}" title="L’original reprend 100 % du trafic. Annulable.">${I.stop(15)}Arrêter</button>` : ''}
     </div>
   </div>`;
 }
@@ -682,6 +798,22 @@ function testCard(c, t, { withClient = false } = {}) {
   </button>`;
 }
 
+function kpis() {
+  if (!CLIENTS.length) return '';
+  const T = CLIENTS.flatMap(c => c.tests.map(t => [c, t]));
+  const enLigne = T.filter(([, t]) => t.etat === 'live');
+  const visiteurs = enLigne.reduce((a, [, t]) => a + (t.res ? t.res.o.n + t.res.v.n : 0), 0);
+  const enPlus = T.filter(([, t]) => t.res && (t.etat === 'live' || t.etat === 'gagnant')).reduce((a, [, t]) => a + Math.max(0, t.res.v.c - stats(t.res).p1 * t.res.v.n), 0);
+  const gagnants = enLigne.filter(([c, t]) => verdict(c, t).k === 'win').length, perdants = enLigne.filter(([c, t]) => verdict(c, t).k === 'lose').length;
+  const prets = T.filter(([, t]) => t.etat === 'pret').length;
+  const dec = [gagnants && `${gagnants} gagnant${gagnants > 1 ? 's' : ''} à déployer`, perdants && `${perdants} à arrêter`, prets && `${prets} prêt${prets > 1 ? 's' : ''} à lancer`].filter(Boolean);
+  return `<div class="kpis">
+    <div class="stat"><div class="l">En ligne</div><div class="v">${enLigne.length}<small>test${enLigne.length > 1 ? 's' : ''}</small></div><div class="s">${visiteurs ? fr(visiteurs) + ' visiteurs répartis' : 'aucun visiteur en test'}</div></div>
+    <div class="stat"><div class="l">Conversions en plus</div><div class="v">+${fr(enPlus)}</div><div class="s">apportées par les variantes, à trafic égal${LIVE ? '' : ' · exemple'}</div></div>
+    <div class="stat"><div class="l">À décider</div><div class="v">${gagnants + perdants + prets}</div><div class="s">${dec.length ? dec.join(', ') : 'rien ne vous attend'}</div></div>
+  </div>`;
+}
+
 /* ---------- vues ---------- */
 function vHome() {
   const lives = CLIENTS.flatMap(c => c.tests.filter(t => t.etat === 'live').map(t => [c, t]));
@@ -699,6 +831,7 @@ function vHome() {
       <h2>Aujourd’hui</h2><p>${enLigne}, ${aLancer}.</p>
       <div class="act">${CLIENTS.length ? `<button class="btn" data-go="ctx:home;view:ajout">${I.plus(15)}Nouvelle page</button>` : ''}</div>
     </section>
+    ${kpis()}
     <div class="grid g2">${lives.map(([c, t]) => liveCard(c, t, { compact: true })).join('')}</div>
     ${prets.length ? `<div class="sec"><h3>Prêts à lancer <span class="n">${prets.length}</span></h3>
       <div class="tests">${prets.map(([c, t]) => testCard(c, t, { withClient: true })).join('')}</div></div>` : ''}
@@ -773,7 +906,7 @@ function vTest(c) {
   const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="0" max="100" step="5" value="${t.part}" aria-label="Part du trafic"><span class="v" id="partv">${t.part} %</span></label>` : '';
   const principal = t.etat === 'prep' ? `<button class="btn lg" disabled>${I.clock(16)}En préparation</button>`
     : t.etat === 'echec' ? `<button class="btn lg" data-go="view:nouveau">${I.sparkle(16)}Refaire un test</button>`
-    : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}">${I.stop(16)}Arrêter : l’original reprend 100 %</button>`
+    : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}" title="Annulable pendant quelques secondes">${I.stop(16)}Arrêter : l’original reprend 100 %</button>`
     : (t.etat === 'pret' || t.etat === 'stop') ? GO(I.play(16) + 'Lancer le test', `data-act="launch" data-test="${t.id}" data-client="${c.id}"`)
     : t.etat === 'integral' ? GO(I.relay(16) + 'Passer en Intégral', 'data-go="guide:integral"')
     : t.etat === 'attente' ? GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')
@@ -785,15 +918,16 @@ function vTest(c) {
     const vd = verdict(c, t); const s = vd.s2;
     const cpc = c.ads ? c.ads.cpc : null;
     const cpaO = cpc ? cpc * t.res.o.n / t.res.o.c : null, cpaV = cpc ? cpc * t.res.v.n / t.res.v.c : null;
-    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r">${t.res.source === 'exemple' ? '<span class="chip">exemple</span>' : `<span class="chip ok"><span class="dot"></span>GA4 · lu le ${esc(new Date(t.res.luLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span>`}</span></h3>
+    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r">${t.res.source === 'exemple' || !t.res.luLe ? '<span class="chip">exemple</span>' : `<span class="chip ok"><span class="dot"></span>GA4 · lu le ${esc(new Date(t.res.luLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span>`}</span></h3>
       <div class="score">
         <div class="stat"><div class="l">Visiteurs</div><div class="v">${fr(t.res.v.n)}</div><div class="s">original ${fr(t.res.o.n)}</div></div>
         <div class="stat"><div class="l">Conversions</div><div class="v">${t.res.v.c}</div><div class="s">original ${t.res.o.c}</div></div>
         <div class="stat"><div class="l">Taux de conversion</div><div class="v">${pct(s.p2, 2)}</div><div class="s ${s.lift >= 0 ? 'up' : 'down'}">${signed(s.lift)} vs original (${pct(s.p1, 2)})</div></div>
         ${cpc ? `<div class="stat"><div class="l">Coût par conversion</div><div class="v">${eur(cpaV)}</div><div class="s ${cpaV <= cpaO ? 'up' : 'down'}">original ${eur(cpaO)} · CPC ${cpc.toLocaleString('fr-FR')} €</div></div>` : ''}
       </div>
-      <div class="verdict"><div><div class="b">${esc(vd.b)}</div><div class="s">${esc(vd.s)}</div></div><div class="bar"><i class="${s.conf >= .95 ? 'ok' : ''}" style="width:${Math.round(s.conf * 100)}%"></i></div>
-        <div class="act">${vd.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}<button class="btn glow" data-act="report">${I.dl(15)}Rapport pour le client</button></div></div>
+      <div class="verdict"><div class="vt"><div class="b">${esc(vd.b)}</div><div class="s">${esc(vd.s)}</div>${jalons(vd)}</div>
+        <div class="act">${vd.k === 'win' && t.etat !== 'gagnant' ? `<button class="btn glow" data-act="deploy" data-test="${t.id}" data-client="${c.id}">${I.trophy(15)}Déployer le gagnant</button>` : ''}<button class="btn glow" data-act="report">${I.dl(15)}Rapport pour le client</button></div>
+        <div class="vf">${vueFourchette(t.res)}<p class="fxs">${phraseFourchette(t.res)}</p></div></div>
     </div>`;
   }
   const ic = ch => ch.q && !/retir|inversé|dupliqu|nouve|ajout/i.test(ch.t) ? I.text(13) : /retir/i.test(ch.t) ? I.minus(13) : /remont|inversé|placé/i.test(ch.t) ? I.up(13) : /dupliqu/i.test(ch.t) ? I.dup(13) : /nouve|ajout|bloc|FAQ|réassurance/i.test(ch.t) ? I.plus(13) : I.text(13);
@@ -871,9 +1005,9 @@ function vResultats(c) {
       </div>
     </div>
     <div class="sec"><h3>Par test</h3>
-      <div class="tbl" style="--cols:minmax(220px,2fr) minmax(130px,1fr) 90px 90px 90px 110px 18px">
-        <div class="tr h"><span>Test</span><span>Statut</span><span class="num">Visiteurs</span><span class="num">Conv.</span><span class="num">Taux</span><span class="num">vs original</span><span></span></div>
-        ${tests.map(t => { const s = stats(t.res); return `<button class="tr r" data-go="test:${t.id}"><span class="t ell">${esc(t.titre)}</span><span>${chipEtat(t)}</span><span class="num">${fr(t.res.v.n)}</span><span class="num">${t.res.v.c}</span><span class="num">${pct(s.p2, 1)}</span><span class="num" style="color:${s.lift >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${signed(s.lift)} · ${pct(s.conf, 0)}</span><span class="muted">${I.chevr(16)}</span></button>`; }).join('')}
+      <div class="tbl" style="--cols:minmax(200px,2fr) minmax(130px,1fr) 80px 60px 70px 110px minmax(120px,1fr) 18px">
+        <div class="tr h"><span>Test</span><span>Statut</span><span class="num">Visiteurs</span><span class="num">Conv.</span><span class="num">Taux</span><span class="num">vs original</span><span>Fourchette</span><span></span></div>
+        ${tests.map(t => { const s = stats(t.res); return `<button class="tr r" data-go="test:${t.id}"><span class="t ell">${esc(t.titre)}</span><span>${chipEtat(t)}</span><span class="num">${fr(t.res.v.n)}</span><span class="num">${t.res.v.c}</span><span class="num">${pct(s.p2, 1)}</span><span class="num" style="color:${s.lift >= 0 ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${signed(s.lift)} · ${pct(s.conf, 0)}</span>${vueFourchette(t.res, { mini: true })}<span class="muted">${I.chevr(16)}</span></button>`; }).join('')}
       </div>
     </div>
     <div class="grid g2 sec">
@@ -1036,7 +1170,8 @@ function vAjout(premiere = false) {
 function vNouveau(c) {
   const liste = (S.textes || {})[c.id];
   const choix = S.choix && liste ? liste.find(x => x.anchor === S.choix) : null;
-  const rows = !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
+  const rows = !LIVE ? `<div class="empty"><b>Démo sans serveur</b>${esc(SANS_SERVEUR)}</div>`
+    : !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
     : !liste.length ? '<div class="empty"><b>Aucun texte trouvé</b>La copie doit avoir abouti pour proposer des textes.</div>'
     : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${S.choix === x.anchor ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span></button>`).join('')}</div>`;
   const genre = choix ? (choix.tag.startsWith('h') ? 'titre' : choix.tag === 'p' ? 'texte' : 'bouton') : '';
@@ -1139,8 +1274,8 @@ function apresRendu() {
 }
 async function chargerTextes(c) {
   S.textes = S.textes || {};
-  if (S.textes[c.id]) return;
-  try { const r = await fetch(`/api/clients/${c.id}/textes`); S.textes[c.id] = await r.json(); } catch { S.textes[c.id] = []; }
+  if (!LIVE || S.textes[c.id]) return;
+  try { const r = await fetch(`/api/clients/${c.id}/textes`); S.textes[c.id] = r.ok ? await r.json() : []; } catch { S.textes[c.id] = []; }
   if (S.view === 'nouveau' && S.ctx === c.id) render();
 }
 
@@ -1170,7 +1305,111 @@ function calcSS() {
   const n = nParBranche(p, mde); const j = Math.ceil(2 * n / clics);
   out.innerHTML = `Avec <b>${fr(clics)} clics par jour</b> et <b>${pct(p, 1)}</b> de conversion aujourd’hui, un test détecte une hausse de <b>${pct(mde, 0)}</b> en <b>~${fr(j)} jours</b> à 50 / 50 : soit environ ${fr(n)} visiteurs par version.`;
 }
-function render() { renderRail(); renderPanel(); renderMain(); save(); }
+function render() { renderRail(); renderPanel(); renderMain(); save(); synchroniserUrl(); }
+
+/* ---------- l'adresse : chaque écran a la sienne, précédent / suivant marchent, un lien se partage ---------- */
+const VUES = ['tests', 'page', 'resultats', 'nouveau', 'campagne'];
+function hashDe() {
+  if (S.view === 'ajout') return '#/nouvelle-page';
+  const p = S.ctx === 'home' ? [] : [S.ctx];
+  if (S.view === 'guide' && S.mode) p.push('guide', S.mode);
+  else if (S.view === 'test' && S.test) p.push('test', S.test);
+  else if (S.ctx !== 'home' && VUES.includes(S.view)) p.push(S.view);
+  return '#/' + p.map(encodeURIComponent).join('/');
+}
+function lireHash() {
+  if (!location.hash) return false;
+  const p = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  if (p[0] === 'nouvelle-page') { S.ctx = 'home'; S.view = 'ajout'; return true; }
+  let ctx = p[0] && p[0] !== 'guide' ? p.shift() : 'home';
+  if (ctx !== 'home' && !byId(ctx)) { ctx = 'home'; p.length = 0; }
+  S.ctx = ctx; S.view = 'dash'; S.test = null;
+  if (p[0] === 'guide' && MODES[p[1]]) { S.view = 'guide'; S.mode = p[1]; S.openMode = p[1]; }
+  else if (p[0] === 'test' && p[1]) { S.view = 'test'; S.test = p[1]; }
+  else if (ctx !== 'home' && VUES.includes(p[0])) S.view = p[0];
+  return true;
+}
+function titreEcran() {
+  const c = S.ctx === 'home' ? null : byId(S.ctx);
+  const t = c && S.view === 'test' ? c.tests.find(x => x.id === S.test) : null;
+  const vue = { dash: c ? '' : 'Aujourd’hui', tests: 'Tests', page: 'Landing page', resultats: 'Résultats', ajout: 'Nouvelle page', nouveau: 'Nouveau test', campagne: 'Campagne', guide: S.mode && MODES[S.mode] ? MODES[S.mode].nom : '' }[S.view];
+  return [t ? t.titre : vue, c && c.nom, 'LPWS'].filter(Boolean).join(' · ');
+}
+let urlRendue = null;
+function synchroniserUrl() {
+  const h = hashDe(); const nav = urlRendue !== null && h !== urlRendue;
+  if (location.hash !== h) history[urlRendue === null ? 'replaceState' : 'pushState'](null, '', h);
+  urlRendue = h; document.title = titreEcran();
+  if (!nav) return;
+  window.scrollTo(0, 0);
+  const h2 = document.querySelector('#main h2');
+  if (h2 && document.getElementById('cmdk').hidden) { h2.setAttribute('tabindex', '-1'); h2.focus({ preventScroll: true }); }
+}
+window.addEventListener('popstate', () => { if (lireHash()) render(); });
+
+/* ---------- la palette : un client, un test, une action, sans quitter le clavier ---------- */
+const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function entrees() {
+  const c = S.ctx === 'home' ? null : byId(S.ctx); const E = [];
+  if (c) {
+    const g = c.nom;
+    if (c.live && c.capture.ok !== null && !c.capture.enCours) E.push({ g, l: 'Nouveau test', d: 'changer un texte de la page', go: 'view:nouveau', i: 'sparkle' });
+    E.push({ g, l: 'Tableau de bord', d: c.url, go: 'view:dash', i: 'home' }, { g, l: 'Tests', d: c.tests.length + ' test' + (c.tests.length > 1 ? 's' : ''), go: 'view:tests', i: 'ab' },
+      { g, l: 'Résultats', d: 'conversions, coût par conversion', go: 'view:resultats', i: 'bars' }, { g, l: 'Landing page', d: 'la copie et ce qu’on peut tester', go: 'view:page', i: 'page' });
+  }
+  E.push({ g: 'Aller à', l: 'Vue d’ensemble', d: 'aujourd’hui, tous clients', go: 'ctx:home', i: 'home' }, { g: 'Aller à', l: 'Nouvelle page', d: 'onboarder la LP d’un client', go: 'ctx:home;view:ajout', i: 'plus' });
+  CLIENTS.forEach(k => E.push({ g: 'Clients', l: k.nom, d: k.url, go: `ctx:${k.id}`, i: 'page' }));
+  CLIENTS.forEach(k => k.tests.forEach(t => E.push({ g: 'Tests', l: t.titre, d: `${k.nom} · ${ETATS[t.etat][1]}`, go: `ctx:${k.id};test:${t.id}`, i: 'ab' })));
+  ['express', 'integral', 'natif'].forEach(m => E.push({ g: 'Connexion', l: `${MODES[m].nom} · ${MODES[m].sous}`, d: 'la marche à suivre', go: `guide:${m}`, i: MODES[m].icon }));
+  return E;
+}
+const K = { q: '', i: 0, list: [], avant: null };
+function ouvrirK() {
+  K.avant = document.activeElement; K.q = ''; K.i = 0;
+  document.getElementById('cmdk').hidden = false;
+  const q = document.getElementById('k-q'); q.value = ''; dessinerK(); q.focus();
+}
+function fermerK() { document.getElementById('cmdk').hidden = true; if (K.avant && K.avant.focus) K.avant.focus(); }
+function dessinerK() {
+  const mots = norm(K.q).split(/\s+/).filter(Boolean);
+  K.list = entrees().filter(e => { const h = norm(`${e.g} ${e.l} ${e.d}`); return mots.every(m => h.includes(m)); }).slice(0, 40);
+  K.i = Math.max(0, Math.min(K.i, K.list.length - 1));
+  let g0 = '';
+  document.getElementById('k-list').innerHTML = K.list.length ? K.list.map((e, n) => { const h = e.g !== g0 ? `<div class="kg">${esc(e.g)}</div>` : ''; g0 = e.g; return h + `<button class="ki ${n === K.i ? 'on' : ''}" id="k-${n}" role="option" aria-selected="${n === K.i}" data-k="${n}" tabindex="-1">${I[e.i] ? I[e.i](16) : ''}<span class="t">${esc(e.l)}</span><span class="d">${esc(e.d)}</span></button>`; }).join('')
+    : `<div class="ke">Rien ne correspond à « ${esc(K.q)} »</div>`;
+  const q = document.getElementById('k-q');
+  if (K.list.length) q.setAttribute('aria-activedescendant', 'k-' + K.i); else q.removeAttribute('aria-activedescendant');
+  const on = document.getElementById('k-' + K.i); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+function choisirK(n) { const e = K.list[n]; if (!e) return; document.getElementById('cmdk').hidden = true; go(e.go); render(); }
+document.addEventListener('keydown', e => {
+  const ouverte = !document.getElementById('cmdk').hidden;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ouverte ? fermerK() : ouvrirK(); return; }
+  if (ouverte) {
+    if (e.key === 'Escape') { e.preventDefault(); fermerK(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (K.list.length) { K.i = (K.i + (e.key === 'ArrowDown' ? 1 : -1) + K.list.length) % K.list.length; dessinerK(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); choisirK(K.i); }
+    else if (e.key === 'Tab') e.preventDefault();
+    return;
+  }
+  if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if (e.key === '/' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); ouvrirK(); return; }
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && toast.undo) { e.preventDefault(); annulerDernier(); }
+});
+
+/* ---------- lancer, arrêter : tout se rattrape ---------- */
+const photo = c => c.tests.map(x => ({ x, etat: x.etat, part: x.part, fin: x.fin, jours: x.jours }));
+const rendre = p => () => { p.forEach(({ x, ...o }) => Object.assign(x, o)); toast('Annulé : tout est comme avant'); render(); };
+/** la machine : publie l'état du test ; l'annulation publie l'inverse */
+function publier(c, t, etat, part, annulable = true) {
+  const on = etat === 'live'; const cid = c.id, tid = t.id;
+  const inverse = annulable ? () => publier(byId(cid), byId(cid).tests.find(x => x.id === tid), on ? 'stop' : 'live', part, false) : null;
+  api(`/api/clients/${cid}/tests/${tid}`, on ? { etat, part } : { etat }).then(async r => {
+    toast(on ? 'Mise en ligne : la balise se met à jour, ~15 s' : 'Arrêt demandé : l’original reprend 100 %, ~15 s', inverse);
+    await chargerEtat(); render();
+    suivreJob(r.job, j => toast(on ? (j.etat === 'ok' ? `En ligne : ${part} % des visiteurs voient la variante` : 'La mise en ligne a échoué') : (j.etat === 'ok' ? 'Arrêté : l’original reprend 100 % du trafic' : 'L’arrêt n’a pas été publié'), j.etat === 'ok' ? inverse : null));
+  }).catch(e => toast(e.message));
+}
 
 /* ---------- interactions ---------- */
 function go(spec) {
@@ -1183,6 +1422,10 @@ function go(spec) {
   }
 }
 document.addEventListener('click', e => {
+  if (e.target.id === 'cmdk') { fermerK(); return; }
+  const kk = e.target.closest('[data-k]');
+  if (kk) { choisirK(+kk.dataset.k); return; }
+  if (e.target.closest('#toast-undo')) { annulerDernier(); return; }
   const g = e.target.closest('[data-go]');
   if (g) {
     if (g.dataset.go.startsWith('mode:')) { const m = g.dataset.go.slice(5); S.openMode = S.openMode === m ? null : m; renderPanel(); save(); return; }
@@ -1197,14 +1440,15 @@ document.addEventListener('click', e => {
   const c = act.dataset.client ? byId(act.dataset.client) : (S.ctx === 'home' ? null : byId(S.ctx));
   const t = c && (act.dataset.test ? c.tests.find(x => x.id === act.dataset.test) : c.tests.find(x => x.id === S.test));
   switch (act.dataset.act) {
-    case 'launch': if (!t) break;
-      if (c.live) { api(`/api/clients/${c.id}/tests/${t.id}`, { etat: 'live', part: t.part || 50 }).then(async r => { toast('Mise en ligne : la balise se met à jour, ~15 s'); await chargerEtat(); render(); suivreJob(r.job, j => toast(j.etat === 'ok' ? `En ligne : ${t.part || 50} % des visiteurs voient la variante` : 'La mise en ligne a échoué')); }).catch(e => toast(e.message)); break; }
-      t.etat = 'live'; t.jours = 0; if (!t.part) t.part = 50; c.tests.forEach(o => { if (o !== t && o.etat === 'live') o.etat = 'stop'; }); toast(`Test en ligne : ${t.part} % des visiteurs voient la variante`); S.ctx = c.id; S.view = 'test'; S.test = t.id; render(); break;
-    case 'stop': if (!t) break;
-      if (c.live) { api(`/api/clients/${c.id}/tests/${t.id}`, { etat: 'stop' }).then(async r => { toast('Arrêt demandé : l’original reprend 100 %, ~15 s'); await chargerEtat(); render(); suivreJob(r.job, j => toast(j.etat === 'ok' ? 'Arrêté : l’original reprend 100 % du trafic' : 'L’arrêt n’a pas été publié')); }).catch(e => toast(e.message)); break; }
-      t.etat = 'stop'; toast('Arrêté : l’original reprend 100 % du trafic'); render(); break;
-    case 'deploy': if (t) { t.etat = 'gagnant'; t.part = 100; t.fin = '18 sept.'; toast('Gagnant déployé sur 100 % du trafic'); render(); } break;
-    case 'restore': if (t) { t.etat = 'stop'; t.part = 0; toast('Original remis en place'); render(); } break;
+    case 'cmdk': ouvrirK(); break;
+    case 'launch': { if (!t) break;
+      if (c.live) { publier(c, t, 'live', t.part || 50); break; }
+      const p = photo(c); t.etat = 'live'; t.jours = 0; if (!t.part) t.part = 50; c.tests.forEach(o => { if (o !== t && o.etat === 'live') o.etat = 'stop'; }); toast(`Test en ligne : ${t.part} % des visiteurs voient la variante`, rendre(p)); S.ctx = c.id; S.view = 'test'; S.test = t.id; render(); break; }
+    case 'stop': { if (!t) break;
+      if (c.live) { publier(c, t, 'stop', t.part); break; }
+      const p = photo(c); t.etat = 'stop'; toast('Arrêté : l’original reprend 100 % du trafic', rendre(p)); render(); break; }
+    case 'deploy': if (t) { const p = photo(c); t.etat = 'gagnant'; t.part = 100; t.fin = aujourdhui(); toast('Gagnant déployé sur 100 % du trafic', rendre(p)); render(); } break;
+    case 'restore': if (t) { const p = photo(c); t.etat = 'stop'; t.part = 0; toast('Original remis en place', rendre(p)); render(); } break;
     case 'verify':
       if (c && c.live) { api(`/api/clients/${c.id}/verifier`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Balise trouvée sur la page' : 'Balise pas encore visible sur la page'); await chargerEtat(); render(); }); }).catch(e => toast(e.message)); }
       else toast('Vérification lancée : résultat dans une minute');
@@ -1264,7 +1508,14 @@ document.addEventListener('click', e => {
     case 'add': toast('Nouveau client : collez l’adresse de sa landing page'); break;
   }
 });
+document.addEventListener('change', e => {
+  if (e.target.id !== 'part') return;
+  const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
+  if (!t || t.etat !== 'live') return;
+  if (c.live) publier(c, t, 'live', t.part, false); else toast(`${t.part} % des visiteurs voient maintenant la variante`);
+});
 document.addEventListener('input', e => {
+  if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
   if (e.target.id === 'part') { const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test); if (t) t.part = +e.target.value; document.getElementById('partv').textContent = e.target.value + ' %'; return; }
   if (e.target.id?.startsWith('ss-')) calcSS();
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
@@ -1282,7 +1533,10 @@ document.addEventListener('scroll', e => {
   if (!other) return;
   syncLock = true; other.scrollTop = el.scrollTop; requestAnimationFrame(() => { syncLock = false; });
 }, true);
-chargerEtat().finally(render);
+document.getElementById('k-ic').innerHTML = I.search(18);
+document.getElementById('k-raccourci').textContent = MOD + 'K';
+document.getElementById('toast-k').textContent = MOD + 'Z';
+chargerEtat().finally(() => { lireHash(); render(); });
 </script>
 </body>
 </html>
