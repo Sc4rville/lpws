@@ -14,11 +14,12 @@ import { Contexte } from "./contexte.ts"
 import { SignauxMecaniques, extraireSignaux } from "./signaux.ts"
 import { juger, corpsDe, type SignauxJuges } from "./jugement.ts"
 import { step } from "../shared/log.ts"
+import { lireArgs } from "../shared/cli.ts"
 
 const SCOPE = "variant/eval"
 const ROOT = resolve(import.meta.dirname, "../..")
 const DOSSIER = join(ROOT, "engine", "variant", "annotations")
-const refaire = process.argv.includes("--refaire")
+const refaire = lireArgs(["--refaire"]).drapeau("--refaire")
 const QUESTIONS = ["promesseDansTitre", "titreType", "cadreDeReference", "niveauLecture", "objectionsTraitees", "preuveAligneeCible", "ctaAligneVente", "risquePercuEleve"] as const
 
 type Annotation = { page: string; contexte: unknown; attendu: Record<string, unknown>; justifications?: Record<string, string> }

@@ -23,9 +23,11 @@
     "ui:deploy": "tsx ui/build.ts && cd ui/dist && vercel deploy --prod --yes",
     "measure": "tsx engine/measure/run.ts",
     "brain": "tsx engine/variant/run.ts",
-    "brain:eval": "tsx engine/variant/eval.ts"
+    "brain:eval": "tsx engine/variant/eval.ts",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "esbuild": "~0.28.2",
     "pixelmatch": "^7",
     "playwright": "^1.55",
     "pngjs": "^7",

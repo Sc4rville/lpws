@@ -33,7 +33,7 @@
  *                           `local` pointe vers assets/ quand les octets sont rapatriés
  *   meta.json               source, date, stats, notes d'honnêteté
  */
-import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { lancerNavigateur, neutraliserNom } from "../../shared/navigateur.ts"
 import { type Page } from "playwright"
 import { writeFile, rm, mkdir } from "node:fs/promises"
 import { createHash } from "node:crypto"
@@ -433,9 +433,7 @@ export async function acquire(url: string, dir: string, acces: Acces = {}): Prom
         if (init && init.mode === "closed") { this.__lpwsOmbreFermee = true; init = { ...init, mode: "open" } }
         return attacher.call(this, init)
       }` })
-    // tsx/esbuild enveloppe les fonctions d'un helper __name ; il n'existe pas dans la page
-    // → on le neutralise avant toute évaluation (chaîne brute : non transformée par esbuild)
-    await page.addInitScript({ content: "window.__name = (f) => f" })
+    await neutraliserNom(page)
 
     // la vérité réseau : tout ce que le live charge réellement (aucune devinette en aval)
     const seen = new Map<string, Resource>()

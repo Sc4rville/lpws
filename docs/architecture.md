@@ -10,7 +10,8 @@ lpws/
   readme.md            vision produit + démarrage rapide
   docs/                ce dossier — décisions & carte du repo
   engine/              LA MACHINE — code exécutable, par familles (voir engine/readme.md)
-    shared/            socle transverse (chemins, logs)
+    shared/            socle transverse : chemins, disposition d'une campagne, logs, args,
+                       json validé, modèle, navigateur + origine synthétique, http statique
     clone/             famille 1 : url → baseline fidèle          ← en cours
     apply/             famille 2 : hypothèse → variante prouvée   ← en cours
   clients/             LES SORTIES — data par client/campagne, gitignoré

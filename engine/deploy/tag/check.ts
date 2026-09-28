@@ -24,6 +24,7 @@ import { buildTag } from "./build.ts"
 import type { ConfigServie } from "./loader.ts"
 import { VariantSpec } from "../../apply/spec.ts"
 import { step, fail } from "../../shared/log.ts"
+import { estLance, lireArgs } from "../../shared/cli.ts"
 
 const SCOPE = "deploy/tag/check"
 const BASE = "https://cfg.lpws.test"
@@ -179,13 +180,11 @@ export async function checkTag(baseline: string, specPaths: string[], urlLive?: 
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("tag/check.ts")) {
-  const args = process.argv.slice(2)
-  const i = args.indexOf("--url")
-  const libres = args.filter((a, k) => !a.startsWith("--") && !args[k - 1]?.startsWith("--"))
-  const [baseline, ...specs] = libres
+if (estLance(import.meta.url)) {
+  const args = lireArgs()
+  const [baseline, ...specs] = args.libres
   if (!baseline || specs.length === 0)
     fail(SCOPE, "usage : npm run tag:check -- <dossier-baseline> <spec.json> [--url <live>]")
-  const r = await checkTag(baseline, specs, i >= 0 ? args[i + 1] : undefined)
+  const r = await checkTag(baseline, specs, args.option("--url"))
   if (!r.ok) process.exit(1)
 }
