@@ -7,6 +7,7 @@ import { lireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { ROOT, BASE_TAGS } from "./config.ts"
 import { jobs } from "./jobs.ts"
+import { historique } from "../../engine/measure/experience.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -42,7 +43,7 @@ async function tagPublie(slug: string): Promise<boolean | null> {
   _publie.set(slug, { at: Date.now(), v })
   return v
 }
-const joursDepuis = (iso?: string) => iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)) : 0
+const joursDepuis = (iso?: string, fin?: string) => iso ? Math.max(0, Math.floor(((fin ? new Date(fin).getTime() : Date.now()) - new Date(iso).getTime()) / 86_400_000)) : 0
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export async function etat() {
@@ -105,6 +106,8 @@ export async function etat() {
         contexte,
         diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0 } : null,
         propositions,
+        // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
+        experiences: (await historique(cdir)).experiences.sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 20),
         brainEnCours, brainJob: brainJob?.id,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
@@ -117,7 +120,7 @@ export async function etat() {
         },
         ads: null,
         tests: tests.map((t) => ({
-          id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe), potentiel: "Moyen",
+          id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe, t.finLe), potentiel: "Moyen", plan: t.plan, fin: dateFr(t.finLe),
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
           changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,

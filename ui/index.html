@@ -538,15 +538,15 @@ const DEMO = [
       { id: 'message-match', titre: 'Le titre reprend la promesse de l’annonce', etat: 'live', part: 50, jours: 7, potentiel: 'Fort',
         teste: 'Un titre qui dit exactement ce que l’annonce promet : « −60 % de temps de sprint planning » : à la place d’une formule générique.',
         pourquoi: 'Le visiteur a cliqué pour une promesse précise. S’il ne la retrouve pas en cinq secondes, il repart, et le clic est payé.',
-        res: { o: { n: 1240, c: 38 }, v: { n: 1236, c: 51 } },
+        res: { o: { n: 3150, c: 96 }, v: { n: 3148, c: 118 } },
         changes: [
           { t: 'Titre', q: 'Cut sprint planning time by 60%', w: 'La promesse exacte de l’annonce, là où l’œil arrive en premier.' },
           { t: 'Sous-titre', q: 'AI agents in Jira turn plans into agent-ready tasks : with the full context your team already has.', w: 'Garde le positionnement produit que le titre ne porte plus.' },
         ] },
-      { id: 'offer-clarity', titre: 'Le bouton dit que c’est gratuit', etat: 'gagnant', part: 100, jours: 14, potentiel: 'Moyen', fin: '12 sept.',
+      { id: 'offer-clarity', titre: 'Le bouton dit que c’est gratuit', etat: 'gagnant', part: 100, jours: 21, potentiel: 'Moyen', fin: '12 sept.',
         teste: 'Le bouton du formulaire annonce l’offre : « gratuit jusqu’à 10 utilisateurs » : au lieu d’un simple « Sign up ».',
         pourquoi: 'L’annonce promet la gratuité, le formulaire n’en parle pas : le doute sur le prix arrive pile au moment de remplir.',
-        res: { o: { n: 3810, c: 118 }, v: { n: 3795, c: 152 } },
+        res: { o: { n: 9450, c: 293 }, v: { n: 9420, c: 368 } },
         note: 'Le volume d’inscriptions peut monter sans que l’activation suive : à surveiller côté client.',
         changes: [ { t: 'Bouton du formulaire', q: 'Start free : up to 10 users', w: 'Un seul changement : si ça marche, on sait pourquoi.' } ] },
       { id: 'proof-fit', titre: 'Une preuve qui parle aux petites équipes', etat: 'pret', part: 0, potentiel: 'Moyen',
@@ -600,7 +600,7 @@ const DEMO = [
       { id: 'preuve-au-dessus-du-pli', titre: 'La preuve client remonte sous le titre', etat: 'live', part: 50, jours: 5, potentiel: 'Fort',
         teste: 'Logos et études de cas passent de 4 700 px du haut à juste sous le titre. Menu et pied de page disparaissent, un bouton de démo suit la preuve.',
         pourquoi: 'Un visiteur froid décide de rester ou de partir dans les premières secondes : c’est là qu’il lui faut la réassurance.',
-        res: { o: { n: 2118, c: 61 }, v: { n: 2095, c: 74 } },
+        res: { o: { n: 3500, c: 101 }, v: { n: 3490, c: 124 } },
         changes: [
           { t: 'Menu retiré', w: 'Autant de sorties en moins sur une page de campagne.' },
           { t: 'Pied de page retiré', w: 'Hors sujet pour la campagne.' },
@@ -706,22 +706,11 @@ const aujourdhui = () => new Date().toLocaleDateString('fr-FR', { day: 'numeric'
 async function copier(t, msg = 'Copié') { try { await navigator.clipboard.writeText(t); toast(msg); } catch { toast('Impossible de copier ici'); } }
 const GO = (label, extra = '') => `<button class="go" ${extra}><span class="halo"></span><span class="clip"><span class="sheen"></span></span>${label}</button>`;
 
-/* statistiques, en langage humain */
-const Z = { a: 1.96, b: 0.8416 };
-const nParBranche = (p, mde) => 2 * Math.pow(Z.a + Z.b, 2) * p * (1 - p) / Math.pow(p * mde, 2);
-function erf(x) { const s = x < 0 ? -1 : 1; x = Math.abs(x); const t = 1 / (1 + .3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - .284496736) * t + .254829592) * t * Math.exp(-x * x); return s * y; }
-const normCdf = z => .5 * (1 + erf(z / Math.SQRT2));
-function stats(r) {
-  const p1 = r.o.c / r.o.n, p2 = r.v.c / r.v.n, p = (r.o.c + r.v.c) / (r.o.n + r.v.n);
-  const se = Math.sqrt(p * (1 - p) * (1 / r.o.n + 1 / r.v.n)); const z = (p2 - p1) / se;
-  return { p1, p2, lift: (p2 - p1) / p1, conf: 2 * normCdf(Math.abs(z)) - 1 };
-}
-/** l'intervalle à 95 % de la hausse relative : ce que « certitude » veut dire, dessiné */
-function fourchette(r) {
-  const p1 = r.o.c / r.o.n, p2 = r.v.c / r.v.n;
-  const se = Math.sqrt(p1 * (1 - p1) / r.o.n + p2 * (1 - p2) / r.v.n);
-  return { lo: (p2 - p1 - Z.a * se) / p1, hi: (p2 - p1 + Z.a * se) / p1, mid: (p2 - p1) / p1 };
-}
+/* statistiques : engine/measure/stats.ts, embarqué ici (global STATS) : l'écran et le serveur rendent le même verdict */
+/*STATS*/
+const nParBranche = (p, mde) => STATS.nParBranche(p, mde).controle;
+const stats = r => STATS.comparer(r.o, r.v);
+const fourchette = r => STATS.comparer(r.o, r.v).ic;
 function vueFourchette(r, { mini = false } = {}) {
   const f = fourchette(r); const k = f.lo > 0 ? 'ok' : f.hi < 0 ? 'bad' : '';
   const m = Math.max(.1, Math.abs(f.lo), Math.abs(f.hi)) * 1.15;
@@ -735,22 +724,34 @@ function phraseFourchette(r) {
   const f = fourchette(r);
   return `La vraie hausse se situe probablement entre <b>${signed(f.lo)}</b> et <b>${signed(f.hi)}</b>.${f.lo < 0 && f.hi > 0 ? ' Zéro est dans la fourchette : on ne peut pas encore trancher.' : f.lo > 0 ? ' Toute la fourchette est au-dessus de l’original.' : ' Toute la fourchette est sous l’original.'}`;
 }
-const JALONS = [['conv', 'Assez de conversions'], ['vol', 'Assez de visiteurs'], ['net', 'Écart net']];
+const JALONS = [['duree', 'Une semaine pleine'], ['conv', 'Assez de conversions'], ['vol', 'Assez de visiteurs'], ['net', 'Écart net']];
 const jalons = v => v.prog ? `<ol class="jal" aria-label="Avancement du test">${JALONS.map(([k, l]) => `<li class="${v.prog[k] ? 'done' : ''}"><span class="k">${v.prog[k] ? I.check(10) : ''}</span>${l}</li>`).join('')}</ol>` : '';
-/** le verdict, dans ses mots : calqué sur ce que Google Ads / VWO / AB Tasty disent */
+const K_UI = { attente: 'wait', collecte: 'run', gagnant: 'win', perdant: 'lose', nul: 'nul', jamais: 'never', srm: 'srm' };
+/** ce que le buyer a dit de la campagne et l'horizon fixé au lancement → l'entrée du verdict */
+function entreeVerdict(c, t) {
+  const ctx = c.contexte || {}, plan = t.plan;
+  const vm = ctx.visiteursMois || (c.ads ? c.ads.clics * 30.4 : null);
+  return { o: t.res && t.res.o, v: t.res && t.res.v, jours: t.jours || 0,
+    part: plan ? plan.part : (t.part > 0 && t.part < 100 ? t.part / 100 : .5),
+    tauxBase: plan && !plan.tauxSuppose ? plan.tauxBase : ctx.tauxConversion ? ctx.tauxConversion / 100 : null,
+    mde: plan ? plan.mde : STATS.mdePour(vm), visiteursJour: vm ? vm / 30.4 : null };
+}
+/** le verdict, dans ses mots : un horizon fixé d'avance, pas une certitude qu'on regarde monter */
 function verdict(c, t) {
-  // un test réel n'a pas encore de résultats : ils se lisent dans GA4 (dimension lpws_variante).
-  // Sans ce garde, la page d'un client plantait dès qu'un test était en ligne (r.o sur null).
-  if (!t.res) return { k: 'wait', b: 'En ligne, en attente des premières données', s: `${t.part} % des visiteurs voient la variante : les conversions se lisent dans GA4 (dimension lpws_variante) et le verdict s’affichera ici dès qu’elles remontent`, s2: null };
-  const s = stats(t.res); const minConv = Math.min(t.res.o.c, t.res.v.c);
-  const need = nParBranche(s.p1, Math.max(Math.abs(s.lift), 0.05)); const reste = Math.max(0, need - Math.min(t.res.o.n, t.res.v.n));
-  const clicsJour = c.ads ? c.ads.clics : 800; const jours = Math.ceil(reste * 2 / clicsJour);
-  const R = o => ({ ...o, s2: s, prog: { conv: minConv >= 25, vol: reste === 0, net: s.conf >= .95 } });
-  if (t.etat === 'gagnant') return R({ k: 'win', b: `Gagnant : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} · déployée sur 100 % du trafic le ${t.fin}` });
-  if (minConv < 25) return R({ k: 'wait', b: 'Pas encore assez de données', s: `Continuez : il manque environ ${fr(25 - minConv)} conversions sur la version la moins vue` });
-  if (s.conf >= .95 && s.lift > 0) return R({ k: 'win', b: `Gagnant probable : la variante, ${signed(s.lift)} de conversions`, s: `Certitude ${pct(s.conf, 0)} : vous pouvez déployer` });
-  if (s.conf >= .95 && s.lift < 0) return R({ k: 'lose', b: `L’original fait mieux (${signed(s.lift)})`, s: `Certitude ${pct(s.conf, 0)} : remettez l’original et testez autre chose` });
-  return R({ k: 'run', b: `${s.lift >= 0 ? 'Avantage variante' : 'Avantage original'} ${signed(s.lift)}, certitude ${pct(s.conf, 0)}`, s: `Encore ~${jours} jour${jours > 1 ? 's' : ''} au rythme actuel pour être sûr à 95 %` });
+  const j = STATS.juger(entreeVerdict(c, t)); const s2 = j.stats;
+  const R = o => ({ ...o, s2, prog: s2 ? j.jalons : null, j });
+  // un test réel n'a pas encore de résultats : ils se lisent dans GA4 (dimension lpws_variante)
+  if (!t.res) return R({ k: 'wait', b: 'En ligne, en attente des premières données', s: `${t.part} % des visiteurs voient la variante : les conversions se lisent dans GA4 (dimension lpws_variante) et le verdict s’affichera ici dès qu’elles remontent${j.plan.jours ? `. Horizon prévu : ~${fr(j.plan.jours)} jours` : ''}` });
+  if (t.etat === 'gagnant') return R({ k: 'win', b: `Gagnant : la variante, ${signed(s2.lift)} de conversions`, s: `${j.k === 'gagnant' ? 'Conclu à l’horizon' : 'Déployé avant d’avoir le droit de conclure'} · sur 100 % du trafic${t.fin ? ' depuis le ' + t.fin : ''}` });
+  return R({ k: K_UI[j.k], b: j.titre, s: j.detail });
+}
+/** avant de lancer : combien de temps, et si ce test peut conclure */
+function horizon(c, t) {
+  const p = STATS.juger({ ...entreeVerdict(c, t), o: null, v: null, part: .5 }).plan;
+  const hausse = pct(p.mde, 0), taux = p.tauxSuppose ? `${pct(p.tauxBase, 0)} de conversion supposés` : `${pct(p.tauxBase, 1)} de conversion`;
+  if (!p.jours) return `<div class="card" style="margin-bottom:14px"><p><b>Combien de temps ?</b> Pour voir une hausse de ${hausse}, il faut ~${fr(p.controle)} visiteurs par version (${taux}). Indiquez les visiteurs par mois dans <a href="#" data-go="view:campagne">Votre campagne</a> pour connaître la durée.</p></div>`;
+  if (!p.faisable) return `<div class="card" style="margin-bottom:14px;border:1px solid var(--warn)"><p><b>Ce test ne pourra pas conclure à ce trafic.</b> Il faudrait ~${fr(Math.round(p.jours / 7))} semaines pour voir une hausse de ${hausse}${p.mdeEnHuitSemaines ? ` : en huit semaines, seule une hausse d’au moins ${pct(p.mdeEnHuitSemaines, 0)} se voit` : ''}. Préférez un changement plus franc.</p></div>`;
+  return `<div class="card" style="margin-bottom:14px"><p><b>~${fr(p.jours)} jours pour conclure.</b> ~${fr(p.controle)} visiteurs par version pour voir une hausse de ${hausse} (${taux}). Le verdict ne tombe qu’à cet horizon, sauf écart écrasant : un écart précoce se retourne souvent.</p></div>`;
 }
 const ETATS = {
   live: ['ok', 'En ligne · collecte', true], gagnant: ['ok', 'Gagnant · déployé', false], pret: ['', 'Prêt à lancer', false],
@@ -850,7 +851,7 @@ function liveCard(c, t, { compact = false } = {}) {
       <div><div class="n">${t.part} %<small>des visiteurs voient la variante</small></div></div>
       <div><div class="n"><small>conversions : en attente de GA4</small></div></div>
     </div>`}
-    <div class="say"><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
+    <div class="say" ${v.k === 'srm' || v.k === 'never' ? 'style="color:var(--bad)"' : ''}><b>${esc(v.b)}.</b> ${esc(v.s)}.</div>
     ${t.etat === 'live' && c.live && c.connexion.express.etat !== 'ok' ? `<div class="say" style="color:var(--bad)"><b>Personne ne voit encore la variante.</b> La balise Express n’a pas été trouvée sur la page : installez-la, publiez dans GTM, puis vérifiez.</div>` : ''}
     <div class="act">
       <button class="btn" data-go="ctx:${c.id};test:${t.id}">Voir le test ${I.arrow(15)}</button>
@@ -886,7 +887,7 @@ function kpis() {
   const enLigne = T.filter(([, t]) => t.etat === 'live');
   const visiteurs = enLigne.reduce((a, [, t]) => a + (t.res ? t.res.o.n + t.res.v.n : 0), 0);
   const enPlus = T.filter(([, t]) => t.res && (t.etat === 'live' || t.etat === 'gagnant')).reduce((a, [, t]) => a + Math.max(0, t.res.v.c - stats(t.res).p1 * t.res.v.n), 0);
-  const gagnants = enLigne.filter(([c, t]) => verdict(c, t).k === 'win').length, perdants = enLigne.filter(([c, t]) => verdict(c, t).k === 'lose').length;
+  const gagnants = enLigne.filter(([c, t]) => verdict(c, t).k === 'win').length, perdants = enLigne.filter(([c, t]) => ['lose', 'nul', 'never', 'srm'].includes(verdict(c, t).k)).length;
   const prets = T.filter(([, t]) => t.etat === 'pret').length;
   const dec = [gagnants && `${gagnants} gagnant${gagnants > 1 ? 's' : ''} à déployer`, perdants && `${perdants} à arrêter`, prets && `${prets} prêt${prets > 1 ? 's' : ''} à lancer`].filter(Boolean);
   return `<div class="kpis">
@@ -974,7 +975,14 @@ function vTests(c) {
   const sec = (titre, arr) => arr.length ? `<div class="sec"><h3>${titre} <span class="n">${arr.length}</span></h3><div class="tests">${arr.map(t => testCard(c, t)).join('')}</div></div>` : '';
   return `
     <div class="hd"><div><h2>Tests</h2><div class="u">${esc(c.url)}</div><p class="lede">Chaque test oppose une variante à l’original, sur la même adresse, avec le trafic que vous choisissez.</p></div>${c.live ? `<div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div>` : ''}</div>
-    ${sec('En préparation', grp('prep'))}${sec('En ligne', grp('live'))}${sec('Prêts à lancer', grp('pret'))}${sec('Gagnants déployés', grp('gagnant'))}${sec('Demandent Intégral', grp('integral'))}${sec('En attente de la boutique', grp('attente'))}${sec('Arrêtés', grp('stop'))}${sec('À reprendre', grp('echec'))}`;
+    ${sec('En préparation', grp('prep'))}${sec('En ligne', grp('live'))}${sec('Prêts à lancer', grp('pret'))}${sec('Gagnants déployés', grp('gagnant'))}${sec('Demandent Intégral', grp('integral'))}${sec('En attente de la boutique', grp('attente'))}${sec('Arrêtés', grp('stop'))}${sec('À reprendre', grp('echec'))}${memoire(c)}`;
+}
+const ISSUES = { gagnant: ['ok', 'Variante gagnante'], perdant: ['bad', 'L’original a gagné'], 'non concluant': ['', 'Pas de différence'], 'trop tôt': ['', 'Arrêté avant l’horizon'], 'sans données': ['', 'Sans données'], 'répartition faussée': ['bad', 'Répartition faussée'] };
+/** la mémoire du client : ce qui a déjà été testé, toutes pages confondues, et comment ça a fini */
+function memoire(c, sauf) {
+  const x = (c.experiences || []).filter(e => !sauf || e.test !== sauf.id);
+  if (!x.length) return '';
+  return `<div class="sec"><h3>Déjà testé chez ce client <span class="n">${x.length}</span></h3><div class="card"><p class="muted" style="margin-bottom:10px">Une variante qui a perdu n’est plus reproposée par l’analyse.</p>${x.map(e => { const [k, l] = ISSUES[e.conclusion] || ['', e.conclusion]; return `<div class="ck"><span class="i">${e.conclusion === 'gagnant' ? I.check(12) : e.conclusion === 'perdant' ? I.minus(12) : I.clock(12)}</span><div><b>${esc(e.titre)}</b> <span class="chip ${k}">${l}</span><div class="d">${esc(e.verdict || l)} · ${esc(new Date(e.arreteLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }))}${e.campagne !== c.campagne ? ' · ' + esc(e.campagne) : ''}</div></div></div>`; }).join('')}</div></div>`;
 }
 
 function vTest(c) {
@@ -1038,8 +1046,9 @@ function vTest(c) {
     <div class="sec"><h3>${live || t.etat === 'gagnant' ? 'Ce qui est garanti' : 'Avant de lancer'}</h3>
       ${t.etat === 'integral' ? `<div class="card"><p><b>Ce test ajoute des sections entières</b> : ce qu’une balise ne peut pas faire. Il passe par la connexion Intégral : une ligne DNS à transmettre au client, une fois, et il est prêt.</p><div style="margin-top:16px"><button class="btn glow" data-go="guide:integral">${I.relay(15)}Voir la marche à suivre</button></div></div>`
       : t.etat === 'attente' ? `<div class="card"><p><b>Ce test attend l’accès à la boutique.</b> Le client vous ajoute comme collaborateur en un clic ; le test devient une version de sa fiche produit, l’original reste publié.</p><div style="margin-top:16px"><button class="btn glow" data-act="shopify">${I.send(15)}Envoyer la demande d’accès</button></div></div>`
-      : guards(c, t)}
-    </div>`;
+      : (t.etat === 'pret' || t.etat === 'stop' ? horizon(c, t) : '') + guards(c, t)}
+    </div>
+    ${memoire(c, t)}`;
 }
 
 function vPage(c) {
@@ -1274,7 +1283,7 @@ function vNouveau(c) {
 /* ---------- le brain : la campagne, les propositions, les conseils ---------- */
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '' });
+  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '' });
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
     <div class="hd"><div><h2>Votre campagne</h2><p class="lede">Deux réponses suffisent pour que LPWS lise la page comme votre visiteur : ce que promet l’annonce, et comment se conclut la vente. Le reste affine.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
@@ -1294,6 +1303,7 @@ function vCampagne(c) {
           ${champ('cible', 'À qui s’adresse la campagne', '', 'placeholder="équipes marketing de PME"')}
           ${champ('offre', 'Ce que vous vendez, en un mot', '', '')}
           ${champ('visiteursMois', 'Visiteurs par mois sur cette page', 'En dessous d’un certain volume, un petit test ne peut pas conclure : LPWS proposera des changements plus francs.', 'inputmode="numeric" placeholder="60000"')}
+          ${champ('tauxConversion', 'Taux de conversion actuel (%)', 'Il fixe la durée de chaque test avant de le lancer.', 'inputmode="decimal" placeholder="2,5"')}
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.sparkle(16) + 'Lancer l’analyse', 'data-act="contexte"')}<span class="muted" id="ctx-err"></span></div>
       </div>
@@ -1490,13 +1500,21 @@ document.addEventListener('keydown', e => {
 const photo = c => c.tests.map(x => ({ x, etat: x.etat, part: x.part, fin: x.fin, jours: x.jours }));
 const rendre = p => () => { p.forEach(({ x, ...o }) => Object.assign(x, o)); toast('Annulé : tout est comme avant'); render(); };
 /** la machine : publie l'état du test ; l'annulation publie l'inverse */
+const MSG_ETAT = {
+  live: ['Mise en ligne : la balise se met à jour, ~15 s', p => `En ligne : ${p} % des visiteurs voient la variante`, 'La mise en ligne a échoué'],
+  stop: ['Arrêt demandé : l’original reprend 100 %, ~15 s', () => 'Arrêté : l’original reprend 100 % du trafic', 'L’arrêt n’a pas été publié'],
+  gagnant: ['Déploiement : la balise se met à jour, ~15 s', () => 'Gagnant déployé sur 100 % du trafic', 'Le déploiement n’a pas été publié'],
+};
 function publier(c, t, etat, part, annulable = true) {
-  const on = etat === 'live'; const cid = c.id, tid = t.id;
-  const inverse = annulable ? () => publier(byId(cid), byId(cid).tests.find(x => x.id === tid), on ? 'stop' : 'live', part, false) : null;
-  api(`/api/clients/${cid}/tests/${tid}`, on ? { etat, part } : { etat }).then(async r => {
-    toast(on ? 'Mise en ligne : la balise se met à jour, ~15 s' : 'Arrêt demandé : l’original reprend 100 %, ~15 s', inverse);
+  const cid = c.id, tid = t.id;
+  // déployer ne s'annule pas en relançant le test (ce serait repartir de zéro) : « Remettre l'original » existe pour ça
+  const inv = etat === 'gagnant' ? null : etat === 'stop' && t.etat === 'gagnant' ? 'gagnant' : etat === 'live' ? 'stop' : 'live';
+  const inverse = annulable && inv ? () => publier(byId(cid), byId(cid).tests.find(x => x.id === tid), inv, part, false) : null;
+  const [avant, ok, ko] = MSG_ETAT[etat];
+  api(`/api/clients/${cid}/tests/${tid}`, etat === 'live' ? { etat, part } : { etat }).then(async r => {
+    toast(avant, inverse);
     await chargerEtat(); render();
-    suivreJob(r.job, j => toast(on ? (j.etat === 'ok' ? `En ligne : ${part} % des visiteurs voient la variante` : 'La mise en ligne a échoué') : (j.etat === 'ok' ? 'Arrêté : l’original reprend 100 % du trafic' : 'L’arrêt n’a pas été publié'), j.etat === 'ok' ? inverse : null));
+    suivreJob(r.job, async j => { toast(j.etat === 'ok' ? ok(part) : ko, j.etat === 'ok' ? inverse : null); await chargerEtat(); render(); });
   }).catch(e => toast(e.message));
 }
 
@@ -1523,7 +1541,7 @@ document.addEventListener('click', e => {
     transition(() => { go(g.dataset.go); render(); }); return;
   }
   const pk = e.target.closest('[data-pick]');
-  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
+  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','cible','offre','visiteursMois','tauxConversion']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
   const cp = e.target.closest('[data-copy]');
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
@@ -1544,8 +1562,10 @@ document.addEventListener('click', e => {
     case 'stop': { if (!t) break;
       if (c.live) { publier(c, t, 'stop', t.part); break; }
       const p = photo(c); t.etat = 'stop'; toast('Arrêté : l’original reprend 100 % du trafic', rendre(p)); render(); break; }
-    case 'deploy': if (t) { const p = photo(c); t.etat = 'gagnant'; t.part = 100; t.fin = aujourdhui(); toast('Gagnant déployé sur 100 % du trafic', rendre(p)); render(); } break;
-    case 'restore': if (t) { const p = photo(c); t.etat = 'stop'; t.part = 0; toast('Original remis en place', rendre(p)); render(); } break;
+    case 'deploy': if (t && c.live) { publier(c, t, 'gagnant', 100); break; }
+      if (t) { const p = photo(c); t.etat = 'gagnant'; t.part = 100; t.fin = aujourdhui(); toast('Gagnant déployé sur 100 % du trafic', rendre(p)); render(); } break;
+    case 'restore': if (t && c.live) { publier(c, t, 'stop', t.part); break; }
+      if (t) { const p = photo(c); t.etat = 'stop'; t.part = 0; toast('Original remis en place', rendre(p)); render(); } break;
     case 'verify':
       if (c && c.live) { api(`/api/clients/${c.id}/verifier`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Balise trouvée sur la page' : 'Balise pas encore visible sur la page'); await chargerEtat(); render(); }); }).catch(e => toast(e.message)); }
       else toast('Vérification lancée : résultat dans une minute');
@@ -1553,7 +1573,7 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined };
+      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, vente: f.vente, cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: parseFloat(g('tauxConversion').replace(',', '.')) > 0 ? parseFloat(g('tauxConversion').replace(',', '.')) : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });

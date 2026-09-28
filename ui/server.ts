@@ -12,7 +12,7 @@
  *   GET  /api/jobs/<id>                     suivre un job (lignes, état)
  *   GET  /api/clients/<c>/<camp>/textes     les textes de la page qu'un test peut changer
  *   POST /api/clients/<c>/<camp>/tests      {titre, pourquoi, edits:[{anchor,text}]} → variante + tag (job)
- *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop', part}  → config republiée (job)
+ *   POST /api/clients/<c>/<camp>/tests/<id> {etat:'live'|'stop'|'gagnant', part} → config republiée (job) ; archivée dans experiences.json à l'arrêt
  *   POST /api/clients/<c>/<camp>/verifier   la balise est-elle posée sur la vraie page ? (job)
  *   GET  /files/<chemin>                    clients/ en statique (captures)
  *   GET  /t/<client>.js · /v/<client>.json  les fichiers du tag, tels que Vercel les sert
@@ -38,6 +38,7 @@ import { lireJson, ecrireJson } from "../engine/shared/json.ts"
 import { envoyerFichier, envoyerJson as json } from "../engine/shared/http.ts"
 import { mimeDe } from "../engine/shared/mime.ts"
 import { campagne as fichiersDe } from "../engine/shared/campagne.ts"
+import { pageAvecStats } from "./stats-embarque.ts"
 import { ROOT, DIST, BASE_TAGS, dossier } from "./server/config.ts"
 import { jobs } from "./server/jobs.ts"
 import { etat } from "./server/etat.ts"
@@ -70,7 +71,7 @@ createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost")
     const p = url.pathname
     const seg = p.split("/").filter(Boolean)
-    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await readFile(UI)); return }
+    if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await pageAvecStats(await readFile(UI, "utf8"))); return }
     if (p === "/api/etat") return json(res, 200, await etat())
     if (p === "/api/clients" && req.method === "POST") {
       const { url: u } = await body(req)
@@ -92,7 +93,7 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
         const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" ? "live" : "stop", Number(b.part) || 50)
+        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })

@@ -7,7 +7,7 @@ import { marque, slugify } from "../../engine/shared/paths.ts"
 import { Contexte } from "../../engine/variant/contexte.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
-import { enregistrerExperiences } from "../../engine/measure/experience.ts"
+import { enregistrerExperiences, planAuLancement } from "../../engine/measure/experience.ts"
 import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
 import { type Job, nouveauJob, dire, finir, lancer } from "./jobs.ts"
 import { construireTag, appliquerParts, publierTag, sonderBalise } from "./tag.ts"
@@ -158,7 +158,7 @@ export async function creerTestDepuisProposition(c: string, camp: string, nom: s
   return { job, id: nom }
 }
 
-export async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop", part: number) {
+export async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop" | "gagnant", part: number) {
   const d = dossier(c, camp)
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   const t = tests.find((x) => x.id === id)
@@ -174,27 +174,48 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     if (!sonde.installe)
       throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
   }
-  const avant = tests.map((o) => [o.id, o.etat, o.part] as const)
-  if (etat === "live") { t.etat = "live"; t.part = part || 50; t.lanceLe = new Date().toISOString(); for (const o of tests) if (o !== t && o.etat === "live") o.etat = "stop" }
-  else { t.etat = "stop" }
+  // un gagnant servi à 100 % capte tous les visiteurs : un nouveau test ne toucherait personne
+  const deploye = tests.find((o) => o !== t && o.etat === "gagnant")
+  if (etat === "live" && deploye)
+    throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
+  if (etat === "gagnant" && t.etat !== "live" && t.etat !== "stop")
+    throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
+  const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan] as const)
+  const maintenant = new Date().toISOString()
+  // un test qui cesse de collecter : sa date de fin fige le verdict qu'on archivera
+  const arretes = new Set<string>()
+  const cesse = (o: Test) => { if (o.etat === "live") o.finLe = maintenant; if (o.lanceLe) arretes.add(o.id) }
+  if (etat === "live") {
+    // l'horizon se fixe AVANT de regarder : c'est lui qui donne le droit de conclure
+    t.etat = "live"; t.part = part || 50; t.lanceLe = maintenant; delete t.finLe
+    t.plan = await planAuLancement(d, t.part / 100)
+    for (const o of tests) if (o !== t && o.etat === "live") { cesse(o); o.etat = "stop" }
+  } else if (etat === "gagnant") {
+    cesse(t); t.etat = "gagnant"; t.part = 100
+    for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant")) { cesse(o); o.etat = "stop"; o.part = 0 }
+  } else {
+    // « Remettre l'original » : un gagnant déployé redescend à 0 %, un test vivant s'arrête
+    if (t.etat === "gagnant") t.part = 0
+    cesse(t); t.etat = "stop"
+  }
   await ecrireJson(fichiersDe(d).tests, tests)
   await appliquerParts(c, camp)
   const job = nouveauJob("config")
   ;(async () => {
-    dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : "arrêt : l’original reprend 100 % du trafic")
+    dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : etat === "gagnant" ? "déploiement : 100 % des visiteurs verront la variante" : "arrêt : l’original reprend 100 % du trafic")
     const code = await publierTag(job, c, camp)
     // l'état affiché doit être l'état EN LIGNE : si la publication rate, on revient en arrière et on dit pourquoi
     const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
     const cible = all.find((x) => x.id === id)
     if (code !== 0) {
-      for (const [oid, oetat, opart] of avant) { const o = all.find((x) => x.id === oid); if (o) { o.etat = oetat; o.part = opart } }
+      for (const [oid, oetat, opart, olance, ofin, oplan] of avant) { const o = all.find((x) => x.id === oid); if (o) Object.assign(o, { etat: oetat, part: opart, lanceLe: olance, finLe: ofin, plan: oplan }) }
       if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
     } else if (cible) delete cible.erreur
     await ecrireJson(fichiersDe(d).tests, all)
-    if (code === 0) {
-      const arretes = all.filter((o) => o.etat === "stop" && avant.some(([oid, oetat]) => oid === o.id && oetat === "live"))
-      for (const x of await enregistrerExperiences(d, arretes)) dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
-    }
+    // publié : ce qui a cessé de collecter entre dans le journal du client
+    if (code === 0)
+      for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
+        dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
     if (code !== 0) await appliquerParts(c, camp)
     finir(job, code === 0)
   })()

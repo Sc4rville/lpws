@@ -268,26 +268,26 @@ reste un outil de développement, pas un produit.
 
 **Ce que ça veut dire :** que le système s'améliore avec ce qui s'est réellement passé.
 
-**Où on en est :** rien, et c'est un choix. Le produit vend du diagnostic, pas de
+**Où on en est :** la mémoire et le droit de conclure sont posés (4.1, 4.2, 4.3 en partie) ; l'apprentissage entre clients reste un choix à ne pas faire trop tôt. Le produit vend du diagnostic, pas de
 l'apprentissage automatique. Mais il y a des fondations qui ne coûtent rien à poser
 maintenant et qui coûteront très cher à rattraper.
 
 ## 4.1 · Enregistrer ce qui s'est passé
 - ✅ Chaque variante porte déjà son hypothèse, sa métrique, son risque et son diagnostic
-- ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique
+- ✅ Enregistrer le résultat : a-t-elle tourné, sur combien de visiteurs, qu'a fait la métrique *(y compris au déploiement du gagnant, avec l'horizon fixé au lancement)*
 - ✅ Un objet « expérience » durable : contrôle, variante, dates, échantillon, résultat, verdict *(`experiences.json`, écrit à chaque arrêt)*
 - ✅ Enregistrer aussi les tests **non concluants** *(sinon on n'apprend que des gagnants)*
-- ⬜ Enregistrer les variantes refusées par le buyer et pourquoi *(signal très précieux sur nos diagnostics)*
+- ✅ Enregistrer les variantes refusées par le buyer et pourquoi *(signal très précieux sur nos diagnostics)* — gardées dans propositions.json même quand le brain repasse
 
 ## 4.2 · Savoir si on a le droit de conclure
-- ⬜ Calculer l'échantillon nécessaire **avant** de lancer
-- ⬜ Dire franchement quand le trafic ne permettra jamais de conclure
-- ⬜ Se méfier d'un gagnant sur petit échantillon
-- ⬜ Surveiller les garde-fous, pas seulement la métrique principale
+- ✅ Calculer l'échantillon nécessaire **avant** de lancer *(engine/measure/stats.ts : l'horizon est figé dans le test au lancement)*
+- ✅ Dire franchement quand le trafic ne permettra jamais de conclure *(au-delà de huit semaines, avec la hausse détectable)*
+- ✅ Se méfier d'un gagnant sur petit échantillon *(verdict à l'horizon et après une semaine pleine ; arrêt anticipé seulement si |z| ≥ 3)*
+- 🟡 Surveiller les garde-fous, pas seulement la métrique principale *(fait : répartition faussée / SRM ; reste : rebond, panier, activation)*
 
 ## 4.3 · Apprendre pour un client
-- ⬜ Historique par client : ce qui a marché, ce qui a échoué
-- ⬜ Ne pas re-proposer une hypothèse déjà perdue chez lui
+- ✅ Historique par client : ce qui a marché, ce qui a échoué *(toutes pages, affiché dans Tests)*
+- ✅ Ne pas re-proposer une hypothèse déjà perdue chez lui *(ni une refusée ; le diagnostic dit pourquoi dans `ecartes`)*
 - ⬜ Enrichir son contexte avec ce qu'on a appris
 
 ## 4.4 · Apprendre entre clients — le pari risqué
@@ -298,7 +298,7 @@ maintenant et qui coûteront très cher à rattraper.
 - ⬜ Décider si on y va — et seulement quand la donnée le justifie
 
 ## 4.5 · Faire vivre la knowledge base
-- ⬜ Tracer quelle règle a produit quelle variante et quel résultat
+- ✅ Tracer quelle règle a produit quelle variante et quel résultat *(`regle` dans chaque expérience)*
 - ⬜ Une règle qui perd plusieurs fois perd de la confiance ; une règle qui gagne en gagne
 - ⬜ Relire la KB à chaque nouvelle recherche
 

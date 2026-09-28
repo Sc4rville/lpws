@@ -30,7 +30,7 @@ export async function appliquerParts(c: string, camp: string) {
   const cfg = await lireJson<any>(f, null)
   if (!cfg) return
   cfg.actif = true
-  for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && t.etat === "live" ? t.part : 0 }
+  for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0 }
   await ecrireJson(f, cfg)
 }
 /** copie loader + config dans ui/dist et pousse sur Vercel : l'URL que GTM connaît */
@@ -62,7 +62,7 @@ export async function publierTag(job: Job, c: string, camp: string): Promise<num
       const t = testsCamp.find((x) => x.id === v.nom)
       if (!t || t.etat === "echec") continue
       if (fusion.variantes.some((x: any) => x.nom === v.nom && x.page === v.page)) continue
-      fusion.variantes.push({ ...v, part: t.etat === "live" ? t.part : 0 })
+      fusion.variantes.push({ ...v, part: t.etat === "live" || t.etat === "gagnant" ? t.part : 0 })
     }
   }
   if (!fusion.delaiMasque) fusion.delaiMasque = 1200
