@@ -50,6 +50,12 @@ Instrument Serif et toute sérif éditoriale. Aucune étiquette en petites capit
 | `--blue` | `#1E6FD2` | l'unique accent : Express, focus, trame de l'illustration |
 | `--ok` / `--warn` / `--bad` | `#1C9457` / `#C7791A` / `#D2413A` | états, jamais décoratifs |
 
+Les valeurs vivent en OKLCH avec `light-dark()` : une seule variable par rôle, le clair et le
+sombre côte à côte. Le sombre (2026-09-28) est une nuit bleu ardoise (`oklch(15.5% .012 265)`),
+les panneaux restent du verre, la pilule s'inverse en blanc, les états s'éclaircissent pour
+garder le contraste. Apparence **Auto** (celle du système) par défaut, **Clair** ou **Sombre**
+au bouton du rail ou dans la palette ; le choix est gardé (`lpws-theme`).
+
 Pas de jaune, pas de crème, pas de rose. Le dégradé n'existe que dans la lumière du fond.
 
 ## Surfaces, espace, rayons
@@ -73,7 +79,9 @@ Pas de jaune, pas de crème, pas de rose. Le dégradé n'existe que dans la lumi
   couvre. Une phrase dessous la dit en mots. Version `mini` dans le tableau des résultats.
 - **Jalons** (`.jal`) : assez de conversions, assez de visiteurs, écart net. Trois ronds
   qui se cochent en vert : le verdict est mûr quand les trois le sont.
-- **Trois chiffres d'accueil** (`.kpis`) : en ligne, conversions en plus, à décider.
+- **Trois chiffres d'accueil** (`.kpis`) : en ligne, conversions en plus, à décider. Sur
+  l'accueil, ils forment un bento avec l'illustration (`.bento`) : colonne à droite en large,
+  rangée de trois dessous quand le principal se resserre (container query).
 - **Palette** (`.kx`) : ⌘K / Ctrl K ou `/`, depuis n'importe quel écran. Groupes en mono
   (l'écran courant d'abord, puis clients, tests, connexion), la ligne choisie en pilule noire.
 - **Toast avec Annuler** : lancer, arrêter, déployer, remettre l'original se rattrapent
@@ -94,5 +102,8 @@ cadratin (`—` interdit : deux-points ou point). Un écran répond toujours à 
 
 ## Motion
 
-Subtile : 150 à 250 ms, `ease`. Une seule animation continue par écran au maximum (l'aurore).
-`prefers-reduced-motion` coupe tout.
+Subtile : 150 à 250 ms pour les survols, un ressort doux (`--spring`, `linear()`) pour ce
+qui arrive. Un changement d'écran passe par une View Transition : la pilule active glisse
+d'une ligne à l'autre, le contenu arrive en cascade, flou puis net. Changer de thème découvre
+le nouveau en cercle depuis le bouton. Une seule animation continue par écran au maximum
+(l'aurore). `prefers-reduced-motion` coupe tout.
