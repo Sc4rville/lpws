@@ -13,13 +13,14 @@ import { classer } from "./classify.ts"
 import { grouper } from "./group.ts"
 import { SUFFIXE_URL_FINALE } from "./schema.ts"
 import { step, fail } from "../shared/log.ts"
+import { lireArgs } from "../shared/cli.ts"
 
 const SCOPE = "intent"
 const ROOT = resolve(import.meta.dirname, "..", "..")
 
-const args = process.argv.slice(2)
-const opt = (k: string) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : undefined }
-const fichier = args.find((a, i) => !a.startsWith("--") && (i === 0 || !args[i - 1].startsWith("--")))
+const args = lireArgs()
+const opt = (k: string) => args.option(`--${k}`)
+const [fichier] = args.libres
 const client = opt("client"), campagne = opt("campagne")
 if (!fichier || !client || !campagne)
   fail(SCOPE, "usage : npm run intents -- <export.csv> --client <client> --campagne <campagne> [--marques a,b]")

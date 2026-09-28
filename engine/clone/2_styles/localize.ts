@@ -21,12 +21,13 @@
  * Export : localizeStyles(dir) ; rewriteCssText et buildLocalMap sont réutilisés par 3_assets.
  */
 import { recopieOmbre } from "../1_acquire/ombre.ts"
-import { lancerNavigateur } from "../../shared/navigateur.ts"
+import { lancerNavigateur, neutraliserNom, horsLigne } from "../../shared/navigateur.ts"
 import { readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve, basename } from "node:path"
 import type { Resource } from "../1_acquire/render.ts"
 import { step, timed, fail } from "../../shared/log.ts"
+import { estLance, lireArgs } from "../../shared/cli.ts"
 
 const SCOPE = "clone/2_styles"
 
@@ -131,10 +132,8 @@ export async function localizeStyles(dir: string): Promise<StylesReport> {
       const fichier = join(dir, nom)
       if (!existsSync(fichier)) continue
       const page = await browser.newPage()
-      // cf. note __name dans 1_acquire/render.ts
-      await page.addInitScript({ content: "window.__name = (f) => f" })
-      await page.route("**/*", (route) =>
-        route.request().url().startsWith("file://") ? route.continue() : route.abort())
+      await neutraliserNom(page)
+      await horsLigne(page)
       await page.goto("file://" + resolve(fichier), { waitUntil: "domcontentloaded", timeout: 60_000 })
       // la base de résolution des références relatives : le <base> posé par 1_acquire
       const baseHref: string = await page.evaluate(
@@ -201,8 +200,8 @@ export async function localizeStyles(dir: string): Promise<StylesReport> {
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("2_styles/localize.ts")) {
-  const dir = process.argv.slice(2).find((a) => !a.startsWith("--"))
+if (estLance(import.meta.url)) {
+  const [dir] = lireArgs().libres
   if (!dir) fail(SCOPE, "usage : npm run styles -- <dossier-baseline>")
   localizeStyles(dir).then((r) => console.log(JSON.stringify(r, null, 2)))
 }

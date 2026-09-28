@@ -15,7 +15,13 @@ plateforme ; le **contrat** (hypothèse + diagnostic + éditions en verbes) rest
 - **SaaS** : LP hébergée sur sous-domaine (modèle Unbounce) OU tag GTM. Non tranché — dépend des
   stacks des clients (Webflow / Framer / WordPress / Next.js ?).
 
-## Fait récemment (2026-09-28)
+## Fait le 2026-09-28 (ui)
+- Interface « décider d'abord » : fourchette + jalons sur chaque résultat, trois chiffres
+  d'accueil, palette ⌘K, Annuler au lieu de confirmer, une adresse par écran, panneau
+  compact sur mobile, curseur de trafic qui s'applique vraiment à un test en ligne.
+  Détail dans design.md (composants, navigation).
+
+## Fait le 2026-09-28 (business model)
 - Recherche business model : `docs/business-model-rapport.md` (concurrents et prix, unité « client
   actif / mois », grille Atelier · Solo · Agence · Régime, modules reliés aux tâches, décisions `3.5`).
 
@@ -142,3 +148,15 @@ le juge avant d'accuser le code.
 - Header/footer Shopify = groupes de sections du layout ; avis = blocs `@app` ; écriture de thème par app publique = exemption.
 - Recherche v2 à lancer : `docs/recherche-v2-brief.md`. Corpus sans page e-commerce.
 - Racine fantôme fermée : visible et éditable dans le clone, mais la balise Express ne peut pas y écrire (Intégral le pourrait).
+
+## Fait le 2026-09-28 — socle partagé (architecture, sans changement de comportement)
+- `engine/shared/` porte désormais un seul exemplaire de ce qui était copié famille par famille :
+  `cli` (args), `json` (lecture validée zod, caches), `modele` (claude -p + contrat, 2 essais),
+  `mime`, `http` (fichiers statiques anti-traversée), `campagne` (disposition d'une campagne sur
+  disque + type `Test`), `navigateur` (shim `__name`, hors ligne, origine synthétique).
+- Tout le moteur, le cockpit et `ui/server.ts` y sont branchés ; `deploy/tag/runtime.ts` (mort,
+  remplacé par `loader.ts`) retiré ; `npm run typecheck` couvre aussi `ui/` ; `esbuild` déclaré.
+- Vérifié identique avant/après : clone démo 0 %/0 %, variant.json, `/api/etat`, relink 68/68,
+  measure --exemple, tag:check (même refus sur la démo statique).
+- Reste : découper `ui/server.ts` (jobs · état · pipeline de test · tag · routes) sur ce socle.
+

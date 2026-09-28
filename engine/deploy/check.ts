@@ -13,23 +13,13 @@
  * Hors ligne : les requêtes vers googletagmanager/facebook sont coupées et comptées. On
  * vérifie que la page les DEMANDE, pas qu'un compte tiers réponde.
  */
-import { lancerNavigateur, UA } from "../shared/navigateur.ts"
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { lancerNavigateur, nouvellePage, servirDossiers, UA } from "../shared/navigateur.ts"
 import type { DeployConfig } from "./config.ts"
 import { step } from "../shared/log.ts"
 
 const SCOPE = "deploy/check"
 const ORIGIN = "http://variante.lpws"
 const GCLID = "TEST-LPWS-0000"
-
-const MIME: Record<string, string> = {
-  html: "text/html", css: "text/css",
-  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-  gif: "image/gif", svg: "image/svg+xml", ico: "image/x-icon", avif: "image/avif",
-  woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
-  mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", json: "application/json",
-}
 
 export type CheckReport = {
   ok: boolean
@@ -45,25 +35,17 @@ export type CheckReport = {
 
 export async function checkDeploy(dir: string, cfg: DeployConfig): Promise<CheckReport> {
   const browser = await lancerNavigateur()
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
-  await page.addInitScript({ content: "window.__name = (f) => f" })
+  const page = await nouvellePage(browser, { viewport: { width: 1440, height: 900 }, userAgent: UA })
 
   const pixelsDemandes: string[] = []
   await page.route("**/*", async (route) => {
     const u = route.request().url()
-    if (u.startsWith(ORIGIN)) {
-      const chemin = decodeURIComponent(new URL(u).pathname)
-      try {
-        if (chemin.includes("..")) throw new Error("hors du dossier")
-        const body = await readFile(join(dir, "." + (chemin === "/" ? "/index.html" : chemin)))
-        const ext = chemin.split(".").pop()?.toLowerCase() ?? "html"
-        return route.fulfill({ body, contentType: MIME[ext] ?? "application/octet-stream" })
-      } catch { return route.fulfill({ status: 404, body: "" }) }
-    }
     // tiers : on note la demande et on coupe — le juge reste hors ligne
     if (/googletagmanager\.com|google-analytics\.com|connect\.facebook\.net/.test(u)) pixelsDemandes.push(u)
     return route.fulfill({ status: 204, body: "" })
   })
+  // enregistrée après : Playwright essaie d'abord la route la plus récente
+  await servirDossiers(page, ORIGIN, [dir], { index: "index.html" })
 
   await page.goto(`${ORIGIN}/index.html?gclid=${GCLID}&utm_source=google&utm_campaign=test`,
     { waitUntil: "load" })

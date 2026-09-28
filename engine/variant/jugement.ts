@@ -12,11 +12,11 @@
  * refusée, réessayée une fois, puis l'ensemble est déclaré « non jugé » et les règles qui en
  * dépendent restent non évaluables. Jamais une supposition silencieuse.
  */
-import { spawn } from "node:child_process"
 import { z } from "zod"
 import type { SignauxMecaniques } from "./signaux.ts"
 import type { Contexte } from "./contexte.ts"
 import { step } from "../shared/log.ts"
+import { demanderValide } from "../shared/modele.ts"
 
 const SCOPE = "variant/jugement"
 
@@ -86,38 +86,10 @@ TEXTE DE LA PAGE (début)
 ${corps.slice(0, 2500)}`
 }
 
-function claude(prompt: string): Promise<string> {
-  return new Promise((ok, ko) => {
-    const p = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.LPWS_MODELE ?? "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
-    let out = "", err = ""
-    p.stdout.on("data", (d) => out += d)
-    p.stderr.on("data", (d) => err += d)
-    p.on("close", (code) => {
-      if (code !== 0) return ko(new Error(`claude -p a quitté avec ${code} : ${err.slice(0, 200)}`))
-      try { ok(String((JSON.parse(out) as { result?: string }).result ?? "")) } catch { ok(out) }
-    })
-    p.stdin.write(prompt); p.stdin.end()
-  })
-}
-
-const extraireJson = (t: string) => {
-  const i = t.indexOf("{"), j = t.lastIndexOf("}")
-  return i >= 0 && j > i ? t.slice(i, j + 1) : t
-}
-
 /** Les signaux de jugement, ou null si le modèle n'a pas répondu dans le format deux fois de suite. */
 export async function juger(m: SignauxMecaniques, c: Contexte, corps: string): Promise<SignauxJuges | null> {
-  const prompt = `${CONSIGNE}\n\n${texteDe(m, c, corps)}`
-  for (let essai = 1; essai <= 2; essai++) {
-    try {
-      const brut = await claude(prompt)
-      const parse = SignauxJuges.safeParse(JSON.parse(extraireJson(brut)))
-      if (parse.success) { step(SCOPE, `8 questions typées répondues (essai ${essai})`); return parse.data }
-      step(SCOPE, `réponse hors schéma (essai ${essai}) : ${parse.error.issues[0]?.path.join(".")} ${parse.error.issues[0]?.message}`)
-    } catch (e) {
-      step(SCOPE, `échec (essai ${essai}) : ${String((e as Error).message).slice(0, 160)}`)
-    }
-  }
+  const j = await demanderValide(SCOPE, `${CONSIGNE}\n\n${texteDe(m, c, corps)}`, SignauxJuges, "objet")
+  if (j) return j
   step(SCOPE, "jugement indisponible : les règles qui en dépendent resteront non évaluables")
   return null
 }

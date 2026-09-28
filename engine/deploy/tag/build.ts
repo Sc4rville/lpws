@@ -23,7 +23,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { build } from "esbuild"
-import { lancerNavigateur, UA } from "../../shared/navigateur.ts"
+import { lancerNavigateur, UA, neutraliserNom } from "../../shared/navigateur.ts"
 import { VariantSpec } from "../../apply/spec.ts"
 import { markDom } from "../../clone/1_acquire/mark.ts"
 import { fingerprintDom, type Empreinte } from "../../clone/1_acquire/fingerprint.ts"
@@ -33,6 +33,8 @@ import { resoudreCibles, type Cible } from "./selector.ts"
 import type { ConfigServie, EditTag, VarianteServie } from "./loader.ts"
 import { slugify } from "../../shared/paths.ts"
 import { step, fail, timed } from "../../shared/log.ts"
+import { estLance, lireArgs } from "../../shared/cli.ts"
+import { ecarts } from "../../shared/json.ts"
 
 const SCOPE = "deploy/tag"
 
@@ -77,8 +79,7 @@ async function resoudreSurLeLive(
       viewport: { width: 1440, height: 900 },
       userAgent: UA,
     })
-    // cf. note __name dans 1_acquire/render.ts : esbuild nomme les fonctions injectées
-    await page.addInitScript({ content: "window.__name = (f) => f" })
+    await neutraliserNom(page)
     // ON LIT LA PAGE TELLE QUE LE CLIENT L'A FAITE, PAS TELLE QUE NOTRE TAG LA MONTRE.
     // Un test déjà en ligne change le titre : sans `lpws=off`, la cible du titre ne se retrouve
     // plus (« e11 non résolue » sur la démo Relay, avec la variante 1 servie à 100 %).
@@ -134,7 +135,7 @@ async function resoudreSurLeLive(
     // même identité que la première page : sans UA, le Chromium headless se présente en
     // « HeadlessChrome » et Akamai sert « Access Denied » à cette seconde ouverture (Salesforce)
     const tot = await browser.newPage({ viewport: { width: 1440, height: 900 }, userAgent: UA })
-    await tot.addInitScript({ content: "window.__name = (f) => f" })
+    await neutraliserNom(tot)
     await tot.goto(urlNeutre, { waitUntil: "domcontentloaded", timeout: 60_000 })
 
     /* ON MESURE QUAND LA CIBLE ARRIVE, ON NE LE DEVINE PAS.
@@ -231,8 +232,7 @@ export async function buildTag(
   for (const p of specPaths) {
     const spec = VariantSpec.safeParse(JSON.parse(await readFile(p, "utf8")))
     if (!spec.success)
-      fail(SCOPE, `spec invalide (${p}) :\n` +
-        spec.error.issues.map((i) => `  · ${i.path.join(".") || "(racine)"} : ${i.message}`).join("\n"))
+      fail(SCOPE, `spec invalide (${p}) :\n${ecarts(spec.error)}`)
     for (const e of spec.data.edits) {
       const op = e.op ?? "set"
       if (!VERBES_TAG.has(op))
@@ -323,11 +323,10 @@ export async function buildTag(
 }
 
 /* CLI */
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("tag/build.ts")) {
-  const args = process.argv.slice(2)
-  const libres = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"))
-  const [baseline, ...specs] = libres
-  const opt = (n: string) => { const i = args.indexOf("--" + n); return i >= 0 ? args[i + 1] : undefined }
+if (estLance(import.meta.url)) {
+  const args = lireArgs()
+  const [baseline, ...specs] = args.libres
+  const opt = (n: string) => args.option("--" + n)
   if (!baseline || specs.length === 0)
     fail(SCOPE, "usage : npm run tag -- <dossier-baseline> <spec.json> [...] [--part 50] [--base <url>]")
   await buildTag(baseline, specs, {

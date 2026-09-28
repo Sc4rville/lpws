@@ -15,9 +15,7 @@
  *
  * Tourne sur les crédits du plan (`claude -p`), comme le jugement.
  */
-import { spawn } from "node:child_process"
-import { readFile, writeFile, mkdir } from "node:fs/promises"
-import { join } from "node:path"
+import { readFile } from "node:fs/promises"
 import { z } from "zod"
 import { VariantSpec } from "../apply/spec.ts"
 import type { Constat } from "./diagnostic.ts"
@@ -25,6 +23,9 @@ import type { SignauxMecaniques } from "./signaux.ts"
 import type { Contexte } from "./contexte.ts"
 import { slugify } from "../shared/paths.ts"
 import { step } from "../shared/log.ts"
+import { demanderValide } from "../shared/modele.ts"
+import { ecrireJson, premierEcart } from "../shared/json.ts"
+import { campagne as fichiersDe } from "../shared/campagne.ts"
 
 const SCOPE = "variant/variantes"
 
@@ -46,20 +47,6 @@ const Proposition = z.object({
   })).min(1).max(2),
 })
 const Propositions = z.array(Proposition).min(1).max(4)
-
-function claude(prompt: string): Promise<string> {
-  return new Promise((ok, ko) => {
-    const p = spawn("claude", ["-p", "--output-format", "json", "--model", process.env.LPWS_MODELE ?? "sonnet"], { stdio: ["pipe", "pipe", "pipe"] })
-    let out = "", err = ""
-    p.stdout.on("data", (d) => out += d); p.stderr.on("data", (d) => err += d)
-    p.on("close", (code) => {
-      if (code !== 0) return ko(new Error(`claude -p a quitté avec ${code} : ${err.slice(0, 200)}`))
-      try { ok(String((JSON.parse(out) as { result?: string }).result ?? "")) } catch { ok(out) }
-    })
-    p.stdin.write(prompt); p.stdin.end()
-  })
-}
-const extraireJson = (t: string) => { const i = t.indexOf("["), j = t.lastIndexOf("]"); return i >= 0 && j > i ? t.slice(i, j + 1) : t }
 
 function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string): string {
   const ancres = [
@@ -99,8 +86,8 @@ export type VarianteProduite = { nom: string; regle: string; fichier: string; ti
 export async function ecrireVariantes(
   campagne: string, constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: string,
 ): Promise<VarianteProduite[]> {
-  const base = join(campagne, "baseline")
-  const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(join(base, "anchors.json"), "utf8"))
+  const f = fichiersDe(campagne)
+  const empreintes: Array<{ a: string; role: string; text: string }> = JSON.parse(await readFile(f.ancres, "utf8"))
   const parAncre = new Map(empreintes.map((e) => [e.a, e]))
   /* UNE VARIANTE PAR CIBLE, pas les trois meilleurs constats quoi qu'ils touchent.
    * Décidé avec kabylesystem le 2026-09-19 : sur HubSpot, les trois meilleurs constats visaient
@@ -122,18 +109,9 @@ export async function ecrireVariantes(
   // UN SEUL APPEL POUR LES TROIS. Mesuré : trois appels parallèles (une variante chacun) 65 s,
   // un appel qui écrit les trois 42 à 55 s ; la latence est dans le modèle, pas dans le nombre
   // de variantes. Le plancher du brain, c'est le jugement (~30 s) plus cet appel.
-  let props: z.infer<typeof Propositions> | null = null
-  for (let essai = 1; essai <= 2 && !props; essai++) {
-    try {
-      const brut = await claude(cadre(choisis, m, c, langue))
-      const p = Propositions.safeParse(JSON.parse(extraireJson(brut)))
-      if (p.success) props = p.data
-      else step(SCOPE, `proposition hors schéma (essai ${essai}) : ${p.error.issues[0]?.path.join(".")} ${p.error.issues[0]?.message}`)
-    } catch (e) { step(SCOPE, `échec (essai ${essai}) : ${String((e as Error).message).slice(0, 160)}`) }
-  }
+  const props = await demanderValide(SCOPE, cadre(choisis, m, c, langue), Propositions, "liste")
   if (!props) { step(SCOPE, "le modèle n'a pas produit de variantes valides"); return [] }
 
-  await mkdir(join(campagne, "specs"), { recursive: true })
   const sorties: VarianteProduite[] = []
   for (const p of props) {
     const k = choisis.find((x) => x.id === p.regle)
@@ -153,9 +131,9 @@ export async function ecrireVariantes(
       }),
     }
     const v = VariantSpec.safeParse(spec)
-    if (!v.success) { step(SCOPE, `« ${p.titre} » hors contrat : ${v.error.issues[0]?.path.join(".")} ${v.error.issues[0]?.message}`); continue }
-    const fichier = join(campagne, "specs", `${nom}.json`)
-    await writeFile(fichier, JSON.stringify(v.data, null, 2))
+    if (!v.success) { step(SCOPE, `« ${p.titre} » hors contrat : ${premierEcart(v.error)}`); continue }
+    const fichier = f.spec(nom)
+    await ecrireJson(fichier, v.data)
     // ce que le buyer lit : des mots, pas des ancres. Le texte d'origine vient des signaux (casse
     // réelle) quand on le connaît, sinon de l'empreinte (normalisée en minuscules)
     const nommer = (a: string): string => {

@@ -11,8 +11,7 @@
  * question indépendante avec un type de sortie déclaré (cf. ETAT.md) : testable seule,
  * remplaçable seule.
  */
-import { type Page } from "playwright"
-import { lancerNavigateur, UA } from "../shared/navigateur.ts"
+import { lancerNavigateur, nouvellePage, servirDossiers, UA } from "../shared/navigateur.ts"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { z } from "zod"
@@ -56,10 +55,6 @@ export const SignauxMecaniques = z.object({
 export type SignauxMecaniques = z.infer<typeof SignauxMecaniques>
 
 const ORIGIN = "http://signaux.lpws"
-const MIME: Record<string, string> = {
-  html: "text/html", css: "text/css", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
-  gif: "image/gif", svg: "image/svg+xml", woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
-}
 
 /** S'exécute DANS la page : ne rien importer ici. */
 function lirePage(hauteurPli: number) {
@@ -147,19 +142,6 @@ function lirePage(hauteurPli: number) {
   }
 }
 
-async function servir(page: Page, baseline: string) {
-  await page.addInitScript({ content: "window.__name = (f) => f" })
-  await page.route(`${ORIGIN}/**`, async (route) => {
-    const chemin = decodeURIComponent(new URL(route.request().url()).pathname)
-    try {
-      if (chemin.includes("..")) throw new Error("hors du dossier")
-      const body = await readFile(join(baseline, "." + chemin))
-      const ext = chemin.split(".").pop()?.toLowerCase() ?? ""
-      await route.fulfill({ body, contentType: MIME[ext] ?? "application/octet-stream" })
-    } catch { await route.fulfill({ status: 404, body: "" }) }
-  })
-}
-
 /** Les signaux mécaniques d'une baseline, mesurés aux deux tailles d'écran. */
 export async function extraireSignaux(baseline: string): Promise<SignauxMecaniques> {
   const browser = await lancerNavigateur()
@@ -167,8 +149,8 @@ export async function extraireSignaux(baseline: string): Promise<SignauxMecaniqu
     const meta = JSON.parse(await readFile(join(baseline, "meta.json"), "utf8").catch(() => "{}"))
     // les deux lectures locales et les trois chargements de la vraie page n'ont rien à s'attendre
     const lire = async (fichier: string, viewport: { width: number; height: number }) => {
-      const page = await browser.newPage({ viewport })
-      await servir(page, baseline)
+      const page = await nouvellePage(browser, { viewport })
+      await servirDossiers(page, ORIGIN, [baseline])
       await page.goto(`${ORIGIN}/${fichier}`, { waitUntil: "load" })
       await page.waitForTimeout(500)
       return page.evaluate(lirePage, viewport.height)

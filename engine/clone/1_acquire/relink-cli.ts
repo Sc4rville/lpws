@@ -10,12 +10,13 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { step, fail } from "../../shared/log.ts"
+import { lireArgs } from "../../shared/cli.ts"
 import { relier } from "./relink.ts"
 import type { Empreinte } from "./fingerprint.ts"
 
 const SCOPE = "clone/1_acquire/relink"
 
-const [a, b] = process.argv.slice(2).filter((x) => !x.startsWith("--"))
+const [a, b] = lireArgs().libres
 if (!a || !b) fail(SCOPE, "usage : npm run relink -- <baseline-avant> <baseline-apres>")
 const lire = async (d: string): Promise<Empreinte[]> => {
   try { return JSON.parse(await readFile(join(d, "anchors.json"), "utf8")) }

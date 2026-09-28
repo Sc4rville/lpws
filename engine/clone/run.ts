@@ -22,16 +22,14 @@ import { localizeAssets } from "./3_assets/localize.ts"
 import { verifyBaseline, SEUIL_DEFAUT } from "./5_verify/verify.ts"
 import { baselineDir, marque, slugify } from "../shared/paths.ts"
 import { step, fail } from "../shared/log.ts"
+import { lireArgs } from "../shared/cli.ts"
 
 const SCOPE = "clone"
 
-function arg(flag: string): string | undefined {
-  const i = process.argv.indexOf(flag)
-  return i > 0 ? process.argv[i + 1] : undefined
-}
-
 async function main() {
-  const url = process.argv.slice(2).find((a) => a.startsWith("http"))
+  const args = lireArgs()
+  const arg = args.option
+  const url = args.libres.find((a) => a.startsWith("http"))
   if (!url) fail(SCOPE, "usage : npm run clone -- <url> [--client x] [--campaign y] [--seuil 0.03] [--auth user:pass] [--cookie \"a=1; b=2\"]")
 
   // par défaut, le dossier porte la MARQUE du client ("atlassian"), pas l'hôte ni un lot
