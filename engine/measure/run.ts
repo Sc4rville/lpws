@@ -85,12 +85,12 @@ export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecte
   const fenetre = async (id: string, lanceLe: string, finLe: string | undefined, experience?: string, ciblage = false): Promise<Fenetre> => {
     const d = lanceLe.slice(0, 10), j = finLe?.slice(0, 10) ?? "today"
     if ((ciblage && !experience) || (exemple && experience))
-      return { depuis: d, jusqua: j, experience, controle: null, variante: null }
+      return { depuis: d, jusqua: j, ...(experience ? { experience } : {}), controle: null, variante: null }
     const cle = `${d}/${j}/${experience ?? ""}`
     if (!fenetres.has(cle)) fenetres.set(cle, lire(d, j, experience))
     const ls = await fenetres.get(cle)!
     const de = (v: string) => { const l = ls.find((x) => x.version === v); return l ? { n: l.sessions, c: l.conversions } : null }
-    return { depuis: d, jusqua: j, experience, controle: de("controle"), variante: de(id) }
+    return { depuis: d, jusqua: j, ...(experience ? { experience } : {}), controle: de("controle"), variante: de(id) }
   }
   for (const t of vivants) if (t.lanceLe) parTest[t.id] = await fenetre(t.id, t.lanceLe, t.finLe, t.experience, !!t.ciblage)
   /* Un test arrêté a été archivé avec ce que GA4 savait à l'arrêt ; ses dernières conversions

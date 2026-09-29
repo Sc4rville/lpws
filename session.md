@@ -30,8 +30,19 @@
 - **Vérif locale** : GitHub Actions est bloqué (facturation du compte) ; `npm run verif` rejoue
   la CI en local (typecheck · menage · tests · interface · 2 clones de démo fidèles, hors `clients/`).
 
+- **Intentions Google Ads (phase 1+2, non publié)** : rapport « termes de recherche » →
+  7 intentions → routes mot-clé → variantes ciblées (`engine/intent/`). Balise : routage au
+  clic par mot-clé acheté (`lpws_kw`…), `lpws_intention`/`lpws_experience` dans GA4, strict
+  fail-closed. Serveur : `ui/server/intentions.ts` (import, décisions, génération, simulateur,
+  connecteur script Google Ads en lecture seule, config mesure) ; verrou par client sur toute
+  mutation ; tests par intention = cycle de vie disjoint possible. Vue Intentions + audience
+  des tests dans l'UI. Pas encore prouvé : vrai compte Ads (suffixe, sync), vrai GTM, GA4.
+
 ## À faire (dans l'ordre)
-0. **Le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées), corrige, puis
+0. **Valider les intentions sur un vrai compte** : coller le suffixe d'URL finale, coller le
+   script Google Ads généré (ou importer l'export CSV), provisionner le compte de service GA4
+   et ajouter l'e-mail en lecteur, créer les 3 dimensions utilisateur, lancer un test ciblé.
+   Puis **le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées), corrige, puis
    `npm run brain:eval` ; puis il lit les 3 propositions Relay dans l'interface.
 1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
    une vraie propriété GA4 (`customUser:lpws_variante`, `sessionKeyEventRate`), trancher la langue

@@ -37,12 +37,14 @@ import { estLance, lireArgs } from "../shared/cli.ts"
 import { ecrireJson, lireCache, lireJson, lireValide } from "../shared/json.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
 import { aEviter, bilanRegles, historique, type Lecon } from "../measure/experience.ts"
+import type { Ciblage } from "../intent/ciblage.ts"
 
 const SCOPE = "variant"
 
 export type Proposition = {
   nom: string; titre: string; teste: string; regle: string; score: number; pourquoi: string; signal: string
   sources: string[]; bilan?: Constat["bilan"]; fichier: string; proposeLe: string; refusee?: boolean; declineDe?: string; consigne?: string
+  ciblage?: Ciblage
 }
 
 /** ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit */
@@ -111,12 +113,14 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   if (opts.sansVariantes) return { d, variantes: [] }
   const langue = langueDe(await readFile(f.capture, "utf8"))
   // les refus du buyer restent, spec comprise : ils sont la mémoire de ce qu'il ne veut pas (feuille de route 4.1)
-  const refusees = (await lireJson<Proposition[]>(f.propositions, [])).filter((p) => p.refusee)
+  const anciennes = await lireJson<Proposition[]>(f.propositions, [])
+  const conservees = anciennes.filter((p) => p.refusee || p.ciblage)
+  const testsExistants = await lireJson<Array<{ id: string }>>(f.tests, [])
   const lecons = await leconsDe(h.lecons)
   const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () =>
-    ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime, { lecons, reserves: refusees.map((p) => p.nom) }))
+    ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime, { lecons, reserves: [...conservees.map((p) => p.nom), ...testsExistants.map((t) => t.id)] }))
   const propositions = versPropositions(variantes, d.tests)
-  await ecrireJson(f.propositions, [...propositions, ...refusees])
+  await ecrireJson(f.propositions, [...propositions, ...conservees])
   step(SCOPE, `${variantes.length} variante(s) prête(s) pour apply`)
   return { d, variantes }
 }

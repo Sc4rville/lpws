@@ -23,8 +23,6 @@ export async function construireTag(job: Job, c: string, camp: string): Promise<
   await appliquerParts(c, camp)
   return 0
 }
-/** part, audience et lancement d'une variante servie : tests.json fait foi, jamais le build.
- *  L'expérience ne sort que pour un test qui collecte : un gagnant déployé sert tout le monde. */
 const enrichie = (v: VarianteServie, t?: Test): VarianteServie => ({
   ...v,
   part: t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0,
@@ -90,9 +88,6 @@ export async function publierTag(job: Job, c: string, camp: string): Promise<num
 
   await ecrireConfigClient(c, camp)
 
-  /* Le loader embarque une copie figée de la config (repli sous CSP) : copier celui du build
-   * resservirait les variantes d'alors — arrêtées, re-partagées, déployées depuis. On le
-   * régénère donc depuis la config fusionnée qui fait foi, strict compris. */
   const fusion = await lireJson<ConfigServie>(join(DIST, "v", `${slug}.json`), { actif: false, strict: true, delaiMasque: 1200, delaiMax: 3200, variantes: [] })
   await writeFile(join(DIST, "t", `${slug}.js`), await buildLoader(slug, BASE_TAGS, fusion))
 

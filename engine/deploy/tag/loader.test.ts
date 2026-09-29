@@ -7,7 +7,6 @@ import { buildLoader } from "./build.ts"
 import type { ConfigServie } from "./loader.ts"
 import type { Ciblage } from "../../intent/ciblage.ts"
 
-/** même répartition que le tag : choisir un gclid qui tombe dans ou hors de la part */
 const fraction = (s: string): number => {
   let h = 2166136261
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
@@ -28,7 +27,6 @@ const CLIENT = "fixture"
 let server: Server
 let base: string
 let browser: Browser
-/** ce que /v/fixture.json doit répondre ; null = réponse en échec */
 let servie: ConfigServie | null = null
 
 const pageHtml = (extra = "") => `<!doctype html><html><head><meta charset="utf-8">

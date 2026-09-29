@@ -1,14 +1,16 @@
 /** pipeline.ts : onboarder une page, lister ses textes, créer un test (à la main ou depuis le brain), le lancer ou l'arrêter. */
 import { mkdir, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { createHash } from "node:crypto"
+import { z } from "zod"
 import { lancerNavigateur, UA } from "../../engine/shared/navigateur.ts"
 import { marque, slugify } from "../../engine/shared/paths.ts"
 import { Contexte } from "../../engine/variant/contexte.ts"
+import { VariantSpec } from "../../engine/apply/spec.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
-import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience } from "../../engine/measure/experience.ts"
+import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience, MOTIFS, estMotif } from "../../engine/measure/experience.ts"
 import { lireCompte, peutLancer } from "../../engine/compte/compte.ts"
 import { CLIENTS_ROOT } from "../../engine/shared/paths.ts"
 import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
@@ -94,7 +96,6 @@ async function pipelineTest(job: Job, c: string, camp: string, id: string, base:
     finir(job, true, { id })
 }
 
-/** Un ciblage fourni par l'appelant est validé une fois, ici ; invalide = 400, pas de test. */
 function ciblageValide(x: unknown): Test["ciblage"] {
   if (x === undefined || x === null) return undefined
   const v = Ciblage.safeParse(x)
@@ -102,233 +103,283 @@ function ciblageValide(x: unknown): Test["ciblage"] {
   return v.data
 }
 
+async function marquerEchec(d: string, id: string, job: Job, e: unknown) {
+  dire(job, String(e))
+  const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
+  const t = all.find((x) => x.id === id)
+  if (t && t.etat === "prep") { t.etat = "echec"; t.erreur = String(e instanceof Error ? e.message : e); await ecrireJson(fichiersDe(d).tests, all) }
+  finir(job, false)
+}
+
+const ENTREE_TEST = z.object({
+  titre: z.string().trim().min(1).max(100),
+  pourquoi: z.string().trim().min(1).max(1000),
+  edits: z.array(z.object({ anchor: z.string().regex(/^[es][0-9]+$/), text: z.string().trim().min(1).max(1200) })).min(1).max(2),
+  ciblage: Ciblage.optional(),
+})
+
 export async function creerTest(c: string, camp: string, entree: { titre: string; pourquoi: string; edits: Array<{ anchor: string; text: string }>; ciblage?: unknown }) {
   const d = dossier(c, camp)
-  const liberer = verrouillerCampagne(d)
+  const liberer = verrouillerCampagne(dirname(d))
   try {
-  const ciblage = ciblageValide(entree.ciblage)
-  const base = fichiersDe(d).baseline
-  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
-  let id = slugify(entree.titre).slice(0, 40) || "test"
-  while (tests.some((t) => t.id === id)) id += "-2"
-  const empreintes = await lireJson<Array<{ a: string; role: string; text: string }>>(fichiersDe(d).ancres, [])
-  const txt = await textes(c, camp)
-  const edits = entree.edits.map((e) => ({ anchor: e.anchor, text: e.text, avant: txt.find((t) => t.anchor === e.anchor)?.text ?? "" }))
-  const job = nouveauJob("test")
-  const teste = edits.map((e) => `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »`).join(" · ")
-  const test: Test = { id, titre: entree.titre, teste, pourquoi: entree.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, ciblage }
-  tests.push(test)
-  await ecrireJson(fichiersDe(d).tests, tests)
+    const v = ENTREE_TEST.safeParse(entree)
+    if (!v.success) throw Object.assign(new Error("test invalide : " + v.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join(", ")), { code: 400 })
+    const base = fichiersDe(d).baseline
+    const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+    let id = slugify(v.data.titre).slice(0, 40) || "test"
+    while (tests.some((t) => t.id === id)) id += "-2"
+    const empreintes = await lireJson<Array<{ a: string; role: string; text: string }>>(fichiersDe(d).ancres, [])
+    const txt = await textes(c, camp)
+    const connues = new Set(txt.map((t) => t.anchor))
+    for (const e of v.data.edits)
+      if (!connues.has(e.anchor) && !empreintes.some((x) => x.a === e.anchor))
+        throw Object.assign(new Error(`ancre ${e.anchor} inconnue sur cette page`), { code: 400 })
+    const edits = v.data.edits.map((e) => ({ anchor: e.anchor, text: e.text, avant: txt.find((t) => t.anchor === e.anchor)?.text ?? "" }))
+    const job = nouveauJob("test")
+    const teste = edits.map((e) => `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »`).join(" · ")
+    const test: Test = { id, titre: v.data.titre, teste, pourquoi: v.data.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, ciblage: v.data.ciblage }
+    tests.push(test)
+    await ecrireJson(fichiersDe(d).tests, tests)
 
-  const spec = {
-    nom: id,
-    hypothese: `Si ${teste}, alors les conversions augmentent, parce que ${entree.pourquoi}`.slice(0, 600).padEnd(20, "."),
-    metrique: "conversions Google Ads sur le trafic payant",
-    risque: "test défini à la main par le media buyer : à relire avant lancement",
-    diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${entree.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer : pas de règle KB" },
-    edits: edits.map((e) => {
-      const emp = empreintes.find((x) => x.a === e.anchor)
-      return { anchor: e.anchor, op: "set", text: e.text, pourquoi: entree.pourquoi, ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
-    }),
-  }
-  const specPath = fichiersDe(d).spec(id)
-  await ecrireJson(specPath, spec)
+    const spec = {
+      nom: id,
+      hypothese: `Si ${teste}, alors les conversions augmentent, parce que ${v.data.pourquoi}`.slice(0, 600).padEnd(20, "."),
+      metrique: "conversions Google Ads sur le trafic payant",
+      risque: "test défini à la main par le media buyer : à relire avant lancement",
+      diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${v.data.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer : pas de règle KB" },
+      edits: edits.map((e) => {
+        const emp = empreintes.find((x) => x.a === e.anchor)
+        return { anchor: e.anchor, op: "set", text: e.text, pourquoi: v.data.pourquoi, ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
+      }),
+    }
+    const specPath = fichiersDe(d).spec(id)
+    try { VariantSpec.parse(spec) } catch { throw Object.assign(new Error("la spec produite est invalide : rien n’a été écrit"), { code: 400 }) }
+    await ecrireJson(specPath, spec)
 
-  // le verrou couvre TOUTE la pipeline de fond : une mutation lancée pendant la
-  // construction verrait un tests.json à moitié écrit et republierait dessus
-  pipelineTest(job, c, camp, id, base, specPath)
-    .catch((e) => { dire(job, String(e)); finir(job, false) })
-    .finally(liberer)
-  return { job, id }
+    pipelineTest(job, c, camp, id, base, specPath)
+      .catch((e) => marquerEchec(d, id, job, e).catch((e2) => dire(job, String(e2))))
+      .finally(liberer)
+    return { job, id }
   } catch (e) { liberer(); throw e }
 }
 
 /** Le brain : écrit context.json, puis signaux → jugement → diagnostic → 3 specs (job). */
 export async function lancerBrain(c: string, camp: string, contexte: unknown): Promise<Job> {
   const d = dossier(c, camp)
-  const v = Contexte.safeParse(contexte)
-  if (!v.success) throw Object.assign(new Error("Il manque au moins ce que promet l’annonce et comment se conclut la vente : " + v.error.issues.map((i) => i.path.join(".")).join(", ")), { code: 400 })
-  await ecrireJson(fichiersDe(d).contexte, v.data)
-  const job = nouveauJob("brain")
-  job.campagne = d
-  ;(async () => {
-    dire(job, "1 · LPWS lit la page : titres, boutons, preuves, prix")
-    dire(job, "2 · puis juge ce qui ne se compte pas, et compare à l’annonce")
-    dire(job, "3 · puis écrit trois variantes, une par cible")
-    const code = await lancer(job, TSX, [join(ROOT, "engine/variant/run.ts"), resolve(d), "--refaire"])
-    finir(job, code === 0)
-  })()
-  return job
+  const liberer = verrouillerCampagne(dirname(d))
+  try {
+    const v = Contexte.safeParse(contexte)
+    if (!v.success) throw Object.assign(new Error("Il manque au moins ce que promet l’annonce et comment se conclut la vente : " + v.error.issues.map((i) => i.path.join(".")).join(", ")), { code: 400 })
+    await ecrireJson(fichiersDe(d).contexte, v.data)
+    const job = nouveauJob("brain")
+    job.campagne = d
+    ;(async () => {
+      dire(job, "1 · LPWS lit la page : titres, boutons, preuves, prix")
+      dire(job, "2 · puis juge ce qui ne se compte pas, et compare à l’annonce")
+      dire(job, "3 · puis écrit trois variantes, une par cible")
+      const code = await lancer(job, TSX, [join(ROOT, "engine/variant/run.ts"), resolve(d), "--refaire"])
+      finir(job, code === 0)
+    })().catch((e) => { dire(job, String(e)); finir(job, false) }).finally(liberer)
+    return job
+  } catch (e) { liberer(); throw e }
 }
 
 /** Décliner une proposition : N variantes de plus sur le même constat, à la consigne du buyer (job). */
 export async function lancerDeclinaison(c: string, camp: string, nom: string, entree: { consigne?: unknown; n?: unknown }): Promise<Job> {
   const d = dossier(c, camp)
-  const props = await lireJson<Array<{ nom: string }>>(fichiersDe(d).propositions, [])
-  if (!props.some((p) => p.nom === nom)) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
-  if ([...jobs.values()].some((jb) => (jb.type === "decliner" || jb.type === "brain") && jb.etat === "en cours" && jb.campagne === d))
-    throw Object.assign(new Error("LPWS écrit déjà pour cette page : attendez la fin, une à deux minutes"), { code: 409 })
-  // « --x » en tête serait lu comme une option par la ligne de commande
-  const consigne = String(entree.consigne ?? "").replace(/\s+/g, " ").trim().replace(/^-+\s*/, "").slice(0, 300)
-  const n = Math.min(3, Math.max(1, Math.round(Number(entree.n) || 3)))
-  const job = nouveauJob("decliner")
-  job.campagne = d; job.sujet = nom
-  ;(async () => {
-    dire(job, `LPWS écrit ${n} autre${n > 1 ? "s" : ""} version${n > 1 ? "s" : ""} de ce test${consigne ? ` : « ${consigne} »` : ""}`)
-    const args = [join(ROOT, "engine/variant/run.ts"), resolve(d), "--decliner", nom, "--n", String(n)]
-    if (consigne) args.push("--consigne", consigne)
-    finir(job, (await lancer(job, TSX, args)) === 0)
-  })()
-  return job
+  const liberer = verrouillerCampagne(dirname(d))
+  try {
+    const props = await lireJson<Array<{ nom: string; ciblage?: unknown }>>(fichiersDe(d).propositions, [])
+    const p = props.find((x) => x.nom === nom)
+    if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
+    if ([...jobs.values()].some((jb) => (jb.type === "decliner" || jb.type === "brain" || jb.type === "intentions") && jb.etat === "en cours" && jb.campagne === d))
+      throw Object.assign(new Error("LPWS écrit déjà pour cette page : attendez la fin, une à deux minutes"), { code: 409 })
+    // « --x » en tête serait lu comme une option par la ligne de commande
+    const consigne = String(entree.consigne ?? "").replace(/\s+/g, " ").trim().replace(/^-+\s*/, "").slice(0, 300)
+    const n = Math.min(3, Math.max(1, Math.round(Number(entree.n) || 3)))
+    const job = nouveauJob(p.ciblage ? "intentions" : "decliner")
+    job.campagne = d; job.sujet = nom
+    const cb = p.ciblage ? Ciblage.safeParse(p.ciblage) : null
+    if (p.ciblage && !cb!.success) throw Object.assign(new Error("ciblage de la proposition invalide"), { code: 400 })
+    ;(async () => {
+      dire(job, `LPWS écrit ${n} autre${n > 1 ? "s" : ""} version${n > 1 ? "s" : ""} de ce test${consigne ? ` : « ${consigne} »` : ""}`)
+      const args = p.ciblage && cb?.success
+        ? [join(ROOT, "engine/intent/personnaliser.ts"), resolve(d), "--intention", cb.data.intention, "--n", String(n), "--source", nom]
+        : [join(ROOT, "engine/variant/run.ts"), resolve(d), "--decliner", nom, "--n", String(n)]
+      if (consigne) args.push("--consigne", consigne)
+      finir(job, (await lancer(job, TSX, args)) === 0)
+    })().catch((e) => { dire(job, String(e)); finir(job, false) }).finally(liberer)
+    return job
+  } catch (e) { liberer(); throw e }
 }
 
 /** Une proposition du brain devient un test : même pipeline qu'un test écrit à la main. */
 export async function creerTestDepuisProposition(c: string, camp: string, nom: string) {
   const d = dossier(c, camp)
-  const liberer = verrouillerCampagne(d)
+  const liberer = verrouillerCampagne(dirname(d))
   try {
-  const base = fichiersDe(d).baseline
-  const props = await lireJson<Array<{ nom: string; titre: string; teste: string; pourquoi: string; regle: string; ciblage?: unknown }>>(fichiersDe(d).propositions, [])
-  const p = props.find((x) => x.nom === nom)
-  if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
-  const ciblage = ciblageValide(p.ciblage)
-  const specPath = fichiersDe(d).spec(nom)
-  if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
-  const spec = await lireJson<any>(specPath, {})
-  let tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
-  if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
-  tests = tests.filter((t) => t.id !== nom)
-  const txt = await textes(c, camp)
-  const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
-  const job = nouveauJob("test")
-  tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, regle: p.regle, ciblage })
-  await ecrireJson(fichiersDe(d).tests, tests)
-  pipelineTest(job, c, camp, nom, base, specPath)
-    .catch((e) => { dire(job, String(e)); finir(job, false) })
-    .finally(liberer)
-  return { job, id: nom }
+    const base = fichiersDe(d).baseline
+    const props = await lireJson<Array<{ nom: string; titre: string; teste: string; pourquoi: string; regle: string; ciblage?: unknown }>>(fichiersDe(d).propositions, [])
+    const p = props.find((x) => x.nom === nom)
+    if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
+    const ciblage = ciblageValide(p.ciblage)
+    const specPath = fichiersDe(d).spec(nom)
+    if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
+    const spec = await lireJson<any>(specPath, {})
+    let tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+    if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
+    tests = tests.filter((t) => t.id !== nom)
+    const txt = await textes(c, camp)
+    const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
+    const job = nouveauJob("test")
+    tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, regle: p.regle, ciblage })
+    await ecrireJson(fichiersDe(d).tests, tests)
+    pipelineTest(job, c, camp, nom, base, specPath)
+      .catch((e) => marquerEchec(d, nom, job, e).catch((e2) => dire(job, String(e2))))
+      .finally(liberer)
+    return { job, id: nom }
   } catch (e) { liberer(); throw e }
 }
 
 export async function changerEtat(c: string, camp: string, id: string, etat: "live" | "stop" | "gagnant", part: number, reprise = false) {
   const d = dossier(c, camp)
-  // pris AVANT la moindre lecture, rendu quand la publication de fond est finie
-  const liberer = verrouillerCampagne(d)
+  const liberer = verrouillerCampagne(dirname(d))
   try {
-  const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
-  const t = tests.find((x) => x.id === id)
-  if (!t) throw new Error("test inconnu")
-  /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
-   * mandaté le buyer (docs/recherche/business-model.md §7). Le palier ne limite qu'en SaaS. */
-  if (etat === "live") {
-    const compte = await lireCompte(FICHIER_COMPTE)
-    const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))
-      : compte.mandats[c] ? { ok: true as const } : { ok: false as const, action: "mandat" as const, raison: "Aucun mandat déclaré pour ce client : LPWS ne met rien en ligne sur un site sans l’accord écrit de son propriétaire. Déclarez-le une fois, puis lancez." }
-    if (!droit.ok) throw Object.assign(new Error(droit.raison), { code: 402, action: droit.action })
-  }
-  /* PAS DE MISE EN LIGNE SANS BALISE.
-   * Constaté en rejouant le parcours : le test passait « En ligne · 50 % » alors que la balise
-   * n'était sur aucune page. Le buyer croyait tester, personne ne voyait la variante. On sonde
-   * donc la vraie page au moment de lancer (il vient peut-être de publier GTM sans cliquer
-   * « Vérifier »), et on refuse franchement si elle ne répond pas. */
-  if (etat === "live") {
-    /* Un test ciblé exige une balise qui sait router (intent-v1) : express.json peut être
-     * ancien, donc on sonde la vraie page plutôt que de croire une vérification d'avant. */
-    const ex = await lireJson<Express>(fichiersDe(d).express, { installe: false })
-    const sonde = t.ciblage || !ex.installe ? await sonderBalise(c, camp) : ex
-    if (!sonde.installe)
-      throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
-    if (t.ciblage && sonde.capacite !== "intent-v1")
-      throw Object.assign(new Error("La balise posée sur la page date d’avant le routage par intention : un test ciblé y serait servi à tout le monde. Republiez la balise (Connexion → Express), puis relancez."), { code: 409 })
-  }
-  /* Un test ciblé ne se lance que prêt (sa variante est construite), sur des routes
-   * non vides, avec le contexte de l'annonce — sinon il routerait vers rien. */
-  if (etat === "live" && t.ciblage) {
-    const cb = Ciblage.safeParse(t.ciblage)
-    if (!cb.success || cb.data.routes.length === 0)
-      throw Object.assign(new Error("Le ciblage de ce test est invalide ou vide : rien ne routerait vers lui."), { code: 409 })
+    const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
+    const t = tests.find((x) => x.id === id)
+    if (!t) throw new Error("test inconnu")
     const reprenable = reprise && t.etat === "stop" && !!t.lanceLe && !!t.plan && !!t.finLe
-    if (t.etat !== "pret" && !reprenable)
-      throw Object.assign(new Error("Un test ciblé se lance une fois sa variante construite (état « prêt ») : celui-ci est « " + t.etat + " »."), { code: 409 })
-    if (!existsSync(fichiersDe(d).contexte))
-      throw Object.assign(new Error("Un test ciblé demande le contexte de l’annonce (ce que promet l’annonce et comment se conclut la vente) : remplissez-le d’abord."), { code: 409 })
-  }
-  // un gagnant servi à 100 % capte tous les visiteurs DE SON AUDIENCE : un test qui vise
-  // d'autres intentions reste possible, un test qui croise la sienne ne toucherait personne
-  const deploye = tests.find((o) => o !== t && o.etat === "gagnant" && ciblagesSeCroisent(t.ciblage, o.ciblage))
-  if (etat === "live" && deploye)
-    throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
-  // les visiteurs déjà comptés l'ont été à cette part : l'horizon et le contrôle de répartition en dépendent
-  if (etat === "live" && t.etat === "live")
-    throw Object.assign(new Error(`La part d’un test en cours ne change pas : les visiteurs déjà comptés l’ont été à ${t.part} %. Arrêtez le test puis relancez-le à la nouvelle part.`), { code: 409 })
-  if (etat === "live" && (part <= 0 || part >= 100))
-    throw Object.assign(new Error("Un test se lance entre 5 et 95 % : à 0 ou 100 %, il n’y a rien à comparer."), { code: 409 })
-  if (etat === "gagnant" && t.etat !== "live" && t.etat !== "stop")
-    throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
-  const avant = tests.map((o) => [o.id, o.etat, o.part, o.lanceLe, o.finLe, o.plan, o.anciens, o.retireLe, o.experience] as const)
-  const maintenant = new Date().toISOString()
-  // seul un test qui collectait entre au journal : un test déjà arrêté a ses chiffres, on n'y touche plus
-  const arretes = new Set<string>(), deployes = new Set<string>()
-  const cesse = (o: Test) => { if (o.etat === "live") { o.finLe = maintenant; arretes.add(o.id) } }
-  // annuler un arrêt reprend la MÊME expérience (même lancement, même horizon), sans repartir de zéro
-  // … à condition qu'aucun autre test DE LA MÊME AUDIENCE n'ait été lancé depuis l'arrêt :
-  // sa fenêtre engloberait l'intermède ; un test disjoint, lui, ne gêne pas la reprise
-  const reprend = etat === "live" && reprise && t.etat === "stop" && !!t.lanceLe && !!t.plan && !!t.finLe
-    && !tests.some((o) => o !== t && !!o.lanceLe && o.lanceLe >= t.finLe! && ciblagesSeCroisent(t.ciblage, o.ciblage))
-  if (reprend) {
-    t.etat = "live"; delete t.finLe
-  } else if (etat === "live") {
-    // l'horizon se fixe AVANT de regarder : c'est lui qui donne le droit de conclure
-    if (t.lanceLe && t.finLe) t.anciens = [...(t.anciens ?? []), { lanceLe: t.lanceLe, finLe: t.finLe, part: t.part, plan: t.plan, experience: t.experience }]
-    t.etat = "live"; t.part = part || 50; t.lanceLe = maintenant; delete t.finLe
-    // chaque LANCEMENT reçoit son identifiant : la mesure isole alors cette fenêtre,
-    // même quand des tests disjoints tournent en parallèle sur la même page
-    t.experience = createHash("sha256").update(d + "\n" + t.id + "\n" + maintenant).digest("hex").slice(0, 32)
-    t.plan = await planAuLancement(d, t.part / 100, !!t.ciblage)
-    for (const o of tests) if (o !== t && o.etat === "live" && ciblagesSeCroisent(t.ciblage, o.ciblage)) { cesse(o); o.etat = "stop" }
-  } else if (etat === "gagnant") {
-    if (t.etat === "stop") deployes.add(t.id)
-    cesse(t); t.etat = "gagnant"; t.part = 100
-    for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant") && ciblagesSeCroisent(t.ciblage, o.ciblage)) { if (o.etat === "gagnant") o.retireLe = maintenant; cesse(o); o.etat = "stop"; o.part = 0 }
-  } else {
-    // « Remettre l'original » : un gagnant déployé redescend à 0 %, un test vivant s'arrête
-    if (t.etat === "gagnant") { t.part = 0; t.retireLe = maintenant }
-    cesse(t); t.etat = "stop"
-  }
-  await ecrireJson(fichiersDe(d).tests, tests)
-  await appliquerParts(c, camp)
-  const job = nouveauJob("config")
-  ;(async () => {
-   try {
-    dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : etat === "gagnant" ? "déploiement : 100 % des visiteurs verront la variante" : "arrêt : l’original reprend 100 % du trafic")
-    const code = await publierTag(job, c, camp)
-    // l'état affiché doit être l'état EN LIGNE : si la publication rate, on revient en arrière et on dit pourquoi
-    const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
-    const cible = all.find((x) => x.id === id)
-    if (code !== 0) {
-      for (const [oid, oetat, opart, olance, ofin, oplan, oanciens, oretire, oexp] of avant) { const o = all.find((x) => x.id === oid); if (o) Object.assign(o, { etat: oetat, part: opart, lanceLe: olance, finLe: ofin, plan: oplan, anciens: oanciens, retireLe: oretire, experience: oexp }) }
-      if (cible) cible.erreur = "La publication sur Vercel a échoué, rien n’a changé en ligne : " + job.lignes.slice(-3).join(" / ")
-    } else if (cible) delete cible.erreur
-    await ecrireJson(fichiersDe(d).tests, all)
-    // publié : ce qui a cessé de collecter entre dans le journal du client
-    if (code === 0) {
-      try {
-        for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
-          dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
-        for (const o of all.filter((x) => deployes.has(x.id)))
-          if (!(await marquerDeploye(d, o)))
-            // l'arrêt n'avait pas été archivé : on l'archive maintenant, sur sa fenêtre de collecte
-            for (const x of await enregistrerExperiences(d, [o])) dire(job, `journal : « ${x.titre} » — ${x.conclusion} (archivé au déploiement)`)
-        if (reprend && cible) await retirerExperience(d, cible)
-      } catch (e) { dire(job, `journal : non écrit (${(e as Error).message.split("\n")[0]}) — la mise en ligne, elle, est faite`) }
+    if (etat === "live" && !(t.etat === "pret" || t.etat === "stop"))
+      throw Object.assign(new Error(`Un test se lance quand sa variante est construite (état « prêt »), ou reprend après un arrêt : celui-ci est « ${t.etat} ».`), { code: 409 })
+    if (etat === "live" && (!Number.isFinite(part) || part < 5 || part > 95))
+      throw Object.assign(new Error("Un test se lance entre 5 et 95 % : à 0 ou 100 %, il n’y a rien à comparer."), { code: 409 })
+    if (etat === "gagnant" && t.etat !== "live" && t.etat !== "stop")
+      throw Object.assign(new Error("seul un test lancé peut être déployé"), { code: 409 })
+    /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
+     * mandaté le buyer (docs/recherche/business-model.md §7). Le palier ne limite qu'en SaaS. */
+    if (etat === "live") {
+      const compte = await lireCompte(FICHIER_COMPTE)
+      const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))
+        : compte.mandats[c] ? { ok: true as const } : { ok: false as const, action: "mandat" as const, raison: "Aucun mandat déclaré pour ce client : LPWS ne met rien en ligne sur un site sans l’accord écrit de son propriétaire. Déclarez-le une fois, puis lancez." }
+      if (!droit.ok) throw Object.assign(new Error(droit.raison), { code: 402, action: droit.action })
+    }
+    /* PAS DE MISE EN LIGNE SANS BALISE.
+     * Constaté en rejouant le parcours : le test passait « En ligne · 50 % » alors que la balise
+     * n'était sur aucune page. Le buyer croyait tester, personne ne voyait la variante. On sonde
+     * donc la vraie page au moment de lancer (il vient peut-être de publier GTM sans cliquer
+     * « Vérifier »), et on refuse franchement si elle ne répond pas. */
+    if (etat === "live") {
+      const ex = await lireJson<Express>(fichiersDe(d).express, { installe: false })
+      const sonde = t.ciblage || !ex.installe ? await sonderBalise(c, camp) : ex
+      if (!sonde.installe)
+        throw Object.assign(new Error("La balise Express n’est pas encore sur la page : personne ne verrait la variante. Installez-la (Connexion → Express), publiez dans GTM, puis lancez le test."), { code: 409 })
+      if (t.ciblage && (sonde.capacite !== "intent-v1" || sonde.mode !== "pilote"))
+        throw Object.assign(new Error("La balise posée ne sait pas router par intention en direct (repli figé ou balise ancienne) : un test ciblé y serait servi à tout le monde ou à personne. Republiez la balise (Connexion → Express), puis relancez."), { code: 409 })
+    }
+    if (etat === "live" && t.ciblage) {
+      const cb = Ciblage.safeParse(t.ciblage)
+      if (!cb.success || cb.data.routes.length === 0)
+        throw Object.assign(new Error("Le ciblage de ce test est invalide ou vide : rien ne routerait vers lui."), { code: 409 })
+      if (!existsSync(fichiersDe(d).contexte))
+        throw Object.assign(new Error("Un test ciblé demande le contexte de l’annonce (ce que promet l’annonce et comment se conclut la vente) : remplissez-le d’abord."), { code: 409 })
+    }
+    // un gagnant servi à 100 % capte tous les visiteurs : un nouveau test ne toucherait personne
+    const deploye = tests.find((o) => o !== t && o.etat === "gagnant" && ciblagesSeCroisent(t.ciblage, o.ciblage))
+    if (etat === "live" && deploye)
+      throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
+    const avant = await lireJson<Test[]>(fichiersDe(d).tests, [])
+    const maintenant = new Date().toISOString()
+    // seul un test qui collectait entre au journal : un test déjà arrêté a ses chiffres, on n'y touche plus
+    const arretes = new Set<string>(), deployes = new Set<string>()
+    const cesse = (o: Test) => { if (o.etat === "live") { o.finLe = maintenant; arretes.add(o.id) } }
+    // annuler un arrêt reprend la MÊME expérience (même lancement, même horizon), sans repartir de zéro
+    // … à condition qu'aucun autre test n'ait été lancé depuis l'arrêt : sa fenêtre engloberait l'intermède
+    const reprend = etat === "live" && reprenable
+      && !tests.some((o) => o !== t && !!o.lanceLe && o.lanceLe >= t.finLe! && ciblagesSeCroisent(t.ciblage, o.ciblage))
+    if (reprend) {
+      t.etat = "live"; delete t.finLe
+    } else if (etat === "live") {
+      // l'horizon se fixe AVANT de regarder : c'est lui qui donne le droit de conclure
+      if (t.lanceLe && t.finLe) t.anciens = [...(t.anciens ?? []), { lanceLe: t.lanceLe, finLe: t.finLe, part: t.part, plan: t.plan, experience: t.experience }]
+      t.etat = "live"; t.part = part; t.lanceLe = maintenant; delete t.finLe
+      t.experience = createHash("sha256").update(d + "\n" + t.id + "\n" + maintenant).digest("hex").slice(0, 32)
+      t.plan = await planAuLancement(d, t.part / 100, !!t.ciblage)
+      for (const o of tests) if (o !== t && o.etat === "live" && ciblagesSeCroisent(t.ciblage, o.ciblage)) { cesse(o); o.etat = "stop" }
+    } else if (etat === "gagnant") {
+      if (t.etat === "stop") deployes.add(t.id)
+      cesse(t); t.etat = "gagnant"; t.part = 100
+      for (const o of tests) if (o !== t && (o.etat === "live" || o.etat === "gagnant") && ciblagesSeCroisent(t.ciblage, o.ciblage)) { if (o.etat === "gagnant") o.retireLe = maintenant; cesse(o); o.etat = "stop"; o.part = 0 }
     } else {
-      // la config fusionnée du client a déjà été écrite pour la tentative : elle repart de l'état restauré
+      // « Remettre l'original » : un gagnant déployé redescend à 0 %, un test vivant s'arrête
+      if (t.etat === "gagnant") { t.part = 0; t.retireLe = maintenant }
+      cesse(t); t.etat = "stop"
+    }
+    await ecrireJson(fichiersDe(d).tests, tests)
+    await appliquerParts(c, camp)
+    const restaurer = async (raison: string) => {
+      const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
+      for (const o0 of avant) {
+        const o = all.find((x) => x.id === o0.id)
+        if (o) Object.assign(o, { etat: o0.etat, part: o0.part, lanceLe: o0.lanceLe, finLe: o0.finLe, plan: o0.plan, anciens: o0.anciens, retireLe: o0.retireLe, experience: o0.experience })
+      }
+      const cible = all.find((x) => x.id === id)
+      if (cible) cible.erreur = raison
+      await ecrireJson(fichiersDe(d).tests, all)
       await appliquerParts(c, camp)
       await ecrireConfigClient(c, camp)
     }
-    finir(job, code === 0)
-   } catch (e) { dire(job, String(e)); finir(job, false) } finally { liberer() }
-  })()
-  return job
+    const job = nouveauJob("config")
+    ;(async () => {
+      let publie = false
+      try {
+        dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : etat === "gagnant" ? "déploiement : 100 % des visiteurs verront la variante" : "arrêt : l’original reprend 100 % du trafic")
+        // l'état affiché doit être l'état EN LIGNE : si la publication rate ou ne répond pas, on revient en arrière et on dit pourquoi
+        try { publie = (await publierTag(job, c, camp)) === 0 }
+        catch (e) { dire(job, `publication : ${(e as Error).message}`) }
+        if (!publie) {
+          await restaurer("Publication non confirmée ; état local restauré. Vérifiez la version en ligne. " + job.lignes.slice(-3).join(" / "))
+          finir(job, false)
+          return
+        }
+        const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
+        const cible = all.find((x) => x.id === id)
+        if (cible) { delete cible.erreur; await ecrireJson(fichiersDe(d).tests, all) }
+        // publié : ce qui a cessé de collecter entre dans le journal du client
+        try {
+          for (const x of await enregistrerExperiences(d, all.filter((o) => arretes.has(o.id))))
+            dire(job, `journal : « ${x.titre} » — ${x.conclusion}`)
+          for (const o of all.filter((x) => deployes.has(x.id)))
+            if (!(await marquerDeploye(d, o)))
+              // l'arrêt n'avait pas été archivé : on l'archive maintenant, sur sa fenêtre de collecte
+              for (const x of await enregistrerExperiences(d, [o])) dire(job, `journal : « ${x.titre} » — ${x.conclusion} (archivé au déploiement)`)
+          if (reprend && cible) await retirerExperience(d, cible)
+        } catch (e) { dire(job, `journal : non écrit (${(e as Error).message.split("\n")[0]}) — la mise en ligne, elle, est faite`) }
+        finir(job, true)
+      } catch (e) {
+        dire(job, String(e))
+        if (!publie) try { await restaurer("Publication non confirmée ; état local restauré. Vérifiez la version en ligne.") } catch (e2) { dire(job, String(e2)) }
+        finir(job, false)
+      } finally { liberer() }
+    })()
+    return job
   } catch (e) { liberer(); throw e }
+}
+
+export async function refuserProposition(c: string, camp: string, nom: string, entree: { motif?: unknown; raison?: unknown }) {
+  const d = dossier(c, camp)
+  const liberer = verrouillerCampagne(dirname(d))
+  try {
+    const f = fichiersDe(d).propositions
+    const props = await lireJson<any[]>(f, [])
+    const p = props.find((x) => x.nom === nom)
+    if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
+    // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
+    // le motif en un clic, la raison en mots si le buyer en écrit une : le brain relit les deux
+    const motif = estMotif(entree.motif) ? entree.motif : undefined
+    const libre = String(entree.raison ?? "").trim().slice(0, 300)
+    p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = [motif && MOTIFS[motif], libre].filter(Boolean).join(" : ")
+    if (motif) p.motif = motif
+    await ecrireJson(f, props)
+    return { ok: true }
+  } finally { liberer() }
 }

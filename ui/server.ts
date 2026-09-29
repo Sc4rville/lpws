@@ -57,18 +57,28 @@ import { dossierAudit } from "../engine/audit/audit.ts"
 import { verifierAdresse } from "./server/adresse.ts"
 import { planifier, mdePour } from "../engine/measure/stats.ts"
 import { rapportHtml } from "../engine/rapport/rapport.ts"
-import { MOTIFS, estMotif } from "../engine/measure/experience.ts"
 import { lireCompte, ecrireCompte, demarrerEssai, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
 import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/compte/stripe.ts"
-import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat } from "./server/pipeline.ts"
+import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat, refuserProposition } from "./server/pipeline.ts"
 import { verifier } from "./server/tag.ts"
+import { etatIntentions, importerIntentions, deciderIntentions, genererVariantes, propositionIntentions, simuler, connecter, configurerMesure, mesurerIntentions, authentifierSync, synchroniserCorps } from "./server/intentions.ts"
 
 const SCOPE = "ui"
 const PORT = Number(process.env.PORT ?? 4700)
 const UI = join(ROOT, "ui", "index.html")
 
 /* ---------- http ---------- */
-const body = (req: IncomingMessage) => new Promise<any>((ok, ko) => { let s = ""; req.on("data", (d) => s += d); req.on("end", () => { try { ok(s ? JSON.parse(s) : {}) } catch (e) { ko(e) } }) })
+const lireBrut = (req: IncomingMessage, max: number) => new Promise<Buffer>((ok, ko) => {
+  const lots: Buffer[] = []; let n = 0
+  req.on("data", (d: Buffer) => { n += d.length; if (n > max) { ko(Object.assign(new Error("corps trop volumineux"), { code: 413 })); req.destroy() } else lots.push(d) })
+  req.on("end", () => ok(Buffer.concat(lots)))
+  req.on("error", ko)
+})
+const body = async (req: IncomingMessage, max = 2_000_000) => {
+  const brut = await lireBrut(req, max)
+  try { return brut.length ? JSON.parse(brut.toString("utf8")) : {} }
+  catch { throw Object.assign(new Error("JSON invalide"), { code: 400 }) }
+}
 
 /** Hébergée en ligne, l'interface est derrière un mot de passe (LPWS_MOT_DE_PASSE) : un seul,
  *  partagé entre Yann et kabylesystem, le navigateur le retient. Sans la variable : rien ne change en local. */
@@ -85,6 +95,15 @@ function autorise(req: IncomingMessage, res: ServerResponse): boolean {
 
 createServer(async (req, res) => {
   try {
+    // le connecteur Google Ads Scripts a son jeton Bearer, pas le mot de passe de l'interface ;
+    // l'authentification passe avant la lecture du corps
+    const segBrut = (req.url ?? "").split("?")[0].split("/").filter(Boolean).map(decodeURIComponent)
+    if (req.method === "POST" && segBrut.length === 5 && segBrut[0] === "api" && segBrut[1] === "intents" && segBrut[4] === "sync") {
+      const auth = req.headers.authorization ?? ""
+      await authentifierSync(segBrut[2], segBrut[3], auth.startsWith("Bearer ") ? auth.slice(7).trim() : undefined)
+      const brut = await lireBrut(req, 5_000_000)
+      return json(res, 200, await synchroniserCorps(segBrut[2], segBrut[3], brut))
+    }
     // Stripe n'a pas le mot de passe : sa requête est authentifiée par sa signature
     if (req.url === "/api/stripe/webhook" && req.method === "POST") {
       const brut = await new Promise<string>((ok) => { let s = ""; req.on("data", (d) => s += d); req.on("end", () => ok(s)) })
@@ -98,6 +117,10 @@ createServer(async (req, res) => {
     const seg = p.split("/").filter(Boolean)
     if (p === "/") { res.writeHead(200, { "content-type": mimeDe(UI) }); res.end(await pageAvecStats(await readFile(UI, "utf8"))); return }
     if (p === "/api/etat") return json(res, 200, await etat())
+    if (p === "/api/intents/exemple.csv" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="lpws-termes-synthetiques-exemple.csv"', "x-lpws-contenu": "synthetique" })
+      res.end(await readFile(join(ROOT, "engine/intent/exemple.csv"))); return
+    }
     if (p === "/api/clients" && req.method === "POST") {
       const { url: u } = await body(req)
       let cible: URL
@@ -148,7 +171,7 @@ createServer(async (req, res) => {
       if (seg[4] === "tests" && !seg[5] && req.method === "POST") {
         const b = await body(req)
         if (!b.titre || !Array.isArray(b.edits) || !b.edits.length || b.edits.some((e: any) => !e.anchor || !e.text)) return json(res, 400, { erreur: "Il faut un titre et au moins un texte à changer." })
-        const r = await creerTest(c, camp, { titre: String(b.titre), pourquoi: String(b.pourquoi || "le media buyer veut le vérifier"), edits: b.edits })
+        const r = await creerTest(c, camp, { titre: String(b.titre), pourquoi: String(b.pourquoi || "le media buyer veut le vérifier"), edits: b.edits, ciblage: b.ciblage })
         return json(res, 202, { job: r.job.id, id: r.id })
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
@@ -175,18 +198,27 @@ createServer(async (req, res) => {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-disposition": `inline; filename="rapport-${slugify(seg[5])}.html"` }); res.end(html); return
       }
       if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
-      if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST") {
-        const f = fichiersDe(dossier(c, camp)).propositions
-        const props = await lireJson<any[]>(f, [])
-        const p = props.find((x) => x.nom === seg[5]); if (!p) return json(res, 404, { erreur: "proposition inconnue" })
-        // gardée, pas effacée : une variante refusée par le buyer est un signal sur nos diagnostics (feuille de route 4.1)
-        // le motif en un clic, la raison en mots si le buyer en écrit une : le brain relit les deux
-        const b = await body(req), m: unknown = b.motif, motif = estMotif(m) ? m : undefined
-        const libre = String(b.raison ?? "").trim().slice(0, 300)
-        p.refusee = true; p.refuseeLe = new Date().toISOString(); p.raison = [motif && MOTIFS[motif], libre].filter(Boolean).join(" : ")
-        if (motif) p.motif = motif
-        await ecrireJson(f, props); return json(res, 200, { ok: true })
-      }
+      if (seg[4] === "intentions" && !seg[5] && req.method === "GET") return json(res, 200, await etatIntentions(c, camp))
+      if (seg[4] === "intentions" && seg[5] === "import" && req.method === "POST")
+        return json(res, 200, await importerIntentions(c, camp, await body(req, 7_000_000)))
+      if (seg[4] === "intentions" && seg[5] === "decisions" && req.method === "POST")
+        return json(res, 200, await deciderIntentions(c, camp, await body(req)))
+      if (seg[4] === "intentions" && seg[5] === "generer" && req.method === "POST")
+        return json(res, 202, { job: (await genererVariantes(c, camp, await body(req))).id })
+      if (seg[4] === "intentions" && seg[5] === "propositions" && seg[6] && req.method === "GET")
+        return json(res, 200, await propositionIntentions(c, camp, seg[6]))
+      if (seg[4] === "intentions" && seg[5] === "simuler" && req.method === "POST")
+        return json(res, 200, await simuler(c, camp, await body(req)))
+      if (seg[4] === "intentions" && seg[5] === "connexion" && req.method === "POST")
+        return json(res, 200, await connecter(c, camp, await body(req)))
+      if (seg[4] === "intentions" && seg[5] === "mesure" && req.method === "POST")
+        return json(res, 200, await configurerMesure(c, camp, await body(req)))
+      if (seg[4] === "intentions" && seg[5] === "mesurer" && req.method === "POST")
+        return json(res, 202, { job: (await mesurerIntentions(c, camp)).id })
+      if (seg[4] === "propositions" && seg[5] && !seg[6] && req.method === "GET")
+        return json(res, 200, await propositionIntentions(c, camp, seg[5]))
+      if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST")
+        return json(res, 200, await refuserProposition(c, camp, seg[5], await body(req)))
       if (seg[4] === "propositions" && seg[5] && seg[6] === "decliner" && req.method === "POST")
         return json(res, 202, { job: (await lancerDeclinaison(c, camp, seg[5], await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }

@@ -51,9 +51,7 @@ export type VarianteServie = {
   /** l'URL de la page où elle s'applique */
   page: string
   edits: EditTag[]
-  /** l'audience routée vers elle : absente = la variante vaut pour tout clic */
   ciblage?: Ciblage
-  /** le lancement qui la sert : isole sa mesure des autres tests */
   experience?: string
 }
 
@@ -69,7 +67,6 @@ export type ConfigServie = {
   /** budget TOTAL de recherche : du contenu peut arriver longtemps après le chargement */
   delaiMax: number
   variantes: VarianteServie[]
-  /** strict : un réseau muet ne ressert jamais une config périmée — l'original, et rien d'autre */
   strict?: boolean
 }
 
@@ -281,10 +278,7 @@ function annonce(version: string, applique: number, abandons: string[]): void {
   const props = { lpws_variante: version, lpws_intention: attribution.intention, lpws_experience: attribution.experience }
   const horsTest = attribution.motif === "page hors test"
   // en PROPRIÉTÉ UTILISATEUR, pas seulement en paramètre d'événement : l'achat arrive plus tard,
-  // dans un autre événement, et c'est lui qu'on veut compter par version (cf. engine/measure).
-  // Un aperçu n'écrit rien chez GA : un visiteur en prévisualisation n'est pas un exposé du test.
-  // Hors page testée (panier, confirmation) on n'écrit rien non plus : l'exposé qui convertit
-  // là-bas garde son attribution, passer « controle » effacerait sa variante avant l'achat.
+  // dans un autre événement, et c'est lui qu'on veut compter par version (cf. engine/measure)
   if (!attribution.apercu && !horsTest && typeof w.gtag === "function") {
     try { w.gtag("set", "user_properties", props) } catch { /* gtag absent ou cassé */ }
   }
@@ -484,10 +478,6 @@ function lancer(): void {
   const reveler = masque(budget)
 
   const repli = (cache: string | null): void => {
-    // strict : le repli, c'est l'original. Une config périmée ou embarquée pourrait resservir
-    // une variante arrêtée — exactement ce que le bouton stop doit rendre impossible. On garde
-    // les pages déclarées : hors de la page testée, on doit taire l'attribution, pas écrire
-    // « controle » par-dessus l'exposition d'un visiteur déjà compté.
     if (__LPWS_CFG__.strict) { poserUneFois({ ...__LPWS_CFG__, actif: false }, "figé", reveler, t0); return }
     try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé", reveler, t0) }
     catch { poserUneFois(__LPWS_CFG__, "figé", reveler, t0) }
