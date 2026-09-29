@@ -4,7 +4,7 @@
 > le vérifie). L'historique = `git log` ; le détail des contributions = [docs/journal/](docs/journal/) ;
 > l'arbre complet = [docs/feuille-de-route.md](docs/feuille-de-route.md).
 
-## Où on en est (2026-09-28)
+## Où on en est (2026-09-29)
 - **Le clone est l'ATELIER, pas la page livrée** : il sert à voir, diagnostiquer, construire et
   montrer une variante sans aucun accès. La livraison passe par trois voies : **Express** (tag GTM,
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),
@@ -29,12 +29,14 @@
   l'horizon ; le calculateur passe par `STATS.planifier` comme le lancement.
   Vitrine produit `ui/site/` (servie sur `/site`, copiée dans `ui/dist/site`) : démo animée en 4 temps
   (capture, message match, test 50/50, verdict), titres légers, chiffres tabulaires.
+  Pistes numérotées (« Piste n° 1 »), vrai nombre de tests annoncé, éditeur en mots du buyer (Titre, Bouton…).
 - **Instances** : la box (https://lpws.46.225.146.226.sslip.io, service `lpws-ui`) est **la seule
   qui publie** sur `lpws-app.vercel.app` ; en local, `LPWS_SANS_VERCEL=1`.
 - **Repo rangé le 2026-09-28** : racine = readme · CLAUDE · session ; docs en `recherche/` et
   `journal/` ; `npm run menage` (racine, noms, liens, code mort) tourne en CI.
-- **Vérif locale** : GitHub Actions est bloqué (facturation du compte) ; `npm run verif` rejoue
-  la CI en local (typecheck · menage · tests · interface · 2 clones de démo fidèles, hors `clients/`).
+- **Git pur** : GitHub Actions est bloqué (facturation du compte), toute CI y paraît en échec. On intègre
+  en local : fusion vérifiée (`npm run verif`, au minimum typecheck · tests · menage) puis `git push` sur
+  master ; les branches des sessions Devin se lisent comme des branches, sans attendre GitHub.
 
 - **Intentions Google Ads (phase 1+2, non publié)** : rapport « termes de recherche » →
   7 intentions → routes mot-clé → variantes ciblées (`engine/intent/`). Balise : routage au
@@ -58,8 +60,13 @@
 4. **Intégral** : spike sur une vraie page WordPress/Webflow, seulement si un client le demande.
 5. **Shopify** : compte Partner + boutique de dev (Yann), puis backend `?view=`.
 6. Comptes et droits sur l'interface (un mot de passe partagé aujourd'hui).
+7. Incohérences media buyer restantes : client nommé « 0 » quand la page est sur une IP ; « Ce que vous
+   vendez » pré-rempli avec la marque ; journal brut visible pendant l'analyse ; promesse vitrine ≠ test démo.
 
 ## Blocages / parking
+- Prod `lpws-app.vercel.app` périmée (d'avant le 28/09 19:25 : « certitude », date du 18/09) : la box
+  doit repartir de master et republier (seule instance qui publie).
+- Quota Devin de la semaine quasi épuisé (97 % le 29/09) : intégration et petits chantiers en local.
 - Non branché faute d'accès : Stripe (`STRIPE_*`), annonces Google Ads/AI Max, Shopify, Intégral.
 - `lpws.vercel.app` (projet de Yann) sert une démo sans `t/` ni `v/` : redéployer depuis `ui/dist`
   ou basculer sur `lpws-app.vercel.app`.
