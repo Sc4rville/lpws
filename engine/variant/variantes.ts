@@ -31,7 +31,7 @@ import type { SignauxMecaniques } from "./signaux.ts"
 import { type Contexte, texteAnnonce } from "./contexte.ts"
 import { slugify } from "../shared/paths.ts"
 import { controler, nomDeSpec, texteDuHtml, type Portee } from "./garde.ts"
-import { principal } from "./citation.ts"
+import { chiffresDe, principal } from "./citation.ts"
 import { step } from "../shared/log.ts"
 import { demanderValide } from "../shared/modele.ts"
 import { ecrireJson, lireJson, premierEcart } from "../shared/json.ts"
@@ -85,7 +85,7 @@ export type RefusBuyer = { textes: string[]; raison: string }
 const LECONS_MAX = 8
 
 /** Ce qu'on demande au modèle pour un constat : une variante simple, multi-éléments, ou une autre version. */
-type Demande = { k: Constat; multi: boolean; autreVersion: boolean; retenue: string }
+type Demande = { k: Constat; multi: boolean; autreVersion: boolean; retenue: string; reparer?: string[] }
 
 function cadre(demandes: Demande[], m: SignauxMecaniques, c: Contexte, langue: string, regime: Regime, dec?: Declinaison, lecons: RefusBuyer[] = [], tour: { refusees: Refus[]; deja: string[] } = { refusees: [], deja: [] }): string {
   const envoi = m.formulaire.bouton?.anchor
@@ -107,7 +107,7 @@ RÈGLES ABSOLUES
 - Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose. La cible du constat doit être éditée ; les autres éditions de texte ne servent qu'à soutenir la même promesse.
 ${AMPLEUR[regime]}
 - op "set" : remplace le texte (clé "text"). op "remove" : retire l'élément. op "move" : déplace l'ancre avant ("before") ou après ("after") une autre ancre. op "duplicate" : copie l'ancre et la pose "before"/"after" une autre, avec "as": un suffixe alphanumérique court. op "swap" : échange avec "with".
-- Le "titre" de la variante est ce que le buyer lira dans sa liste : court, dans ses mots (ex. « Le titre reprend la promesse de l'annonce »).
+- Le "titre" de la variante est ce que le buyer lira dans sa liste : court (70 caractères au plus), dans ses mots (ex. « Le titre reprend la promesse de l'annonce »).
 
 ANNONCE : « ${c.annonce.titre} » ${c.annonce.description ? "/ « " + c.annonce.description + " »" : ""}
 MOTS-CLÉS : ${c.annonce.motsCles.join(", ") || "(aucun)"}
@@ -117,10 +117,19 @@ ANCRES DISPONIBLES
 ${ancres}
 
 ${dec ? `CONSTAT À DÉCLINER EN ${dec.n} VARIANTE${dec.n > 1 ? "S" : ""} (chacune avec "regle": "${constats[0].id}", différentes entre elles et de celles déjà proposées)` : `CONSTATS À TRANSFORMER EN VARIANTES (une variante par ligne, dans cet ordre : ${demandes.length} au total)`}
-${demandes.map(({ k, multi, autreVersion }, i) => `${i + 1}. [${k.id}] Constat sur cette page : ${k.signal}\n   Règle : ${k.principe ?? ""}\n   Action : ${k.action}\n   Consigne : ${k.test?.consigne}\n   Verbes autorisés : ${k.test?.verbes.join(", ")} · Cible : ${k.test?.cible}${cibleCitee(k)}${multi ? `\n   MULTI-ÉLÉMENTS : cette variante change AU MOINS DEUX ancres différentes (par exemple le titre, le bouton principal et le bouton du formulaire), toutes au service de la même hypothèse, alignées sur la promesse de l'annonce et sur le mode de vente (${c.vente}).` : ""}${autreVersion ? "\n   AUTRE VERSION : une variante de ce constat est déjà retenue ; écris-en une autre, sur un autre angle, sans reprendre ses textes." : ""}`).join("\n")}
+${demandes.map(({ k, multi, autreVersion, reparer }, i) => `${i + 1}. [${k.id}] Constat sur cette page : ${k.signal}\n   Règle : ${k.principe ?? ""}\n   Action : ${k.action}\n   Consigne : ${k.test?.consigne}\n   Verbes autorisés : ${k.test?.verbes.join(", ")} · Cible : ${k.test?.cible}${cibleCitee(k)}${multi ? consigneMulti(k, m, c) : ""}${reparer?.length ? `\n   À RÉPARER : ta proposition précédente pour ce constat a été refusée, ${reparer.join(" ; ")}. Même hypothèse : corrige exactement cela.` : ""}${autreVersion ? "\n   AUTRE VERSION : une variante de ce constat est déjà retenue ; écris-en une autre, sur un autre angle, sans reprendre ses textes." : ""}`).join("\n")}
 ${dec?.deja.length ? `\nDÉJÀ PROPOSÉ POUR CE CONSTAT (ne pas le répéter, ni le reformuler à peine) :\n${dec.deja.map((x) => "- " + x).join("\n")}\n` : ""}${tour.deja.length ? `\nDÉJÀ RETENU DANS CETTE ANALYSE (ne pas le répéter) :\n${tour.deja.map((x) => "- " + x).join("\n")}\n` : ""}${tour.refusees.length ? `\nREFUSÉ PAR LES GARDE-FOUS AU TOUR PRÉCÉDENT (ne pas refaire la même faute) :\n${tour.refusees.map((r) => `- [${r.regle}] « ${r.titre} » : ${r.raisons.join(" ; ")}`).join("\n")}\n` : ""}${lecons.length ? `\nREFUSÉ PAR LE MEDIA BUYER CHEZ CE CLIENT (ne pas y revenir, et en tirer la leçon pour le ton et la promesse) :\n${lecons.map((l) => `- ${l.textes.map((t) => "« " + t.slice(0, 90) + " »").join(" + ")}${l.raison ? " : " + l.raison : ""}`).join("\n")}\n` : ""}${dec?.consigne ? `\nCONSIGNE DU MEDIA BUYER (à suivre dans les règles absolues, qui priment toujours) : ${dec.consigne}\n` : ""}
 Réponds UNIQUEMENT par un tableau JSON, sans texte autour, sans balises :
 [{"regle": "<id du constat>", "titre": "...", "hypothese": "Si ... alors ... parce que ...", "metrique": "...", "risque": "...", "edits": [{"anchor": "e123", "op": "set", "text": "...", "pourquoi": "..."}]}]`
+}
+
+/** La variante multi-éléments : le titre, le bouton principal et le bouton du formulaire, sur la promesse de l'annonce. */
+function consigneMulti(k: Constat, m: SignauxMecaniques, c: Contexte): string {
+  const titre = k.test!.cible === "titre" || k.test!.cible === "sous-titre"
+  const p = principal(m)?.anchor, envoi = m.formulaire.bouton?.anchor
+  const cibles = [titre && m.hero.titreAnchor && `le titre (${m.hero.titreAnchor})`, p && `le bouton principal (${p})`, envoi && envoi !== p && `le bouton du formulaire (${envoi})`].filter(Boolean)
+  const chiffres = chiffresDe([c.annonce.titre, c.annonce.description].filter(Boolean).join(" "))
+  return `\n   MULTI-ÉLÉMENTS : cette variante change AU MOINS DEUX ancres différentes (${cibles.join(", ") || "par exemple le titre, le bouton principal et le bouton du formulaire"}), toutes au service de la même hypothèse, alignées sur la promesse de l'annonce et sur le mode de vente (${c.vente}).${titre ? ` Le titre dit le résultat que le visiteur obtient, jamais une catégorie de produit${chiffres.length ? `, et reprend ${chiffres.map((x) => `« ${x} »`).join(" ou ")} de l'annonce` : ""}.` : ""}`
 }
 
 /** Les éléments cités par le constat, quand ils sont la cible : « à éditer : e67 » */
@@ -152,7 +161,9 @@ function porteeDe(k: Constat, m: SignauxMecaniques): Portee {
     renforts: s([m.hero.titreAnchor, m.hero.sousTitreAnchor, m.formulaire.bouton?.anchor, ...boutonsProposes(m).map((x) => x.anchor)]) }
 }
 
-export type Refus = { regle: string; titre: string; raisons: string[]; edits: unknown[]; le: string }
+/** `reparable` : refusée pour la forme (contrat, longueur), pas pour le fond ; la même piste se relance avec l'erreur. */
+export type Refus = { regle: string; titre: string; raisons: string[]; edits: unknown[]; le: string; reparable?: boolean }
+const REPARABLE = /^hors contrat|caractères \(\d+ au plus\)/
 
 export type VarianteProduite = {
   nom: string; regle: string; fichier: string; titre: string; teste: string
@@ -227,7 +238,7 @@ export async function ecrirePropositions(
   }
   const refus: Refus[] = []
   const refuser = (p: PropositionBrute, raisons: string[]) => {
-    refus.push({ regle: p.regle, titre: p.titre, raisons, edits: p.edits, le: new Date().toISOString() })
+    refus.push({ regle: p.regle, titre: p.titre, raisons, edits: p.edits, le: new Date().toISOString(), ...raisons.every((r) => REPARABLE.test(r.replace(/^e\d+ : /, ""))) ? { reparable: true } : {} })
     step(SCOPE, `« ${p.titre} » refusée :\n    ${raisons.join("\n    ")}`)
   }
   const dejaVus = new Map<string, string>((dec?.deja ?? []).map((t) => [normer(t), "est déjà proposé"]))
@@ -255,7 +266,7 @@ export async function ecrirePropositions(
       const r = Proposition.safeParse(b)
       if (!r.success) {
         const o = (b ?? {}) as { regle?: unknown; titre?: unknown; edits?: unknown }
-        refus.push({ regle: String(o.regle ?? "?"), titre: String(o.titre ?? "(sans titre)"), raisons: [`hors contrat : ${premierEcart(r.error)}`], edits: Array.isArray(o.edits) ? o.edits : [], le: new Date().toISOString() })
+        refus.push({ regle: String(o.regle ?? "?"), titre: String(o.titre ?? "(sans titre)"), raisons: [`hors contrat : ${premierEcart(r.error)}`], edits: Array.isArray(o.edits) ? o.edits : [], le: new Date().toISOString(), reparable: true })
         step(SCOPE, `proposition hors contrat (${premierEcart(r.error)}) : refusée, les autres continuent`)
         continue
       }
@@ -285,22 +296,28 @@ export async function ecrirePropositions(
     const premier = choisirPistes(testables)
     step(SCOPE, `cibles retenues : ${premier.map((d) => `${d.k.id}${d.multi ? " (multi)" : ""}`).join(" · ")}`)
     await tour(premier)
-    // ce qui est tombé se remplace : d'abord les pistes jamais tentées, puis une autre version
-    // des pistes qui ont tenu, jamais un constat refusé deux fois
+    const porteuseId = premier.find((d) => d.multi)?.k.id
+    // ce qui est tombé se remplace : d'abord la même piste si l'erreur est de forme (avec l'erreur),
+    // puis les pistes jamais tentées, puis une autre version des pistes qui ont tenu ;
+    // jamais un constat refusé deux fois
     while (acceptees.length < objectif && bilan.appels < MAX_APPELS) {
       const manque = objectif - acceptees.length
       const refusDe = (id: string) => refus.filter((r) => r.regle === id).length
+      const dernier = (id: string) => refus.filter((r) => r.regle === id).slice(-1)[0]
+      const aReparer = testables.filter((k) => !acceptees.some((a) => a.d.k.id === k.id) && refusDe(k.id) < 2 && dernier(k.id)?.reparable)
       const vierges = testables.filter((k) => !bilan.tentees.includes(k.id))
       const retenues = testables.filter((k) => acceptees.some((a) => a.d.k.id === k.id) && refusDe(k.id) < 2)
-      const encore = testables.filter((k) => bilan.tentees.includes(k.id) && !acceptees.some((a) => a.d.k.id === k.id) && refusDe(k.id) < 2)
+      const encore = testables.filter((k) => bilan.tentees.includes(k.id) && !acceptees.some((a) => a.d.k.id === k.id) && refusDe(k.id) < 2 && !aReparer.includes(k))
       const veutMulti = !acceptees.some((a) => estMulti(a.p))
       const demandes: Demande[] = [
+        ...aReparer.map((k) => ({ k, multi: false, autreVersion: false, retenue: `${premier.find((d) => d.k.id === k.id)?.retenue ?? "piste"}, réparée après une erreur de forme`.replace(", multi-éléments", ""), reparer: dernier(k.id)!.raisons })),
         ...vierges.map((k) => ({ k, multi: false, autreVersion: false, retenue: "piste suivante, après un refus des garde-fous" })),
         ...encore.map((k) => ({ k, multi: false, autreVersion: false, retenue: "piste retentée, après un refus des garde-fous" })),
         ...retenues.map((k) => ({ k, multi: false, autreVersion: true, retenue: "autre version d'une piste retenue" })),
       ].slice(0, manque)
       if (!demandes.length) break
-      const porteuse = veutMulti ? demandes.find((d) => d.k.test!.verbes.includes("set")) : undefined
+      // la multi-éléments reste sur la piste qui la portait au premier tour, la mieux classée
+      const porteuse = veutMulti ? demandes.find((d) => d.k.id === porteuseId) ?? demandes.find((d) => d.k.test!.verbes.includes("set")) : undefined
       if (porteuse) { porteuse.multi = true; porteuse.retenue += ", multi-éléments" }
       await tour(demandes)
     }
