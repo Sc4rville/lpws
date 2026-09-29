@@ -52,15 +52,16 @@ const joursEntre = (a: string, b: string) => Math.max(0, Math.floor((new Date(b)
 const visiteursJour = (ctx: Ctx) => ctx?.visiteursMois ? ctx.visiteursMois / 30.4 : null
 
 /** L'horizon d'un test, fixé au lancement à partir de ce que le buyer a dit de la campagne. */
-export async function planAuLancement(dir: string, part: number): Promise<NonNullable<Test["plan"]>> {
-  const ctx = await lireJson<Ctx>(fichiersDe(dir).contexte, null)
+export async function planAuLancement(dir: string, part: number, cible = false): Promise<NonNullable<Test["plan"]>> {
+  const ctx = cible ? null : await lireJson<Ctx>(fichiersDe(dir).contexte, null)
   const p = planifier({ tauxBase: ctx?.tauxConversion ? ctx.tauxConversion / 100 : null, mde: mdePour(ctx?.visiteursMois), part, visiteursJour: visiteursJour(ctx) })
   return { tauxBase: p.tauxBase, tauxSuppose: p.tauxSuppose, mde: p.mde, part, controle: p.controle, variante: p.variante, jours: p.jours }
 }
 
 /** L'original et la variante d'un test, comptés sur la fenêtre de ce lancement quand la mesure l'a fournie. */
-export function comptes(res: Resultats | null, id: string, lanceLe?: string): { o: Compte | null; v: Compte | null } {
+export function comptes(res: Resultats | null, id: string, lanceLe?: string, experience?: string): { o: Compte | null; v: Compte | null } {
   const p = (lanceLe ? res?.archives?.[`${id}@${lanceLe}`] : undefined) ?? res?.parTest?.[id]
+  if (experience && p?.experience !== experience) return { o: null, v: null }
   if (p) return { o: p.controle, v: p.variante }
   return { o: res?.versions?.controle ?? null, v: res?.versions?.[id] ?? null }
 }
@@ -70,14 +71,14 @@ export async function verdictDe(dir: string, t: Test, maintenant = new Date().to
   const f = fichiersDe(dir)
   const res = await lireJson<Resultats | null>(f.resultats, null)
   const ctx = await lireJson<Ctx>(f.contexte, null)
-  const { o, v } = comptes(res, t.id, t.lanceLe)
+  const { o, v } = t.ciblage && !t.experience ? { o: null, v: null } : comptes(res, t.id, t.lanceLe, t.experience)
   const verdict = juger({
     o, v, jours: t.lanceLe ? joursEntre(t.lanceLe, t.finLe ?? maintenant) : 0,
     // la part pendant la collecte : celle du plan, pas les 100 % d'un gagnant déployé
     part: t.plan?.part ?? (t.part > 0 && t.part < 100 ? t.part / 100 : 0.5),
     tauxBase: t.plan && !t.plan.tauxSuppose ? t.plan.tauxBase : ctx?.tauxConversion ? ctx.tauxConversion / 100 : null,
     mde: t.plan?.mde ?? mdePour(ctx?.visiteursMois),
-    visiteursJour: visiteursJour(ctx),
+    visiteursJour: t.ciblage ? null : visiteursJour(ctx),
     cible: t.plan ? { controle: t.plan.controle, variante: t.plan.variante } : null,
   })
   return { verdict, o, v, res }
@@ -104,7 +105,7 @@ export async function enregistrerExperiences(dir: string, arretes: Test[], arret
       // la règle d'une expérience se fixe à sa première écriture ; celle du test (figée à sa
       // création) passe avant la spec, qu'une nouvelle génération peut réécrire
       regle: i >= 0 ? journal[i].regle : t.regle ?? spec?.diagnostic?.regle ?? propositions.find((p) => p.nom === t.id)?.regle,
-      plan: t.plan, verdict: `${verdict.titre}. ${verdict.detail}.`,
+      plan: t.plan, verdict: `${verdict.titre}. ${verdict.detail}.`, experience: t.experience, ciblage: t.ciblage,
       // remettre l'original après un déploiement ne réécrit pas l'histoire : il a été déployé
       deploye: t.etat === "gagnant" || (i >= 0 && journal[i].deploye === true),
     })

@@ -28,6 +28,8 @@
  * Aucun import node : ce fichier part dans le navigateur du visiteur.
  */
 import type { Cible } from "./selector.ts"
+import type { Ciblage } from "../../intent/ciblage.ts"
+import { choisirPourClic } from "../../intent/routage.ts"
 
 export type EditTag = {
   op: "set" | "remove" | "move" | "swap" | "duplicate"
@@ -49,6 +51,10 @@ export type VarianteServie = {
   /** l'URL de la page où elle s'applique */
   page: string
   edits: EditTag[]
+  /** l'audience routée vers elle : absente = la variante vaut pour tout clic */
+  ciblage?: Ciblage
+  /** le lancement qui la sert : isole sa mesure des autres tests */
+  experience?: string
 }
 
 export type ConfigServie = {
@@ -63,6 +69,8 @@ export type ConfigServie = {
   /** budget TOTAL de recherche : du contenu peut arriver longtemps après le chargement */
   delaiMax: number
   variantes: VarianteServie[]
+  /** strict : un réseau muet ne ressert jamais une config périmée — l'original, et rien d'autre */
+  strict?: boolean
 }
 
 declare const __LPWS_BASE__: string
@@ -70,18 +78,12 @@ declare const __LPWS_CLIENT__: string
 /** la config figée au build : le repli quand le réseau nous est interdit */
 declare const __LPWS_CFG__: ConfigServie
 
-const CLE_CONFIG = "lpws_cfg"
+const CLE_CONFIG = "lpws_cfg:" + __LPWS_CLIENT__
 const CLE_ID = "lpws_id"
 
 const local = {
   lire(k: string): string | null { try { return localStorage.getItem(k) } catch { return null } },
   ecrire(k: string, v: string): void { try { localStorage.setItem(k, v) } catch { /* mode privé */ } },
-}
-
-function hash(s: string): number {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
-  return (h >>> 0) / 4294967295
 }
 
 /**
@@ -263,21 +265,12 @@ function appliquer(r: Resolu): void {
 
 /* ————— choisir ————— */
 
-const memePage = (motif: string): boolean => {
-  const ici = (location.origin + location.pathname).replace(/\/$/, "")
-  const la = motif.split("?")[0].replace(/\/$/, "")
-  return ici === la || ici === la.replace(/^(https?:\/\/)www\./, "$1")
-}
+let attribution = { intention: "inconnue", experience: "", motif: "", apercu: false }
 
 function choisir(cfg: ConfigServie): VarianteServie | null {
-  const force = new URLSearchParams(location.search).get("lpws")
-  if (force === "off") return null
-  const candidates = cfg.variantes.filter((v) => memePage(v.page))
-  if (force) return candidates.filter((v) => v.nom === force)[0] ?? null
-  if (!cfg.actif) return null
-  const id = identite()
-  for (const v of candidates) if (hash(v.nom + id) * 100 < v.part) return v
-  return null
+  const c = choisirPourClic(cfg, location.href, identite())
+  attribution = { intention: c.intention, experience: c.experience, motif: c.motif, apercu: c.apercu }
+  return c.variante
 }
 
 let mode: "pilote" | "figé" | "cache" = "figé"
@@ -285,16 +278,22 @@ let mode: "pilote" | "figé" | "cache" = "figé"
 function annonce(version: string, applique: number, abandons: string[]): void {
   const w = window as unknown as { dataLayer?: unknown[]; __lpws?: unknown; gtag?: (...a: unknown[]) => void }
   w.dataLayer = w.dataLayer || []
+  const props = { lpws_variante: version, lpws_intention: attribution.intention, lpws_experience: attribution.experience }
+  const horsTest = attribution.motif === "page hors test"
   // en PROPRIÉTÉ UTILISATEUR, pas seulement en paramètre d'événement : l'achat arrive plus tard,
-  // dans un autre événement, et c'est lui qu'on veut compter par version (cf. engine/measure)
-  if (typeof w.gtag === "function") {
-    try { w.gtag("set", "user_properties", { lpws_variante: version }) } catch { /* gtag absent ou cassé */ }
+  // dans un autre événement, et c'est lui qu'on veut compter par version (cf. engine/measure).
+  // Un aperçu n'écrit rien chez GA : un visiteur en prévisualisation n'est pas un exposé du test.
+  // Hors page testée (panier, confirmation) on n'écrit rien non plus : l'exposé qui convertit
+  // là-bas garde son attribution, passer « controle » effacerait sa variante avant l'achat.
+  if (!attribution.apercu && !horsTest && typeof w.gtag === "function") {
+    try { w.gtag("set", "user_properties", props) } catch { /* gtag absent ou cassé */ }
   }
   w.dataLayer.push({
-    event: "lpws_variante", lpws_variante: version,
+    event: attribution.apercu ? "lpws_apercu" : horsTest ? "lpws_hors_test" : "lpws_variante", ...props,
     lpws_editions: applique, lpws_abandons: abandons.length, lpws_mode: mode,
+    lpws_apercu: attribution.apercu, lpws_motif: attribution.motif,
   })
-  w.__lpws = { version, applique, abandons, mode }
+  w.__lpws = { version, applique, abandons, mode, intention: attribution.intention, experience: attribution.experience, motif: attribution.motif, apercu: attribution.apercu, capacite: "intent-v1" }
 }
 
 /** Visible sans scroller ? C'est la seule zone où un changement tardif se voit. */
@@ -485,6 +484,11 @@ function lancer(): void {
   const reveler = masque(budget)
 
   const repli = (cache: string | null): void => {
+    // strict : le repli, c'est l'original. Une config périmée ou embarquée pourrait resservir
+    // une variante arrêtée — exactement ce que le bouton stop doit rendre impossible. On garde
+    // les pages déclarées : hors de la page testée, on doit taire l'attribution, pas écrire
+    // « controle » par-dessus l'exposition d'un visiteur déjà compté.
+    if (__LPWS_CFG__.strict) { poserUneFois({ ...__LPWS_CFG__, actif: false }, "figé", reveler, t0); return }
     try { poserUneFois(cache ? JSON.parse(cache) as ConfigServie : __LPWS_CFG__, cache ? "cache" : "figé", reveler, t0) }
     catch { poserUneFois(__LPWS_CFG__, "figé", reveler, t0) }
   }

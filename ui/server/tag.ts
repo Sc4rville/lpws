@@ -1,8 +1,10 @@
 /** tag.ts : la balise Express : construire, répartir le trafic, publier sur Vercel, sonder la vraie page. */
-import { readdir, mkdir, copyFile } from "node:fs/promises"
+import { readdir, mkdir, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { lancerNavigateur, UA } from "../../engine/shared/navigateur.ts"
+import { buildLoader } from "../../engine/deploy/tag/build.ts"
+import type { ConfigServie, VarianteServie } from "../../engine/deploy/tag/loader.ts"
 import { CLIENTS_ROOT, slugify } from "../../engine/shared/paths.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
@@ -21,6 +23,15 @@ export async function construireTag(job: Job, c: string, camp: string): Promise<
   await appliquerParts(c, camp)
   return 0
 }
+/** part, audience et lancement d'une variante servie : tests.json fait foi, jamais le build.
+ *  L'expérience ne sort que pour un test qui collecte : un gagnant déployé sert tout le monde. */
+const enrichie = (v: VarianteServie, t?: Test): VarianteServie => ({
+  ...v,
+  part: t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0,
+  ciblage: t?.ciblage,
+  experience: t && t.etat === "live" ? t.experience : undefined,
+})
+
 /** la part de trafic de chaque variante vient de tests.json, pas du build (qui met la même partout) */
 export async function appliquerParts(c: string, camp: string) {
   const d = dossier(c, camp)
@@ -30,7 +41,11 @@ export async function appliquerParts(c: string, camp: string) {
   const cfg = await lireJson<any>(f, null)
   if (!cfg) return
   cfg.actif = true
-  for (const v of cfg.variantes) { const t = tests.find((x) => x.id === v.nom); v.part = t && (t.etat === "live" || t.etat === "gagnant") ? t.part : 0 }
+  cfg.strict = true
+  for (const v of cfg.variantes) {
+    const t = tests.find((x) => x.id === v.nom)
+    Object.assign(v, enrichie(v, t))
+  }
   await ecrireJson(f, cfg)
 }
 /** ui/dist/v/<client>.json : la config servie, reconstruite depuis les tests.json de toutes les pages du client */
@@ -44,7 +59,7 @@ export async function ecrireConfigClient(c: string, camp: string) {
    * variantes de l'autre : le test de la page A disparaissait dès qu'on touchait à la page B.
    * On fusionne donc ici toutes les pages du client ; le loader sait déjà filtrer par URL. */
   const cdir = join(CLIENTS_ROOT, c)
-  const fusion: any = { actif: true, delaiMasque: 0, delaiMax: 0, variantes: [] as any[] }
+  const fusion: any = { actif: true, strict: true, delaiMasque: 0, delaiMax: 0, variantes: [] as any[] }
   for (const camp of await readdir(cdir)) {
     const f = fichiersDe(join(cdir, camp)).configTag(slug)
     const cfg = await lireJson<any>(f, null)
@@ -59,7 +74,7 @@ export async function ecrireConfigClient(c: string, camp: string) {
       const t = testsCamp.find((x) => x.id === v.nom)
       if (!t || t.etat === "echec") continue
       if (fusion.variantes.some((x: any) => x.nom === v.nom && x.page === v.page)) continue
-      fusion.variantes.push({ ...v, part: t.etat === "live" || t.etat === "gagnant" ? t.part : 0 })
+      fusion.variantes.push(enrichie(v, t))
     }
   }
   if (!fusion.delaiMasque) fusion.delaiMasque = 1200
@@ -72,9 +87,14 @@ export async function publierTag(job: Job, c: string, camp: string): Promise<num
   const meta = await lireJson<any>(fichiersDe(d).meta, {})
   const slug = slugify(meta.client ?? c)
   await mkdir(join(DIST, "t"), { recursive: true }); await mkdir(join(DIST, "v"), { recursive: true })
-  await copyFile(fichiersDe(d).loader, join(DIST, "t", `${slug}.js`))
 
   await ecrireConfigClient(c, camp)
+
+  /* Le loader embarque une copie figée de la config (repli sous CSP) : copier celui du build
+   * resservirait les variantes d'alors — arrêtées, re-partagées, déployées depuis. On le
+   * régénère donc depuis la config fusionnée qui fait foi, strict compris. */
+  const fusion = await lireJson<ConfigServie>(join(DIST, "v", `${slug}.json`), { actif: false, strict: true, delaiMasque: 1200, delaiMax: 3200, variantes: [] })
+  await writeFile(join(DIST, "t", `${slug}.js`), await buildLoader(slug, BASE_TAGS, fusion))
 
   // le même dossier sert AUSSI la démo statique (ui:deploy) : déployer l'un sans l'autre
   // efface l'autre en production : c'est ainsi que t/<client>.js est passé en 404 sur Vercel.
@@ -114,7 +134,7 @@ export async function sonderBalise(c: string, camp: string, job?: Job): Promise<
     await page.goto(meta.source, { waitUntil: "domcontentloaded", timeout: 45_000 })
     await page.waitForFunction(() => (window as any).__lpws, { timeout: 12_000 }).catch(() => null)
     const info = await page.evaluate(() => (window as any).__lpws ?? null)
-    const ex: Express = { installe: !!info || demande, verifieLe: new Date().toISOString(), version: info?.version, mode: info?.mode,
+    const ex: Express = { installe: !!info || demande, verifieLe: new Date().toISOString(), version: info?.version, mode: info?.mode, capacite: info?.capacite,
       detail: info ? `balise active (${info.mode}), version servie : ${info.version}` : demande ? "balise demandée par la page, mais pas encore exécutée au moment de la lecture" : "aucune trace de la balise sur la page : GTM ne l’a pas encore publiée" }
     await ecrireJson(fichiersDe(d).express, ex)
     return ex

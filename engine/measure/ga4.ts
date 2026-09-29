@@ -59,14 +59,19 @@ async function jeton(sa: CompteDeService): Promise<string> {
  * propriété), pas le G-XXXX de la balise.
  */
 export async function rapportParVersion(
-  sa: CompteDeService, propriete: string, depuis: string, jusqua = "today",
+  sa: CompteDeService, propriete: string, depuis: string, jusqua = "today", experience?: string,
 ): Promise<LigneVersion[]> {
+  if (!/^\d+$/.test(propriete)) throw new Error("Identifiant numérique GA4 invalide")
+  if (experience !== undefined && !/^[a-f0-9]{32}$/.test(experience)) throw new Error("Identifiant d'expérience invalide")
   const token = await jeton(sa)
   const corps = {
     dateRanges: [{ startDate: depuis, endDate: jusqua }],
     dimensions: [{ name: "customUser:lpws_variante" }],
     metrics: [{ name: "sessions" }, { name: "sessionKeyEventRate" }],
-    limit: 50,
+    ...(experience ? { dimensionFilter: { filter: {
+      fieldName: "customUser:lpws_experience", stringFilter: { matchType: "EXACT", value: experience, caseSensitive: true },
+    } } } : {}),
+    limit: 100_000,
   }
   const r = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${propriete}:runReport`, {
     method: "POST",
@@ -74,15 +79,22 @@ export async function rapportParVersion(
     body: JSON.stringify(corps),
   })
   if (!r.ok) throw new Error(`GA4 a répondu ${r.status} : ${(await r.text()).slice(0, 300)}`)
-  return lireRapport(await r.json())
+  const brut = await r.json() as { rowCount?: number; rows?: unknown[]; metadata?: { subjectToThresholding?: boolean; dataLossFromOtherRow?: boolean } }
+  if ((brut.rowCount ?? 0) > (brut.rows?.length ?? 0)) throw new Error("Rapport GA4 incomplet : trop de versions, aucune mesure enregistrée.")
+  if (brut.metadata?.subjectToThresholding || brut.metadata?.dataLossFromOtherRow)
+    throw new Error("GA4 masque ou agrège des lignes : comparaison non fiable, aucune mesure enregistrée.")
+  return lireRapport(brut)
 }
 
 /** Le format brut de GA4 → nos lignes. Séparé pour être testable sans réseau. */
 export function lireRapport(brut: unknown): LigneVersion[] {
   const rep = brut as { rows?: Array<{ dimensionValues: { value: string }[]; metricValues: { value: string }[] }> }
+  if (!rep || typeof rep !== "object" || (rep.rows !== undefined && !Array.isArray(rep.rows))) throw new Error("Réponse GA4 invalide")
   return (rep.rows ?? []).map((row) => {
-    const sessions = Number(row.metricValues[0]?.value ?? 0)
-    const taux = Math.min(1, Math.max(0, Number(row.metricValues[1]?.value ?? 0)))
+    const sessions = Number(row.metricValues?.[0]?.value)
+    const taux = Number(row.metricValues?.[1]?.value)
+    if (!Number.isInteger(sessions) || sessions < 0 || !Number.isFinite(taux) || taux < 0 || taux > 1)
+      throw new Error("Métriques GA4 invalides : sessions ou taux de sessions converties")
     return { version: row.dimensionValues[0]?.value ?? "", sessions, conversions: Math.round(sessions * taux) }
   }).filter((l) => l.version && l.version !== "(not set)")
 }

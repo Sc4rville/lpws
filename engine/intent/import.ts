@@ -16,7 +16,7 @@ import { readFile } from "node:fs/promises"
 import { basename } from "node:path"
 import { Termes, type Terme } from "./schema.ts"
 
-type Col = "terme" | "correspondance" | "campagne" | "groupe" | "motCle" | "impressions" | "clics" | "cout" | "coutMicros" | "conversions"
+type Col = "terme" | "correspondance" | "campagne" | "groupe" | "campagneId" | "groupeId" | "motCle" | "impressions" | "clics" | "cout" | "coutMicros" | "conversions"
 
 /** les noms de colonnes connus, normalisés (minuscules, sans accents) */
 const ALIAS: Record<Col, string[]> = {
@@ -24,6 +24,8 @@ const ALIAS: Record<Col, string[]> = {
   correspondance: ["type de correspondance", "type de correspondance du terme de recherche", "match type", "search terms match type", "segments.keyword.info.match_type", "search_term_view.search_term_match_type"],
   campagne: ["campagne", "campaign", "campaign.name"],
   groupe: ["groupe d'annonces", "groupe d’annonces", "ad group", "ad_group.name"],
+  campagneId: ["campaign.id", "campaign id", "id de la campagne"],
+  groupeId: ["ad_group.id", "ad group id", "id du groupe d'annonces"],
   motCle: ["mot cle", "mot-cle", "mots cles", "keyword", "segments.keyword.info.text"],
   impressions: ["impr.", "impr", "impressions", "metrics.impressions"],
   clics: ["clics", "clicks", "metrics.clicks"],
@@ -65,6 +67,7 @@ function cellules(ligne: string, sep: string): string[] {
     else if (ch === sep) { out.push(cur); cur = "" }
     else cur += ch
   }
+  if (q) throw new Error("CSV invalide : guillemet non fermé")
   out.push(cur)
   return out.map((s) => s.trim())
 }
@@ -73,11 +76,15 @@ function cellules(ligne: string, sep: string): string[] {
 function nombre(s: string | undefined, langue: "fr" | "en"): number {
   if (!s) return 0
   let t = s.replace(/[^\d.,-]/g, "")
-  if (!t) return 0
+  if (!t || /^-+$/.test(t)) {
+    if (/^\s*(?:[-—–]+)?\s*$/.test(s)) return 0
+    throw new Error(`Valeur numérique illisible : « ${s.slice(0, 60)} »`)
+  }
   if (langue === "fr") t = t.replace(/\./g, "").replace(",", ".")
   else t = t.replace(/,/g, "")
-  const n = parseFloat(t)
-  return Number.isFinite(n) ? n : 0
+  const n = Number(t)
+  if (!Number.isFinite(n)) throw new Error(`Valeur numérique illisible : « ${s.slice(0, 60)} »`)
+  return n
 }
 
 function correspondance(s: string | undefined): Terme["correspondance"] {
@@ -90,7 +97,12 @@ function correspondance(s: string | undefined): Terme["correspondance"] {
 }
 
 export async function importer(fichier: string): Promise<Termes> {
-  const texte = decoder(await readFile(fichier))
+  return importerBuffer(await readFile(fichier), basename(fichier))
+}
+
+export function importerBuffer(buf: Buffer, fichier = "export.csv"): Termes {
+  if (buf.length > 5_000_000) throw new Error("Export trop volumineux : 5 Mo maximum")
+  const texte = decoder(buf)
   const lignes = texte.split(/\r?\n/)
 
   // l'en-tête est la première ligne qui contient une colonne « terme »
@@ -104,6 +116,9 @@ export async function importer(fichier: string): Promise<Termes> {
 
   const col = (k: Col) => entete.findIndex((c) => ALIAS[k].includes(c))
   const ix = Object.fromEntries((Object.keys(ALIAS) as Col[]).map((k) => [k, col(k)])) as Record<Col, number>
+  for (const k of ["clics", "impressions", "conversions"] as const)
+    if (ix[k] < 0) throw new Error(`Colonne manquante : ${k}. Exportez le rapport avec ses métriques.`)
+  if (ix.cout < 0 && ix.coutMicros < 0) throw new Error("Colonne manquante : coût")
   const script = entete.some((c) => c.startsWith("search_term_view.") || c.startsWith("metrics."))
   const langue: "fr" | "en" = script ? "en" : entete.includes("terme de recherche") ? "fr" : "en"
   // la période est sur la 2e ligne de titre des exports de l'interface (« 1 sept. 2026 - 17 sept. 2026 »)
@@ -115,7 +130,8 @@ export async function importer(fichier: string): Promise<Termes> {
     if (!ligne.trim()) { ignorees++; continue }
     const c = cellules(ligne, sep)
     const terme = c[ix.terme]?.trim()
-    if (!terme || norm(terme).startsWith("total")) { ignorees++; continue }
+    if (!terme || /^total(?:\s*:|\s*$)/.test(norm(terme))) { ignorees++; continue }
+    if (c.length !== entete.length) throw new Error(`CSV invalide pour « ${terme.slice(0, 60)} » : ${c.length} cellules au lieu de ${entete.length}`)
     const cout = ix.coutMicros >= 0 ? nombre(c[ix.coutMicros], "en") / 1e6 : nombre(c[ix.cout], langue)
     termes.push({
       terme,
@@ -123,6 +139,8 @@ export async function importer(fichier: string): Promise<Termes> {
       correspondance: correspondance(ix.correspondance >= 0 ? c[ix.correspondance] : undefined),
       campagne: ix.campagne >= 0 && c[ix.campagne] ? c[ix.campagne] : undefined,
       groupeAnnonces: ix.groupe >= 0 && c[ix.groupe] ? c[ix.groupe] : undefined,
+      campagneId: ix.campagneId >= 0 && c[ix.campagneId] ? c[ix.campagneId] : undefined,
+      groupeId: ix.groupeId >= 0 && c[ix.groupeId] ? c[ix.groupeId] : undefined,
       impressions: Math.round(nombre(c[ix.impressions], langue)),
       clics: Math.round(nombre(c[ix.clics], langue)),
       cout,

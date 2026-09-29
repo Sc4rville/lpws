@@ -13,6 +13,9 @@ import { historique as relevesDe, type Alerte } from "../../engine/surveille/sur
 import { historique, comptes } from "../../engine/measure/experience.ts"
 import type { Resultats } from "../../engine/measure/run.ts"
 import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
+import { VariantSpec } from "../../engine/apply/spec.ts"
+import { analyser, EtatIntentions } from "../../engine/intent/analyse.ts"
+import { LIBELLES } from "../../engine/intent/schema.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -72,9 +75,22 @@ export async function etat() {
       const contexte = await lireJson<any>(fichiersDe(d).contexte, null)
       const diag = await lireJson<any>(fichiersDe(d).diagnostic, null)
       const signaux = await lireJson<SignauxMecaniques | null>(fichiersDe(d).signaux, null)
+      const intentions = EtatIntentions.safeParse(await lireJson<unknown>(fichiersDe(d).intents, null))
+      const recherches = intentions.success ? analyser(intentions.data).routes.filter((r) => r.intention).reduce((acc, r) => {
+        const id = r.intention!
+        const item = acc.find((x) => x.intention === id)
+        if (item) item.routes++
+        else acc.push({ intention: id, libelle: LIBELLES[id], routes: 1 })
+        return acc
+      }, [] as Array<{ intention: keyof typeof LIBELLES; libelle: string; routes: number }>) : []
       // un test en échec libère sa proposition : le buyer peut la retenter après correction
       const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
-      const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
+      const propositions = await Promise.all((await lireJson<any[]>(fichiersDe(d).propositions, []))
+        .filter((p) => !dejaTests.has(p.nom) && !p.refusee)
+        .map(async (p) => {
+          const spec = VariantSpec.safeParse(await lireJson<unknown>(fichiersDe(d).spec(p.nom), null))
+          return { ...p, edits: spec.success ? spec.data.edits : [] }
+        }))
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const dernierBrain = [...jobs.values()].filter((jb) => jb.type === "brain" && jb.campagne === d).at(-1)
       const brainEnCours = !!brainJob
@@ -116,6 +132,7 @@ export async function etat() {
         capture,
         job: captureEnCours ? encours!.job : undefined,
         contexte,
+        recherches,
         signaux: signaux ? { hero: signaux.hero, ctas: signaux.ctas, nav: signaux.nav, formulaire: signaux.formulaire,
           preuves: signaux.preuves, sections: signaux.sections, prix: signaux.prix, commerce: signaux.commerce,
           ctaAuDessusDuPliMobile: signaux.ctaAuDessusDuPliMobile } : null,

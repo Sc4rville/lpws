@@ -36,8 +36,8 @@ export type Resultats = {
   archives?: Record<string, Fenetre>
 }
 
-type Fenetre = { depuis: string; jusqua: string; controle: { n: number; c: number } | null; variante: { n: number; c: number } | null }
-type Lecteur = (depuis: string, jusqua: string) => Promise<LigneVersion[]>
+type Fenetre = { depuis: string; jusqua: string; experience?: string; controle: { n: number; c: number } | null; variante: { n: number; c: number } | null }
+type Lecteur = (depuis: string, jusqua: string, experience?: string) => Promise<LigneVersion[]>
 
 export const cleLancement = (id: string, lanceLe: string) => `${id}@${lanceLe}`
 
@@ -69,7 +69,7 @@ export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecte
         `    et crée la dimension personnalisée lpws_variante (portée UTILISATEUR) dans Admin → Définitions personnalisées.`)
     const m: Mesure = JSON.parse(await readFile(f.mesure, "utf8"))
     const sa: CompteDeService = JSON.parse(await readFile(m.compteDeService, "utf8"))
-    lire = (d, j) => rapportParVersion(sa, m.propriete, d, j)
+    lire = (d, j, experience) => rapportParVersion(sa, m.propriete, d, j, experience)
     lignes = await lire(depuis, "today")
     step(SCOPE, `GA4 propriété ${m.propriete}, depuis le ${depuis} : ${lignes.length} version(s)`)
   }
@@ -82,14 +82,17 @@ export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecte
   const parTest: NonNullable<Resultats["parTest"]> = {}
   const archives: NonNullable<Resultats["archives"]> = {}
   const fenetres = new Map<string, Promise<LigneVersion[]>>()
-  const fenetre = async (id: string, lanceLe: string, finLe: string | undefined): Promise<Fenetre> => {
+  const fenetre = async (id: string, lanceLe: string, finLe: string | undefined, experience?: string, ciblage = false): Promise<Fenetre> => {
     const d = lanceLe.slice(0, 10), j = finLe?.slice(0, 10) ?? "today"
-    if (!fenetres.has(`${d}/${j}`)) fenetres.set(`${d}/${j}`, lire(d, j))
-    const ls = await fenetres.get(`${d}/${j}`)!
+    if ((ciblage && !experience) || (exemple && experience))
+      return { depuis: d, jusqua: j, ...(experience ? { experience } : {}), controle: null, variante: null }
+    const cle = `${d}/${j}/${experience ?? ""}`
+    if (!fenetres.has(cle)) fenetres.set(cle, lire(d, j, experience))
+    const ls = await fenetres.get(cle)!
     const de = (v: string) => { const l = ls.find((x) => x.version === v); return l ? { n: l.sessions, c: l.conversions } : null }
-    return { depuis: d, jusqua: j, controle: de("controle"), variante: de(id) }
+    return { depuis: d, jusqua: j, ...(experience ? { experience } : {}), controle: de("controle"), variante: de(id) }
   }
-  for (const t of vivants) if (t.lanceLe) parTest[t.id] = await fenetre(t.id, t.lanceLe, t.finLe)
+  for (const t of vivants) if (t.lanceLe) parTest[t.id] = await fenetre(t.id, t.lanceLe, t.finLe, t.experience, !!t.ciblage)
   /* Un test arrêté a été archivé avec ce que GA4 savait à l'arrêt ; ses dernières conversions
    * arrivent jusqu'à 48 h plus tard. On ré-archive donc (même lancement : la ligne est mise à
    * jour, pas dupliquée) tout lancement terminé dont la lecture précède ce délai — y compris
@@ -103,12 +106,12 @@ export async function mesurer(campagne: string, exemple = false, lireGa4?: Lecte
   })())
   const orphelins: Test[] = journal.filter((e) => e.lanceLe && !courants.has(cleLancement(e.test, e.lanceLe)) && enAttente(e.luLe, e.arreteLe))
     .map((e) => ({ id: e.test, titre: e.titre, teste: e.teste, pourquoi: e.pourquoi, edits: e.edits, part: e.part, etat: "stop",
-      creeLe: e.lanceLe!, lanceLe: e.lanceLe, finLe: e.arreteLe, plan: e.plan, regle: e.regle }))
+      creeLe: e.lanceLe!, lanceLe: e.lanceLe, finLe: e.arreteLe, plan: e.plan, regle: e.regle, experience: e.experience, ciblage: e.ciblage }))
   // un lancement remplacé dont l'arrêt n'a jamais été écrit : tests.json en garde la fenêtre
   if (!exemple) for (const t of vivants) for (const a of t.anciens ?? [])
     if (!journal.some((x) => x.test === t.id && x.lanceLe === a.lanceLe))
-      orphelins.push({ ...t, etat: "stop", lanceLe: a.lanceLe, finLe: a.finLe, part: a.part, plan: a.plan, anciens: undefined })
-  for (const t of orphelins) archives[cleLancement(t.id, t.lanceLe!)] = await fenetre(t.id, t.lanceLe!, t.finLe)
+      orphelins.push({ ...t, etat: "stop", lanceLe: a.lanceLe, finLe: a.finLe, part: a.part, plan: a.plan, experience: a.experience, anciens: undefined })
+  for (const t of orphelins) archives[cleLancement(t.id, t.lanceLe!)] = await fenetre(t.id, t.lanceLe!, t.finLe, t.experience, !!t.ciblage)
   const res: Resultats = { luLe: new Date().toISOString(), depuis, source: exemple ? "exemple" : "ga4", versions, parTest, ...(orphelins.length ? { archives } : {}) }
   await ecrireJson(f.resultats, res)
   for (const e of await enregistrerExperiences(campagne, [...aRelire, ...orphelins]))

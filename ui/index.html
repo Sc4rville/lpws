@@ -1294,12 +1294,31 @@ function vNouveau(c) {
   const liste = (S.textes || {})[c.id];
   const edits = S.ntEdits || (S.ntEdits = {});
   const selection = (liste || []).filter(x => edits[x.anchor]);
+  const m = c.signaux, pistes = c.diagnostic?.tests || [], propositions = c.propositions || [];
+  const mode = S.ntMode || 'propositions', custom = S.ntCustom || 'guide';
+  const hero = liste?.find(x => x.anchor === m?.hero.titreAnchor);
+  const cta = liste?.find(x => x.anchor === m?.ctas[0]?.anchor);
+  const preuve = m?.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre));
+  const destination = m?.sections.find(x => x.anchor !== preuve?.anchor);
   const rows = !LIVE ? `<div class="empty"><b>Démo sans serveur</b>${esc(SANS_SERVEUR)}</div>`
     : !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
     : !liste.length ? '<div class="empty"><b>Aucun élément trouvé</b>La copie doit avoir abouti pour proposer des changements.</div>'
     : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${edits[x.anchor] ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span>${edits[x.anchor] ? I.check(14) : ''}</button>`).join('')}</div>`;
   return `
-    <div class="hd"><div><h2>Construire une variante</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez les éléments qui portent la même idée : promesse, preuve, CTA ou ordre des sections. L’original reste visible pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="hd"><div><h2>Construire une variante</h2><div class="u">${esc(c.url)}</div><p class="lede">L’audit du clone, le diagnostic et la campagne guident les pistes. Une seule hypothèse, plusieurs éléments cohérents. L’original reste intact.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="grid g2" style="margin-bottom:16px"><button class="card" data-act="nt-mode" data-mode="propositions" style="text-align:left;cursor:pointer;${mode === 'propositions' ? 'outline:2px solid var(--ink)' : ''}"><h3>Propositions LP</h3><p>Constats de l’audit et recherches de la campagne, puis modifications libres avant génération.</p></button><button class="card" data-act="nt-mode" data-mode="custom" style="text-align:left;cursor:pointer;${mode === 'custom' ? 'outline:2px solid var(--ink)' : ''}"><h3>Variante personnalisée</h3><p>Questionnaire rapide ou édition manuelle, avec les mêmes garde-fous.</p></button></div>
+    ${mode === 'propositions' && !S.ntComposer ? `<div class="sec"><h3>Pistes fondées sur le clone et la campagne</h3>${propositions.length ? `<div class="tests">${propositions.map(p => `<div class="tc"><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d">${esc(p.pourquoi)}</div><button class="btn sm" data-act="nt-proposition" data-nom="${esc(p.nom)}">Modifier les ${p.edits?.length || 0} changements</button></div>`).join('')}</div>` : `<p class="muted">Aucune proposition rédigée pour l’instant.${c.brainErreur ? ' ' + esc(c.brainErreur) : ' Lancez l’analyse pour en obtenir.'}</p>`}
+      ${c.recherches?.length ? `<h3>Angles tirés des recherches Google Ads</h3><div class="tests">${c.recherches.map(r => `<div class="tc"><div class="t">${esc(r.libelle)}</div><div class="d">${r.routes} mot${r.routes > 1 ? 's' : ''}-clé${r.routes > 1 ? 's' : ''} validé${r.routes > 1 ? 's' : ''} · ciblage conservé dans le test</div><button class="btn sm" data-act="nt-recherche" data-intention="${esc(r.intention)}">Rédiger des propositions ciblées</button></div>`).join('')}</div>${S.ntRechercheJob ? jobBox(S.ntRechercheJob) : ''}` : ''}
+      ${pistes.length ? `<div class="tests">${pistes.slice(0, 8).map(k => `<div class="tc"><span class="chip">${esc(nomRegle(k.id))}</span><div class="t">${esc(k.action)}</div><div class="d">${esc(k.signal)}</div><div class="d">${esc(k.test?.consigne || '')}</div><button class="btn sm" data-act="piste" data-regle="${esc(k.id)}">Construire cette piste</button></div>`).join('')}</div>` : '<p class="muted">Lancez le Brain après avoir décrit la campagne pour obtenir des pistes ancrées dans le diagnostic.</p>'}</div>` : ''}
+    ${mode === 'custom' && !S.ntComposer ? `<div class="sec"><div class="f"><button class="btn ${custom === 'guide' ? 'pri' : ''}" data-act="nt-custom" data-mode="guide">Questionnaire rapide</button><button class="btn ${custom === 'manuel' ? 'pri' : ''}" data-act="nt-custom" data-mode="manuel">Saisie manuelle</button></div>
+      ${custom === 'guide' ? `<div class="card" style="display:grid;gap:14px;margin-top:14px"><h3>Que doit comprendre ou faire le visiteur ?</h3><p class="muted">Reprenez uniquement les promesses et preuves déjà présentes sur la page ou dans l’annonce. L’étape suivante permet de tout ajuster.</p>
+        ${hero ? `<label class="fld">Titre · actuellement « ${esc(hero.text)} »<input class="inp" id="nt-q-titre" placeholder="Nouvelle promesse (facultatif)" value="${esc(S.ntQuestion?.titre || '')}"></label>` : ''}
+        ${cta ? `<label class="fld">Bouton · actuellement « ${esc(cta.text)} »<input class="inp" id="nt-q-cta" placeholder="Nouvelle action (facultatif)" value="${esc(S.ntQuestion?.cta || '')}"></label>` : ''}
+        ${preuve && destination ? `<label class="fld"><input type="checkbox" id="nt-q-preuve" ${S.ntQuestion?.preuve ? 'checked' : ''}> Rapprocher la preuve « ${esc(preuve.titre)} » du début de page</label>` : ''}
+        <label class="fld">Pourquoi ces changements ?<input class="inp" id="nt-q-pourquoi" value="${esc(S.ntQuestion?.pourquoi || '')}" placeholder="Ex. aligner l’annonce et la première impression"></label>
+        <button class="btn pri" data-act="nt-question">Préparer les changements</button><span class="muted" id="nt-err"></span></div>` : `<div class="card" style="margin-top:14px"><p>Choisissez librement jusqu’à six textes, boutons ou blocs de la copie.</p><button class="btn pri" data-act="nt-manuel">Ouvrir l’éditeur</button></div>`}</div>` : ''}
+    ${!S.ntComposer ? '' : `<div class="f" style="margin-bottom:14px"><button class="btn sm" data-act="nt-retour">${I.back(14)}Retour aux deux choix</button></div>`}
+    ${!S.ntComposer ? '' : `
     ${S.piste ? `<div class="card" style="margin-bottom:14px"><b>Piste du Brain · ${esc(S.piste.action)}</b><p>${esc(S.piste.signal)} · ${esc(S.piste.test?.consigne || '')}</p></div>` : ''}
     <div class="grid nt">
       <div class="card"><h3>1 · Les éléments à changer <span class="n">${selection.length} / 6</span></h3>${rows}</div>
@@ -1312,7 +1331,7 @@ function vNouveau(c) {
         <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="nt-titre" value="${esc(S.ntTitre || S.piste?.action || '')}"></label>
         <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${selection.length ? GO(I.sparkle(16) + 'Créer le test', 'data-act="creer-test"') : ''}<span class="muted" id="nt-err"></span></div>
       </div>
-    </div>`;
+    </div>`}`;
 }
 
 /* ---------- le brain : la campagne, les propositions, les conseils ---------- */
@@ -1755,7 +1774,7 @@ function go(spec) {
   for (const part of spec.split(';')) {
     const [k, v] = part.split(':');
     if (k === 'ctx') { S.ctx = v; S.view = 'dash'; S.test = null; S.openMode = null; }
-    else if (k === 'view') { S.view = v; if (v === 'nouveau') S.piste = null; }
+    else if (k === 'view') { S.view = v; if (v === 'nouveau') { S.piste = null; S.ntComposer = false; S.ntCiblage = null; } }
     else if (k === 'test') { S.view = 'test'; S.test = v; }
     else if (k === 'guide') { S.view = 'guide'; S.mode = v; S.openMode = v; }
   }
@@ -1892,6 +1911,45 @@ document.addEventListener('click', e => {
       api('/api/compte', corps).then(async () => { toast('Compte enregistré'); await chargerEtat(); render(); }).catch(e => { const z = document.getElementById('cp-err'); if (z) z.textContent = e.message; else toast(e.message); });
       break;
     }
+    case 'nt-mode': S.ntMode = act.dataset.mode; S.ntComposer = false; render(); break;
+    case 'nt-recherche': {
+      if (!c) break;
+      api(`/api/clients/${c.id}/recherches`, { intention: act.dataset.intention }).then(async r => {
+        S.ntRechercheJob = r.job; render();
+        suivreJob(r.job, async j => { S.ntRechercheJob = null; await chargerEtat(); render(); toast(j.etat === 'ok' ? 'Propositions ciblées prêtes à modifier' : 'La rédaction ciblée a échoué : ' + (j.lignes || []).slice(-1)[0]); });
+      }).catch(e => toast(e.message));
+      break;
+    }
+    case 'nt-custom': S.ntCustom = act.dataset.mode; render(); break;
+    case 'nt-manuel': S.ntComposer = true; S.ntEdits = {}; S.piste = null; S.ntCiblage = null; render(); break;
+    case 'nt-retour': S.ntComposer = false; render(); break;
+    case 'nt-question': {
+      if (!c) break;
+      const m = c.signaux, liste = S.textes?.[c.id] || [];
+      const q = { titre: document.getElementById('nt-q-titre')?.value.trim() || '', cta: document.getElementById('nt-q-cta')?.value.trim() || '',
+        preuve: !!document.getElementById('nt-q-preuve')?.checked, pourquoi: document.getElementById('nt-q-pourquoi')?.value.trim() || '' };
+      S.ntQuestion = q;
+      const edits = {};
+      for (const [anchor, texte] of [[m?.hero.titreAnchor, q.titre], [m?.ctas[0]?.anchor, q.cta]]) {
+        const original = liste.find(x => x.anchor === anchor);
+        if (original && texte && texte !== original.text) edits[anchor] = { op: 'set', text: texte };
+      }
+      const preuve = m?.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre));
+      const cible = m?.sections.find(x => x.anchor !== preuve?.anchor);
+      if (q.preuve && preuve && cible) edits[preuve.anchor] = { op: 'move', position: 'before', target: cible.anchor };
+      if (!q.pourquoi || !Object.keys(edits).length) { document.getElementById('nt-err').textContent = 'Expliquez le test et changez au moins un élément.'; break; }
+      S.ntEdits = edits; S.ntWhy = q.pourquoi; S.ntTitre = 'Variante · ' + (q.titre ? 'promesse' : q.cta ? 'action' : 'preuve');
+      S.ntCiblage = null; S.piste = null; S.ntComposer = true; render(); break;
+    }
+    case 'nt-proposition': {
+      const p = c?.propositions?.find(x => x.nom === act.dataset.nom);
+      if (!p?.edits?.length) { toast('Le détail de cette proposition est indisponible : relancez l’analyse.'); break; }
+      S.ntEdits = Object.fromEntries(p.edits.filter(e => e.anchor).map(e => [e.anchor, {
+        op: e.op, text: e.text, target: e.before || e.after || e.with, position: e.before ? 'before' : 'after',
+      }]));
+      S.ntTitre = p.titre; S.ntWhy = p.pourquoi; S.ntCiblage = p.ciblage || null;
+      S.piste = null; S.ntComposer = true; render(); break;
+    }
     case 'piste': {
       if (!c) break;
       const k = c.diagnostic?.tests.find(x => x.id === act.dataset.regle), m = c.signaux;
@@ -1904,7 +1962,8 @@ document.addEventListener('click', e => {
       const cible = k.test?.cible === 'titre' ? m.hero.titreAnchor : k.test?.cible === 'sous-titre' ? m.hero.sousTitreAnchor
         : k.test?.cible === 'cta' ? cta?.anchor : k.test?.cible === 'nav' ? m.nav.anchor : section?.anchor;
       S.ntEdits = cible ? { [cible]: { op: k.test?.verbes?.[0] || 'set' } } : {};
-      S.piste = k; S.ntTitre = k.action; S.ntWhy = k.pourquoi; S.view = 'nouveau'; render(); break;
+      S.piste = k; S.ntTitre = k.action; S.ntWhy = k.pourquoi; S.ntCiblage = null;
+      S.ntMode = 'propositions'; S.ntComposer = true; S.view = 'nouveau'; render(); break;
     }
     case 'choisir': {
       const anchor = act.dataset.anchor;
@@ -1923,8 +1982,8 @@ document.addEventListener('click', e => {
       const err = document.getElementById('nt-err');
       if (!titre || !why || !edits.length || edits.some(e => e.op === 'set' ? !e.text : e.op !== 'remove' && !S.ntEdits[e.anchor].target)) { if (err) err.textContent = 'Nommez le test, expliquez pourquoi et complétez chaque changement.'; break; }
       if (err) err.textContent = 'Création…';
-      api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits })
-        .then(async r => { S.ntEdits = {}; S.piste = null; S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
+      api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits, ...(S.ntCiblage ? { ciblage: S.ntCiblage } : {}) })
+        .then(async r => { S.ntEdits = {}; S.piste = null; S.ntCiblage = null; S.ntComposer = false; S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
         .catch(e => { if (err) err.textContent = e.message; });
       break;
     }

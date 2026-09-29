@@ -8,11 +8,16 @@
 - **Variantes complètes en cours** : les signaux et constats du Brain reviennent dans le cockpit ;
   les pistes mènent à l'éditeur multi-éléments (texte, CTA, navigation et sections), validé par
   les ancres et les garde-fous. Le Brain peut proposer plusieurs éditions pour une hypothèse.
+  La création présente deux choix : propositions de l'audit et des recherches, modifiables avant
+  test ; ou variante personnalisée par questionnaire court ou saisie libre. Ciblage et verrouillage
+  de campagne sont conservés avec la validation des éditions. Les recherches Google Ads validées
+  peuvent alimenter des propositions ciblées quand le modèle est disponible.
 - **Parcours Relay vérifié en local** : capture fidèle, analyse et signaux, refus d'une
   affirmation inventée, titre + CTA + déplacement de preuve visibles dans la variante.
   La destination d'un déplacement compte dans le delta ; une variante qui change une section
   non visée ne peut plus passer prête ni être lancée. La génération rédigée nécessite
   `claude -p`, absent et non authentifié sur cette VM ; l'échec s'affiche sans simulation.
+  À revalider après fusion avec `master` : les parcours UI et les tests de mesure et de verrou.
 - **Le clone est l'ATELIER, pas la page livrée** : il sert à voir, diagnostiquer, construire et
   montrer une variante sans aucun accès. La livraison passe par trois voies : **Express** (tag GTM,
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),

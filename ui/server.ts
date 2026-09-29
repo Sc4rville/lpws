@@ -60,7 +60,7 @@ import { rapportHtml } from "../engine/rapport/rapport.ts"
 import { MOTIFS, estMotif } from "../engine/measure/experience.ts"
 import { lireCompte, ecrireCompte, demarrerEssai, Compte, DECLARATION_MANDAT, VERSION_CONDITIONS } from "../engine/compte/compte.ts"
 import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/compte/stripe.ts"
-import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat } from "./server/pipeline.ts"
+import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, lancerPersonnalisation, changerEtat } from "./server/pipeline.ts"
 import { verifier } from "./server/tag.ts"
 
 const SCOPE = "ui"
@@ -175,6 +175,7 @@ createServer(async (req, res) => {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "content-disposition": `inline; filename="rapport-${slugify(seg[5])}.html"` }); res.end(html); return
       }
       if (seg[4] === "contexte" && req.method === "POST") return json(res, 202, { job: (await lancerBrain(c, camp, await body(req))).id })
+      if (seg[4] === "recherches" && req.method === "POST") return json(res, 202, { job: (await lancerPersonnalisation(c, camp, await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST") {
         const f = fichiersDe(dossier(c, camp)).propositions
         const props = await lireJson<any[]>(f, [])
