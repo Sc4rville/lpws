@@ -64,11 +64,10 @@
    vendez » pré-rempli avec la marque ; journal brut visible pendant l'analyse ; promesse vitrine ≠ test démo.
 
 ## Blocages / parking
-- Prod `lpws-app.vercel.app` périmée (d'avant le 28/09 19:25 : « certitude », date du 18/09) : la box
-  doit repartir de master et republier (seule instance qui publie).
+- `lpws-app.vercel.app` périmée (d'avant le 28/09 19:25) : ce projet Vercel est sur le compte de la box,
+  pas sur celui de Yann ; la box doit repartir de master et republier. `lpws.vercel.app` (compte de Yann)
+  est à jour depuis le 29/09 : interface, /site, /demo, balise HubSpot recopiée à l'identique.
 - Quota Devin de la semaine quasi épuisé (97 % le 29/09) : intégration et petits chantiers en local.
 - Non branché faute d'accès : Stripe (`STRIPE_*`), annonces Google Ads/AI Max, Shopify, Intégral.
-- `lpws.vercel.app` (projet de Yann) sert une démo sans `t/` ni `v/` : redéployer depuis `ui/dist`
-  ou basculer sur `lpws-app.vercel.app`.
 - Recherche v2 à lancer : [docs/recherche/v2-brief.md](docs/recherche/v2-brief.md). Corpus sans page e-commerce.
 - Racine fantôme fermée : éditable dans le clone, pas par la balise Express (Intégral le pourrait).
