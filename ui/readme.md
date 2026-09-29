@@ -41,14 +41,21 @@ données de démonstration.
 | `POST /api/clients/<c>/<camp>/tests/<id>` `{etat, part}` | lancer / arrêter → config republiée (job) |
 | `POST /api/clients/<c>/<camp>/verifier` | la balise est-elle sur la vraie page ? (job) |
 | `GET /files/…` · `GET /t/…` · `GET /v/…` | captures ; fichiers du tag tels que Vercel les sert |
+| `GET/POST /api/clients/<c>/<camp>/intentions[/…]` | analyse, import CSV, décisions, génération par intention, simulateur, connecteur Google Ads, mesure — voir [../engine/intent/readme.md](../engine/intent/readme.md) |
+| `POST /api/intents/<c>/<camp>/sync` | le seul endpoint hors mot de passe : Bearer du connecteur Google Ads |
 
 État dans `clients/<client>/<campagne>/` : `tests.json`, `express.json`, `capture.json` (le
 temps d'une capture). Jamais dans le repo.
 
 ## Ce qui n'est pas là
 
-- **Pas de mesure** : les résultats se lisent dans GA4 (dimension `lpws_variante`) — la page
-  du test le dit au lieu d'inventer des chiffres.
+- **Mesure GA4 branchable** : la vue Intentions → étape 4 enregistre la propriété et lance
+  `engine/measure/run.ts` ; sans compte de service provisionné, la page du test dit que les
+  résultats se lisent dans GA4 au lieu d'inventer des chiffres.
+- **Intentions Google Ads** : vue dédiée par client (import CSV du rapport « termes de
+  recherche », relecture par intention, variantes ciblées, simulateur, connecteur script
+  Google Ads en lecture seule). La synchronisation exige une instance publique HTTPS
+  (`LPWS_URL_PUBLIQUE` + `LPWS_MOT_DE_PASSE`) ; en local seul l'import CSV fonctionne.
 - **Un seul verbe** pour le buyer : changer un texte. Retirer, déplacer, dupliquer existent
   dans la machine mais pas encore à l'écran.
 - **Une page par client** : la config du tag est par client (`v/<client>.json`), deux pages
@@ -62,7 +69,7 @@ temps d'une capture). Jamais dans le repo.
 - `index.html` — la source, un seul fichier, sans dépendance. Marqueur `/*THUMBS*/` pour la
   démo statique.
 - `server.ts` — la v1 : les routes et le mot de passe ; le reste dans `server/` (config · jobs ·
-  etat · pipeline des tests · tag).
+  etat · pipeline des tests · tag · verrou par client · intentions).
 - `build.ts` — la démo statique : injecte les captures lues dans `clients/`, réduites en JPEG
   dans Chromium.
 - `dist/` — la sortie déployée (ignorée), avec `t/` et `v/` du tag et le lien Vercel.

@@ -748,10 +748,10 @@ const K_UI = { attente: 'wait', collecte: 'run', gagnant: 'win', perdant: 'lose'
 /** ce que le buyer a dit de la campagne et l'horizon fixé au lancement → l'entrée du verdict */
 function entreeVerdict(c, t) {
   const ctx = c.contexte || {}, plan = t.plan;
-  const vm = ctx.visiteursMois || (c.ads ? c.ads.clics * 30.4 : null);
+  const vm=t.ciblage?null:(ctx.visiteursMois||(c.ads?c.ads.clics*30.4:null));
   return { o: t.res && t.res.o, v: t.res && t.res.v, jours: t.jours || 0,
     part: plan ? plan.part : (t.part > 0 && t.part < 100 ? t.part / 100 : .5),
-    tauxBase: plan && !plan.tauxSuppose ? plan.tauxBase : ctx.tauxConversion ? ctx.tauxConversion / 100 : null,
+    tauxBase: plan ? (plan.tauxSuppose?null:plan.tauxBase) : t.ciblage?null:ctx.tauxConversion?ctx.tauxConversion/100:null,
     mde: plan ? plan.mde : STATS.mdePour(vm), visiteursJour: vm ? vm / 30.4 : null,
     cible: plan ? { controle: plan.controle, variante: plan.variante } : null };
 }
@@ -768,7 +768,7 @@ function verdict(c, t) {
 function horizon(c, t) {
   const p = STATS.juger({ ...entreeVerdict(c, t), o: null, v: null, part: .5 }).plan;
   const hausse = pct(p.mde, 0), taux = p.tauxSuppose ? `${pct(p.tauxBase, 0)} de conversion supposés` : `${pct(p.tauxBase, 1)} de conversion`;
-  if (!p.jours) return `<div class="card" style="margin-bottom:14px"><p><b>Combien de temps ?</b> Pour voir une hausse de ${hausse}, il faut ~${fr(p.controle)} visiteurs par version (${taux}). Indiquez les visiteurs par mois dans <a href="#" data-go="view:campagne">Votre campagne</a> pour connaître la durée.</p></div>`;
+  if (!p.jours) return `<div class="card" style="margin-bottom:14px"><p><b>Combien de temps ?</b> ${t.ciblage ? 'Le volume de cette intention n’est pas encore mesuré : durée inconnue' : `Pour voir une hausse de ${hausse}, il faut ~${fr(p.controle)} visiteurs par version (${taux}). Indiquez les visiteurs par mois dans <a href="#" data-go="view:campagne">Votre campagne</a> pour connaître la durée.`}</p></div>`;
   if (!p.faisable) return `<div class="card" style="margin-bottom:14px;border:1px solid var(--warn)"><p><b>Ce test ne pourra pas conclure à ce trafic.</b> Il faudrait ~${fr(Math.round(p.jours / 7))} semaines pour voir une hausse de ${hausse}${p.mdeEnHuitSemaines ? ` : en huit semaines, seule une hausse d’au moins ${pct(p.mdeEnHuitSemaines, 0)} se voit` : ''}. Préférez un changement plus franc.</p></div>`;
   return `<div class="card" style="margin-bottom:14px"><p><b>~${fr(p.jours)} jours pour conclure.</b> ~${fr(p.controle)} visiteurs par version pour voir une hausse de ${hausse} (${taux}). Le verdict ne tombe qu’à cet horizon, sauf écart écrasant : un écart précoce se retourne souvent.</p></div>`;
 }
@@ -777,7 +777,8 @@ const ETATS = {
   stop: ['', 'Arrêté', false], integral: ['warn', 'Demande Intégral', false], attente: ['warn', 'Boutique à connecter', false],
   prep: ['warn', 'En préparation', true], echec: ['bad', 'À reprendre', false],
 };
-const chipEtat = t => { const [k, l, p] = ETATS[t.etat]; return `<span class="chip ${k}">${k ? `<span class="dot ${p ? 'pulse' : ''}"></span>` : ''}${l}${t.etat === 'live' ? ' · ' + t.part + ' %' : ''}</span>`; };
+const INTENTIONS_LIB = { transaction: 'Prêt à agir', alternative: 'Alternative à un concurrent', prix: 'Prix et budget', comparaison: 'Comparaison et choix', information: 'Information et apprentissage', marque: 'Marque et navigation', categorie: 'Catégorie générique' };
+const chipEtat = t => { const [k, l, p] = ETATS[t.etat]; const aud = t.ciblage && INTENTIONS_LIB[t.ciblage.intention] ? ` du trafic ${INTENTIONS_LIB[t.ciblage.intention]}` : ' du trafic'; return `<span class="chip ${k}">${k ? `<span class="dot ${p ? 'pulse' : ''}"></span>` : ''}${l}${t.etat === 'live' ? ' · ' + t.part + ' %' + (t.ciblage ? aud : '') : ''}</span>`; };
 const chipPot = t => `<span class="chip ${t.potentiel === 'Fort' ? 'ink' : ''}">${I.sparkle(12)}Potentiel ${t.potentiel.toLowerCase()}</span>`;
 const voieDe = c => c.shopify ? 'natif' : 'express';
 const chipConn = c => { const m = voieDe(c); const x = c.connexion[m]; const k = x.etat === 'ok' ? 'ok' : x.etat === 'warn' ? 'warn' : ''; return `<span class="chip ${k}">${I[MODES[m].icon](13)}${MODES[m].nom} · ${esc(x.label)}</span>`; };
@@ -850,6 +851,7 @@ function renderPanel() {
       ${c.tests.length ? `<div class="sub">${c.tests.map(t => `<button class="si ${S.view === 'test' && S.test === t.id ? 'on' : ''}" data-go="test:${t.id}"><span class="t">${esc(t.titre)}</span><span class="dot ${t.etat === 'live' ? 'ok pulse' : t.etat === 'gagnant' ? 'ok' : t.etat === 'integral' || t.etat === 'attente' ? 'warn' : 'off'}"></span></button>`).join('')}</div>` : ''}
       <button class="ni ${S.view === 'page' ? 'on' : ''}" data-go="view:page" ${S.view === 'page' ? 'aria-current="page"' : ''}>${I.page()}Landing page</button>
       <button class="ni ${S.view === 'resultats' ? 'on' : ''}" data-go="view:resultats" ${S.view === 'resultats' ? 'aria-current="page"' : ''}>${I.bars()}Résultats</button>
+      <button class="ni ${S.view === 'intentions' ? 'on' : ''}" data-go="view:intentions" ${S.view === 'intentions' ? 'aria-current="page"' : ''}>${I.search()}Intentions Google Ads</button>
       <button class="ni ${S.view === 'suivi' ? 'on' : ''}" data-go="view:suivi" ${S.view === 'suivi' ? 'aria-current="page"' : ''}>${I.shield()}Suivi${(c.alertes || []).length ? `<span class="n">${c.alertes.length} alerte${c.alertes.length > 1 ? 's' : ''}</span>` : ''}</button>
       <div class="gl">Connexion</div>
       ${(c.shopify ? ['natif', 'express', 'integral'] : ['express', 'integral', 'natif']).map(m => modeItem(c, m)).join('')}
@@ -1109,6 +1111,15 @@ function vPage(c) {
 }
 
 function vResultats(c) {
+  if (!c.ads && c.live) {
+    const ms = (c.intentions && c.intentions.mesure) || { configure: false };
+    const mesures = c.tests.filter(t => t.res);
+    return `<div class="hd"><div><h2>Résultats</h2><div class="u">${esc(c.url)}</div></div><div class="act"><button class="btn" data-act="ms-run" ${ms.configure ? '' : 'disabled title="Configurez la propriété GA4 dans Intentions → 4"'}>Mesurer maintenant</button></div></div>
+      <div class="card" style="margin-bottom:16px"><h3>Mesure <span class="r">${ms.configure ? `<span class="chip ok"><span class="dot"></span>Propriété ${esc(ms.propriete || '')}</span>` : '<span class="chip">À configurer</span>'}</span></h3>
+      <p>${ms.configure ? `Les versions lues par GA4 remontent ici après chaque mesure (GA4 compte sous 24–48 h).` : 'Les résultats viennent de GA4 : indiquez la propriété et le compte de service lecteur dans la vue Intentions, étape 4.'}</p>
+      <div class="f"><button class="btn sm" data-go="view:intentions">Ouvrir Intentions</button></div></div>
+      ${mesures.length ? `<div class="tests">${mesures.map(t => testCard(c, t)).join('')}</div>` : `<div class="empty"><b>Rien à mesurer encore</b>Les résultats arrivent avec le premier test mesuré.</div>`}`;
+  }
   if (!c.ads) return `<div class="hd"><div><h2>Résultats</h2><div class="u">${esc(c.url)}</div></div></div>${c.shopify ? `<div class="grid g2"><div class="card"><h3>Mesure native</h3><p>Chaque test est une version de la fiche produit : les commandes et les conversions se lisent dans Shopify et Google Ads comme aujourd’hui.</p></div><div class="card"><h3>Google Ads <span class="r"><span class="chip">À connecter</span></span></h3><p>Connectez le compte pour voir le coût par conversion de chaque version, ici.</p><div style="margin-top:16px"><button class="btn glow" data-act="gads">${I.link(15)}Connecter Google Ads</button></div></div></div>` : `<div class="empty"><b>Rien à mesurer encore</b>Les résultats arrivent avec le premier test.</div>`}`;
   const tests = c.tests.filter(t => t.res);
   const a = c.ads; const ex = c.connexion.express;
@@ -1233,12 +1244,16 @@ function vGuide(c, m) {
 }
 
 /* ---------- la v1 : quand le serveur est là, l'interface pilote la machine ---------- */
+let ETAT_ERREUR = null;
 async function chargerEtat() {
   try {
     const r = await fetch('/api/etat', { cache: 'no-store' }); if (!r.ok) throw 0;
-    const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE; COMPTE = d.compte || null;
+    const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE; COMPTE = d.compte || null; ETAT_ERREUR = null;
     if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
-  } catch { CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; } }
+  } catch (e) {
+    if (LIVE) { ETAT_ERREUR = 'La connexion au serveur a été perdue : l’écran montre la dernière lecture connue.'; return; }
+    CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
+  }
 }
 async function api(path, data) {
   const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data || {}) });
@@ -1460,6 +1475,7 @@ function apresRendu() {
   const c = S.ctx === 'home' ? null : byId(S.ctx);
   const recharger = async () => { await chargerEtat(); render(); };
   if (S.view === 'test' && c) { const t = c.tests.find(x => x.id === S.test); if (t && t.etat === 'prep' && t.job) suivreJob(t.job, recharger); }
+  if (S.view === 'intentions' && c && c.intentionsJob) suivreJob(c.intentionsJob.id, recharger);
   if (S.view === 'dash' && c && c.job) suivreJob(c.job, recharger);
   if (S.view === 'nouveau' && c) chargerTextes(c);
   if (S.view === 'audit' && S.auditJob && !S.auditRes) suivreJob(S.auditJob, j => { S.auditRes = j.resultat || null; S.auditErr = j.etat === 'ok' ? '' : (j.lignes || []).slice(-1)[0]; S.auditJob = null; if (S.view === 'audit') render(); });
@@ -1609,6 +1625,7 @@ function renderMain() {
   else if (S.view === 'conclure') html = vConclure();
   else if (S.view === 'compte') html = vCompte();
   else if (S.view === 'suivi' && c) html = vSuivi(c);
+  else if (S.view === 'intentions' && c) html = vIntentions(c);
   else if (!c) html = vHome();
   else if (S.view === 'tests') html = vTests(c);
   else if (S.view === 'test') html = vTest(c);
@@ -1616,7 +1633,8 @@ function renderMain() {
   else if (S.view === 'resultats') html = vResultats(c);
   else html = vDash(c);
   m.classList.toggle('entre', nav && !calme.matches);
-  m.innerHTML = html; m.scrollTop = 0;
+  m.innerHTML = (ETAT_ERREUR ? `<div class="card" style="border-color:var(--warn);margin-bottom:16px"><p><b>Connexion interrompue.</b> ${esc(ETAT_ERREUR)}</p></div>` : '') + html;
+  m.scrollTop = 0;
   if (S.view === 'resultats') calcSS();
   if (S.view === 'conclure') calcPlan();
   apresRendu();
@@ -1634,7 +1652,7 @@ function calcSS() {
 function render() { renderRail(); renderPanel(); renderMain(); save(); synchroniserUrl(); }
 
 /* ---------- l'adresse : chaque écran a la sienne, précédent / suivant marchent, un lien se partage ---------- */
-const VUES = ['tests', 'page', 'resultats', 'nouveau', 'campagne', 'suivi'];
+const VUES = ['tests', 'page', 'resultats', 'nouveau', 'campagne', 'suivi', 'intentions'];
 const VUES_ACCUEIL = { audit: 'audit', conclure: 'peut-on-conclure', compte: 'compte' };
 function hashDe() {
   if (S.view === 'ajout') return '#/nouvelle-page';
@@ -1662,7 +1680,7 @@ function lireHash() {
 function titreEcran() {
   const c = S.ctx === 'home' ? null : byId(S.ctx);
   const t = c && S.view === 'test' ? c.tests.find(x => x.id === S.test) : null;
-  const vue = { dash: c ? '' : 'Aujourd’hui', tests: 'Tests', page: 'Landing page', resultats: 'Résultats', ajout: 'Nouvelle page', nouveau: 'Nouveau test', campagne: 'Campagne', suivi: 'Suivi', audit: 'Audit tracking', conclure: 'Peut-on conclure ?', compte: 'Compte et offres', guide: S.mode && MODES[S.mode] ? MODES[S.mode].nom : '' }[S.view];
+  const vue = { dash: c ? '' : 'Aujourd’hui', tests: 'Tests', page: 'Landing page', resultats: 'Résultats', ajout: 'Nouvelle page', nouveau: 'Nouveau test', campagne: 'Campagne', suivi: 'Suivi', intentions: 'Intentions Google Ads', audit: 'Audit tracking', conclure: 'Peut-on conclure ?', compte: 'Compte et offres', guide: S.mode && MODES[S.mode] ? MODES[S.mode].nom : '' }[S.view];
   return [t ? t.titre : vue, c && c.nom, 'LPWS'].filter(Boolean).join(' · ');
 }
 let urlRendue = null;
@@ -1691,7 +1709,8 @@ function entrees() {
     const g = c.nom;
     if (c.live && c.capture.ok !== null && !c.capture.enCours) E.push({ g, l: 'Nouveau test', d: 'changer un texte de la page', go: 'view:nouveau', i: 'sparkle' });
     E.push({ g, l: 'Tableau de bord', d: c.url, go: 'view:dash', i: 'home' }, { g, l: 'Tests', d: c.tests.length + ' test' + (c.tests.length > 1 ? 's' : ''), go: 'view:tests', i: 'ab' },
-      { g, l: 'Résultats', d: 'conversions, coût par conversion', go: 'view:resultats', i: 'bars' }, { g, l: 'Landing page', d: 'la copie et ce qu’on peut tester', go: 'view:page', i: 'page' });
+      { g, l: 'Résultats', d: 'conversions, coût par conversion', go: 'view:resultats', i: 'bars' }, { g, l: 'Landing page', d: 'la copie et ce qu’on peut tester', go: 'view:page', i: 'page' },
+      { g, l: 'Intentions Google Ads', d: 'mots-clés achetés, variantes par intention', go: 'view:intentions', i: 'search' });
   }
   if (c) E.push({ g: c.nom, l: 'Suivi', d: 'audit, surveillance, alertes, historique', go: 'view:suivi', i: 'shield' });
   E.push({ g: 'Aller à', l: 'Audit tracking', d: 'gratuit : gclid, redirections, consentement, vitesse', go: 'ctx:home;view:audit', i: 'shield' },
@@ -1741,6 +1760,140 @@ document.addEventListener('keydown', e => {
   if (e.key === '/' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); ouvrirK(); return; }
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && toast.undo) { e.preventDefault(); annulerDernier(); }
 });
+
+
+/* ---------- intentions Google Ads : le mot-clé acheté choisit la variante ---------- */
+const INT = {};
+const intState = c => INT[c.id] || (INT[c.id] = { filtreInt: '', filtreQ: '', page: 0, dec: {}, marques: '', compte: '', campagnes: '', consignes: {}, sim: null, perso: null });
+const SCRIPTS = {};
+const ETAPES_INT = [
+  ['import', '1. Importer / synchroniser', 'Le rapport « termes de recherche » de Google Ads, ou le script de synchronisation'],
+  ['decisions', '2. Relire les intentions', 'Chaque mot-clé acheté est confirmé ou exclu avant de router'],
+  ['variantes', '3. Personnaliser et tester', 'Une variante par intention validée, mesurée à part'],
+  ['mesure', '4. Brancher et mesurer', 'La balise sur la page, GA4 branché, le suffixe dans Google Ads'],
+];
+const etapesInt = { import: it => !!(it.analyse || it.connexion && it.connexion.configure),
+  decisions: it => !!(it.analyse && it.analyse.routes.some(r => r.decision)),
+  variantes: (it, c) => (c.propositions || []).some(p => p.ciblage) || c.tests.some(t => t.ciblage),
+  mesure: it => !!(it.mesure && it.mesure.configure) };
+
+function cartePropCiblee(c, p) {
+  const nom = esc(p.nom), dc = c.declinaison, ecrit = dc && dc.source === p.nom, occupe = !!dc;
+  const st = intState(c);
+  const pied = ecrit
+    ? `<div class="d"><b>LPWS écrit d’autres versions de ce test.</b></div>${jobBox(dc.job)}`
+    : S.decl === p.nom
+    ? `<label class="fld" style="font-weight:600">D’autres versions de ce test<input class="inp" id="decl-consigne" maxlength="300" placeholder="Une consigne ? ex. plus court, parler de la livraison" value="${esc(S.declConsigne || '')}"></label>
+       <div class="f">${GO(I.sparkle(15) + 'Écrire 3 versions', `data-act="decliner" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-fermer">Annuler</button></div>`
+    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="perso" data-nom="${nom}" title="Changer le texte de la variante avant de la créer">Personnaliser</button><button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : ''}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refus-ouvrir" data-nom="${nom}">Pas celui-là</button></div>`;
+  const refus = S.refus === p.nom ? `<div class="d"><b>Pourquoi ?</b> LPWS s’en souvient : les prochaines versions pour ce client en tiennent compte.</div>
+     <div class="f" style="flex-wrap:wrap">${MOTIFS_REFUS.map(([k, l, t]) => `<button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}" data-motif="${k}" title="${t}">${l}</button>`).join('')}</div>
+     <label class="fld"><input class="inp" id="refus-raison" maxlength="300" placeholder="Ou en vos mots (facultatif)" value="${esc(S.refusRaison || '')}"></label>
+     <div class="f"><button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}">Retirer</button><button class="btn sm" data-act="refus-fermer">Annuler</button></div>` : '';
+  const chip = p.ciblage ? `<span class="chip">${I.search(12)}${esc(INTENTIONS_LIB[p.ciblage.intention] || p.ciblage.intention)}</span>` : '';
+  const source = p.declineDe && (c.propositions || []).find(x => x.nom === p.declineDe);
+  return `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap">${chip}<span class="chip">${esc(nomRegle(p.regle))}</span>${p.declineDe ? `<span class="chip" title="${esc(source ? 'Déclinée de « ' + source.titre + ' »' : 'Déclinaison')}">Déclinaison</span>` : ''}${(p.sources || []).slice(0, 2).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div>${pied}${refus}</div>`;
+}
+
+function vIntentions(c) {
+  const st = intState(c);
+  if (!LIVE) return `<div class="hd"><div><h2>Intentions Google Ads</h2></div></div><div class="empty"><b>Vue réservée au serveur local</b>L’import, la relecture et la génération passent par le serveur LPWS : cette démo ne peut pas les rejouer. ${esc(SANS_SERVEUR)}</div>`;
+  const it = c.intentions || {};
+  const a = it.analyse, cx = it.connexion || { configure: false, publicDisponible: false }, ms = it.mesure || { configure: false };
+  const ex = c.connexion.express;
+  const devise = a && a.source && a.source.devise ? a.source.devise : null;
+  const routes = a ? a.routes : [];
+  const intentions = Object.keys(INTENTIONS_LIB);
+  const statsInt = i => routes.filter(r => r.intention === i).reduce((x, r) => ({ clics: x.clics + r.clics, conv: x.conv + r.conversions }), { clics: 0, conv: 0 });
+  const jobEnCours = c.intentionsJob ? `<div id="job-zone" style="margin-top:6px">${jobBox(c.intentionsJob.id)}</div>` : '<div id="job-zone"></div>';
+
+  const etape = (k, titre, sous) => { const f = etapesInt[k](it, c); return `<div class="card" style="padding:16px 18px"><div class="f" style="align-items:center"><span class="k" style="width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:${f ? 'var(--ok-bg)' : 'var(--paper-2)'};color:${f ? 'var(--ok)' : 'var(--muted)'};font-family:var(--mono);font-size:12px">${f ? I.check(11) : titre[0]}</span><b>${titre}</b></div><p class="muted" style="margin-top:6px;font-size:13px">${sous}</p></div>`; };
+
+  const importBloc = `<div class="card"><h3>Importer le rapport « termes de recherche » <span class="r"><a class="btn sm" href="/api/intents/exemple.csv" download>Télécharger l’exemple synthétique</a></span></h3>
+    <p class="muted">Google Ads → Rapports → Termes de recherche → Exporter (CSV, avec Clics, Impressions, Coût, Conversions, et les colonnes Campagne/Groupe d’annonces + leurs identifiants). Le fichier reste sur cette machine.</p>
+    <label class="fld" style="margin-top:12px">Fichier CSV<input class="inp" type="file" id="int-file" accept=".csv,text/csv"></label>
+    <label class="fld" style="margin-top:10px">Noms de marque du client <span class="muted" style="font-weight:400">(séparés par des virgules : mieux classés en « marque »)</span><input class="inp" id="int-marques" value="${esc(st.marques)}" placeholder="ex. acme, acme pro"></label>
+    <div class="f" style="margin-top:14px">${GO(I.sparkle(16) + 'Importer', 'data-act="int-import"')}<span class="muted" id="int-err"></span></div>
+    ${a ? `<p class="muted" style="margin-top:12px">Dernier rapport : ${esc(a.source.fichier)} · ${fr(a.clics)} clics visibles · importé le ${esc(new Date(a.importeLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}${a.source.periode ? ' · ' + esc(a.source.periode) : ''}${a.source.compte ? ' · compte ' + esc(a.source.compte) : ''}${devise ? ' · montants en ' + esc(devise) : ''}</p>` : ''}
+  </div>
+  <div class="card"><h3>Synchronisation automatique <span class="r">${cx.configure ? '<span class="chip ok"><span class="dot"></span>Script généré' + (cx.derniereSync ? ' · dernière synchro le ' + esc(new Date(cx.derniereSync).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })) : ' · jamais synchronisé') : '<span class="chip">Non configurée</span>'}</span></h3>
+    <p class="muted">Un script en lecture seule dans Google Ads envoie les termes de la période à LPWS. Il ne modifie ni annonces ni enchères. ${cx.configure ? 'Générer à nouveau le script révoque l’ancien jeton.' : ''}</p>
+    ${cx.publicDisponible ? `<label class="fld" style="margin-top:12px">Compte Google Ads (10 chiffres, sans tirets)<input class="inp mono" id="cnx-compte" inputmode="numeric" value="${esc(st.compte)}" placeholder="1234567890"></label>
+    <label class="fld" style="margin-top:10px">Campagnes à synchroniser <span class="muted" style="font-weight:400">(identifiants, séparés par des virgules)</span><input class="inp mono" id="cnx-camps" value="${esc(st.campagnes)}" placeholder="123456789, 987654321"></label>
+    <div class="f" style="margin-top:14px"><button class="btn pri" data-act="cnx-generer">${I.sparkle(15)}${cx.configure ? 'Régénérer le script (révoque l’ancien)' : 'Générer le script'}</button></div>
+    ${SCRIPTS[c.id] ? `<label class="fld" style="margin-top:14px">Le script à coller une fois dans Google Ads → Scripts <span class="muted" style="font-weight:400">(affiché cette fois seulement : LPWS n’en garde que l’empreinte)</span><textarea class="inp mono" rows="10" readonly>${esc(SCRIPTS[c.id])}</textarea></label>
+    <div class="f" style="margin-top:10px"><button class="btn" data-act="cnx-copier">Copier le script</button><button class="btn sm" data-act="cnx-dl">Télécharger (.js)</button></div>` : ''}`
+    : `<p class="muted" style="margin-top:10px">Indisponible ici : la synchronisation exige que LPWS soit servi en HTTPS public avec un accès privé. <b>L’import CSV ci-contre fonctionne localement.</b></p>`}
+  </div>`;
+
+  const metriques = a ? `<div class="kpis" style="margin:0 0 20px">
+    <div class="stat"><div class="l">Clics visibles</div><div class="v">${fr(a.clics)}</div><div class="s">termes du rapport ; Google en masque une partie</div></div>
+    <div class="stat"><div class="l">Clics routables</div><div class="v">${fr(a.routables)}</div><div class="s">vers une intention validée</div></div>
+    <div class="stat"><div class="l">Couverture</div><div class="v">${a.couverture === null ? '—' : pct(a.couverture, 0)}</div><div class="s">part du trafic visible qui route</div></div>
+  </div>` : '';
+
+  const cartesInt = a ? `<div class="tests">${intentions.map(i => { const x = statsInt(i); const ok = routes.some(r => r.intention === i); return `<div class="tc" style="cursor:default">
+      <div style="display:flex;gap:6px;align-items:center"><b style="flex:1">${INTENTIONS_LIB[i]}</b><span class="chip ${ok ? 'ok' : ''}">${ok ? fr(x.clics) + ' clics' : 'aucun clic'}</span></div>
+      <div class="d">${x.conv ? fr(x.conv) + ' conversion' + (x.conv > 1 ? 's' : '') + ' historique' + (x.conv > 1 ? 's' : '') + ' sur les termes visibles' : 'Pas de conversion observée sur ces termes'}</div>
+      <div class="f">${ok ? GO(I.sparkle(14) + 'Proposer 3 variantes', `data-act="gen-intent" data-int="${i}"`) : `<button class="btn sm" disabled title="${c.contexte ? 'Aucune route validée pour cette intention : tranchez les mots-clés à l’étape 2' : 'Décrivez d’abord la campagne (vue Variantes)'}">${I.sparkle(14)}Proposer 3 variantes</button>`}</div>
+      ${ok ? `<input class="inp" id="gen-${i}" placeholder="Consigne facultative : ex. parler de la livraison" value="${esc(st.consignes[i] || '')}" style="margin-top:8px">` : ''}
+    </div>`; }).join('')}</div>` : '';
+
+  const filtr = routes.filter(r => (!st.filtreInt || (r.intention || r.suggestion) === st.filtreInt || (!r.intention && st.filtreInt === '_indecis'))
+    && (!st.filtreQ || r.motCle.includes(st.filtreQ.toLowerCase()) || r.termes.some(t => t.toLowerCase().includes(st.filtreQ.toLowerCase()))));
+  const nbPages = Math.max(1, Math.ceil(filtr.length / 50));
+  st.page = Math.min(st.page, nbPages - 1);
+  const pageRoutes = filtr.slice(st.page * 50, st.page * 50 + 50);
+  const tableRoutes = a ? `<div class="card"><h3>Les mots-clés achetés <span class="n">${filtr.length}</span></h3>
+    <div class="f" style="margin-bottom:12px;flex-wrap:wrap">
+      <select class="inp" id="int-fint" style="max-width:220px"><option value="">Toutes les intentions</option>${intentions.map(i => `<option value="${i}" ${st.filtreInt === i ? 'selected' : ''}>${INTENTIONS_LIB[i]}</option>`).join('')}<option value="_indecis" ${st.filtreInt === '_indecis' ? 'selected' : ''}>À trancher</option></select>
+      <input class="inp" id="int-fq" placeholder="Filtrer par mot-clé ou terme…" value="${esc(st.filtreQ)}" style="max-width:260px">
+      ${Object.keys(st.dec).length ? `<span class="chip warn">${Object.keys(st.dec).length} décision${Object.keys(st.dec).length > 1 ? 's' : ''} en attente</span>` : ''}
+    </div>
+    <div class="tbl" style="--cols:minmax(160px,1.2fr) minmax(140px,1fr) minmax(160px,1.4fr) minmax(0,1.6fr)"><div class="tr h"><span>Mot-clé acheté</span><span>Campagne · groupe</span><span>Termes vus · répartition</span><span>Décision</span></div>
+    ${pageRoutes.map(r => `<div class="tr" style="align-items:start">
+      <span><b>${esc(r.motCle)}</b><div class="muted" style="font-size:12px;margin-top:2px">${fr(r.clics)} clics · ${fr(r.conversions)} conv.${devise ? ' · ' + fr(r.cout) + ' ' + esc(devise) : ''}</div></span>
+      <span>${esc(r.campagne || '—')}${r.campagneId ? ` <span class="mono muted">#${esc(r.campagneId)}</span>` : ''}<br>${esc(r.groupeAnnonces || '—')}${r.groupeId ? ` <span class="mono muted">#${esc(r.groupeId)}</span>` : ''}</span>
+      <span>${r.termes.slice(0, 3).map(t => esc(t)).join(' · ')}${r.termes.length > 3 ? '…' : ''}<div class="muted" style="font-size:12px;margin-top:2px">${r.repartition.map(x => `${INTENTIONS_LIB[x.intention]} ${fr(x.clics)}`).join(' · ') || '—'}</div><div class="muted" style="font-size:12px">${esc(r.raison)}</div></span>
+      <span><select class="inp" data-intdec="${r.id}" style="max-width:220px"><option value="_" ${st.dec[r.id] === undefined ? 'selected' : ''}>${r.intention ? INTENTIONS_LIB[r.intention] + (r.decision ? ' (validée)' : ' (auto)') : r.suggestion ? 'À trancher — suggestion : ' + INTENTIONS_LIB[r.suggestion] : 'À trancher'}</option>${intentions.map(i => `<option value="${i}" ${st.dec[r.id] === i ? 'selected' : ''}>${INTENTIONS_LIB[i]}</option>`).join('')}<option value="" ${st.dec[r.id] === null ? 'selected' : ''}>Exclure</option></select></span>
+    </div>`).join('')}</div>
+    <div class="f" style="margin-top:14px;justify-content:space-between"><span class="muted">Page ${st.page + 1}/${nbPages}</span><span class="f"><button class="btn sm" data-act="int-page" data-d="-1" ${st.page === 0 ? 'disabled' : ''}>Précédente</button><button class="btn sm" data-act="int-page" data-d="1" ${st.page >= nbPages - 1 ? 'disabled' : ''}>Suivante</button></span></div>
+    <div class="f" style="margin-top:14px">${Object.keys(st.dec).length ? GO(I.check(16) + 'Enregistrer les décisions', 'data-act="int-save"') : ''}<span class="muted" id="int-dec-err"></span></div>
+  </div>` : '';
+
+  const propsCiblees = (c.propositions || []).filter(p => p.ciblage);
+  const blocProps = propsCiblees.length ? `<div class="sec"><h3>Variantes par intention proposées <span class="n">${propsCiblees.length}</span></h3><div class="tests">${propsCiblees.map(p => cartePropCiblee(c, p)).join('')}</div></div>` : '';
+  const testsCibles = c.tests.filter(t => t.ciblage);
+  const blocTests = testsCibles.length ? `<div class="sec"><h3>Tests par intention <span class="n">${testsCibles.length}</span></h3><div class="tests">${testsCibles.map(t => testCard(c, t)).join('')}</div></div>` : '';
+
+  const sim = st.sim;
+  const exemples = [`https://${c.url}?lpws_kw=exemple+de+mot-cle&lpws_mt=e&lpws_cp=123456789&lpws_ag=987654321`, `https://${c.url}`];
+  const simBloc = `<div class="card"><h3>Simuler un clic</h3>
+    <p class="muted">Collez l’adresse de la page avec ses paramètres Google Ads (<span class="mono">lpws_kw</span> = le mot-clé acheté, jamais la requête) : LPWS dit quelle variante ce clic verrait. Rien n’est mesuré ni servi : c’est une projection hors ligne.</p>
+    <div class="f" style="margin-top:12px"><input class="inp mono" id="sim-url" style="flex:1;min-width:240px" placeholder="${esc(exemples[0])}" value="${esc(st.simUrl || '')}"><button class="btn pri" data-act="simuler">Simuler</button></div>
+    ${sim ? `<p style="margin-top:12px">${sim.nom ? `Ce clic verrait <b>${esc(sim.nom)}</b> — intention « ${esc(sim.intention)} ».` : `Ce clic verrait l’original : ${esc(sim.motif)}.`} ${sim.actuelle && sim.actuelle.nom ? `<span class="muted">La configuration locale servirait « ${esc(sim.actuelle.nom)} » (non prouvée déployée).</span>` : ''}</p>` : ''}
+    <p class="muted" style="margin-top:10px">Aperçu hors mesure : <a href="https://${esc(c.url)}?lpws=ID-DU-TEST" target="_blank" rel="noopener" class="mono">https://${esc(c.url)}?lpws=…</a></p>
+  </div>`;
+
+  const check4 = `<div class="card"><h3>Brancher et mesurer</h3>
+    <div class="ck ${ex.etat === 'ok' ? '' : 'off'}"><span class="i">${ex.etat === 'ok' ? I.check(12) : I.stop(12)}</span><div><b>La balise Express sur la page</b><div class="d">${ex.etat === 'ok' ? `installée, vérifiée le ${ex.verifie || ''}${ex.capacite === 'intent-v1' ? ' · routage par intention prêt' : ' · balise ancienne : republier pour le routage par intention'}` : 'à installer depuis la vue Connexion → Express, puis vérifiez'}</div><div class="f" style="margin-top:8px"><button class="btn sm" data-act="verify" data-client="${c.id}">Vérifier l’installation</button><button class="btn sm" data-go="guide:express">La marche à suivre</button></div></div></div>
+    <div class="ck off"><span class="i">${I.copy(12)}</span><div><b>Le suffixe d’URL finale dans Google Ads</b><div class="d">à coller une fois (compte ou campagne), après vos paramètres UTM existants s’il y en a :</div><div class="code" style="margin-top:8px">${esc(it.suffixe || '')}</div><div class="f" style="margin-top:8px"><button class="btn sm" data-copy="${esc(it.suffixe || '')}" data-msg="Suffixe copié">Copier le suffixe</button></div></div></div>
+    <div class="ck ${ms.configure ? '' : 'off'}"><span class="i">${ms.configure ? I.check(12) : I.stop(12)}</span><div><b>GA4 branché</b><div class="d">${ms.configure ? `propriété ${esc(ms.propriete || '')}` : 'identifiant numérique de la propriété GA4 du client'}${ms.serviceEmail ? ` · ajoutez <span class="mono">${esc(ms.serviceEmail)}</span> en lecteur de la propriété` : ''}${ms.configure ? '' : ms.serviceDisponible ? '' : ' · compte de service non provisionné sur cette instance'}</div>
+      <div class="f" style="margin-top:8px"><input class="inp mono" id="ms-prop" placeholder="ID de propriété GA4" style="max-width:180px" inputmode="numeric"><button class="btn sm" data-act="ms-save">Enregistrer</button><button class="btn sm" data-act="ms-run" ${ms.configure ? '' : 'disabled title="Enregistrez la propriété d’abord"'}>Mesurer maintenant</button></div>
+      <div class="d" style="margin-top:6px">Dans GA4 → Admin → Définitions personnalisées : trois dimensions UTILISATEUR <span class="mono">lpws_variante</span>, <span class="mono">lpws_intention</span>, <span class="mono">lpws_experience</span>, remplies par l’événement <span class="mono">lpws_variante</span> (les aperçus <span class="mono">lpws_apercu</span> n’y entrent pas ; le consentement CMP reste tel quel). GA4 compte sous 24–48 h. Les conversions importées dans Google Ads restent globales, pas par variante.</div></div></div>
+  </div>`;
+
+  return `
+    <div class="hd"><div><h2>Intentions Google Ads</h2><div class="u">${esc(c.url)}</div>
+      <p class="lede"><b>Une recherche, une page plus pertinente.</b> La requête exacte reste privée. LPWS utilise le mot-clé acheté pour choisir une variante validée.</p></div>
+      <div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="kpis" style="margin:-8px 0 20px">${ETAPES_INT.map(([k, t, s2]) => etape(k, t, s2)).join('')}</div>
+    ${jobEnCours}
+    <div class="sec"><h3>1 · Importer / synchroniser</h3><div class="grid g2">${importBloc}</div></div>
+    <div class="sec"><h3>2 · Relire les intentions</h3>${a ? metriques + tableRoutes : '<div class="empty"><b>Pas encore de rapport</b>Importez l’export « termes de recherche » de Google Ads à l’étape 1, ou configurez la synchronisation.</div>'}</div>
+    <div class="sec"><h3>3 · Personnaliser et tester</h3>${a ? cartesInt : '<div class="empty"><b>Rien à personnaliser</b>Importez et tranchez les intentions d’abord.</div>'}${blocProps}${blocTests}${simBloc}</div>
+    <div class="sec"><h3>4 · Brancher et mesurer</h3>${check4}</div>`;
+}
 
 /* ---------- lancer, arrêter : tout se rattrape ---------- */
 const photo = c => c.tests.map(x => ({ x, etat: x.etat, part: x.part, fin: x.fin, jours: x.jours }));
@@ -1941,14 +2094,15 @@ document.addEventListener('click', e => {
       S.ntEdits = edits; S.ntWhy = q.pourquoi; S.ntTitre = 'Variante · ' + (q.titre ? 'promesse' : q.cta ? 'action' : 'preuve');
       S.ntCiblage = null; S.piste = null; S.ntComposer = true; render(); break;
     }
-    case 'nt-proposition': {
+    case 'nt-proposition':
+    case 'perso': {
       const p = c?.propositions?.find(x => x.nom === act.dataset.nom);
       if (!p?.edits?.length) { toast('Le détail de cette proposition est indisponible : relancez l’analyse.'); break; }
       S.ntEdits = Object.fromEntries(p.edits.filter(e => e.anchor).map(e => [e.anchor, {
         op: e.op, text: e.text, target: e.before || e.after || e.with, position: e.before ? 'before' : 'after',
       }]));
       S.ntTitre = p.titre; S.ntWhy = p.pourquoi; S.ntCiblage = p.ciblage || null;
-      S.piste = null; S.ntComposer = true; render(); break;
+      S.piste = null; S.ntMode = 'propositions'; S.ntComposer = true; S.view = 'nouveau'; render(); break;
     }
     case 'piste': {
       if (!c) break;
@@ -1958,7 +2112,7 @@ document.addEventListener('click', e => {
         ? m.ctas.find(x => /^(submit|send|soumettre|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok|go)$/i.test(x.texte.trim()))
         : k.id === 'sea-trop-de-ctas'
           ? m.ctas.find((x, i) => i > 0 && x.auDessusDuPli) : m.ctas[0];
-      const section = k.id.startsWith('pr-') ? m.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre)) : m.sections[0];
+      const section = k.id.startsWith('pr-') ? m.sections.find(x => x.preuve || /preuve|avis|client|témoignage|logo/i.test(x.titre)) : m.sections[0];
       const cible = k.test?.cible === 'titre' ? m.hero.titreAnchor : k.test?.cible === 'sous-titre' ? m.hero.sousTitreAnchor
         : k.test?.cible === 'cta' ? cta?.anchor : k.test?.cible === 'nav' ? m.nav.anchor : section?.anchor;
       S.ntEdits = cible ? { [cible]: { op: k.test?.verbes?.[0] || 'set' } } : {};
@@ -1987,9 +2141,81 @@ document.addEventListener('click', e => {
         .catch(e => { if (err) err.textContent = e.message; });
       break;
     }
+    case 'int-import': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const fi = document.getElementById('int-file'), errz = document.getElementById('int-err');
+      const file = fi && fi.files && fi.files[0];
+      if (!file) { if (errz) errz.textContent = 'Choisissez le CSV exporté de Google Ads.'; break; }
+      if (file.size > 5_000_000) { if (errz) errz.textContent = 'Export trop volumineux : 5 Mo maximum.'; break; }
+      if (errz) errz.textContent = 'Lecture…';
+      const frd = new FileReader();
+      frd.onerror = () => { if (errz) errz.textContent = 'Lecture du fichier impossible.'; };
+      frd.onload = () => {
+        const b64 = String(frd.result).split(',')[1] || '';
+        const marques = (document.getElementById('int-marques')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
+        api(`/api/clients/${c.id}/intentions/import`, { nom: file.name, base64: b64, marques })
+          .then(async () => { intState(c).dec = {}; toast('Rapport importé'); await chargerEtat(); render(); })
+          .catch(e => { if (errz) errz.textContent = e.message; });
+      };
+      frd.readAsDataURL(file);
+      break;
+    }
+    case 'int-save': {
+      if (!c) break;
+      const st2 = intState(c), a = c.intentions && c.intentions.analyse;
+      if (!a || !Object.keys(st2.dec).length) break;
+      api(`/api/clients/${c.id}/intentions/decisions`, { revision: a.revision, decisions: st2.dec })
+        .then(async () => { st2.dec = {}; toast('Décisions enregistrées'); await chargerEtat(); render(); })
+        .catch(e => { if (e.message && /409|changé|rechargez/i.test(e.message)) { toast(e.message); chargerEtat().then(render); } else { const z = document.getElementById('int-dec-err'); if (z) z.textContent = e.message; else toast(e.message); } });
+      break;
+    }
+    case 'int-page': { if (!c) break; intState(c).page = Math.max(0, intState(c).page + (+act.dataset.d || 0)); render(); break; }
+    case 'gen-intent': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const i = act.dataset.int;
+      api(`/api/clients/${c.id}/intentions/generer`, { intention: i, n: 3, consigne: document.getElementById('gen-' + i)?.value || '' })
+        .then(async r => { toast('LPWS écrit trois variantes pour cette intention'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Variantes proposées' : 'Aucune variante n’a passé les garde-fous'); await chargerEtat(); render(); }); })
+        .catch(e => toast(e.message));
+      break;
+    }
+    case 'simuler': {
+      if (!c) break;
+      const u = document.getElementById('sim-url')?.value.trim() || '';
+      intState(c).simUrl = u;
+      api(`/api/clients/${c.id}/intentions/simuler`, { url: u }).then(r => { intState(c).sim = r; render(); }).catch(e => toast(e.message));
+      break;
+    }
+    case 'cnx-generer': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const compte = (document.getElementById('cnx-compte')?.value || '').replace(/\D/g, '');
+      const campagnes = (document.getElementById('cnx-camps')?.value || '').split(',').map(x => x.replace(/\D/g, '')).filter(Boolean);
+      api(`/api/clients/${c.id}/intentions/connexion`, { compte, campagnes }).then(async r => {
+        if (r.script) SCRIPTS[c.id] = r.script;
+        toast('Script généré : il ne sera affiché que cette fois'); await chargerEtat(); render();
+      }).catch(e => toast(e.message));
+      break;
+    }
+    case 'cnx-copier': if (c && SCRIPTS[c.id]) copier(SCRIPTS[c.id], 'Script copié'); break;
+    case 'cnx-dl': {
+      if (!c || !SCRIPTS[c.id]) break;
+      const ael = document.createElement('a'); ael.href = URL.createObjectURL(new Blob([SCRIPTS[c.id]], { type: 'text/javascript' })); ael.download = 'lpws-sync-google-ads.js'; ael.click(); setTimeout(() => URL.revokeObjectURL(ael.href), 2000);
+      break;
+    }
+    case 'ms-save': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      const propriete = (document.getElementById('ms-prop')?.value || '').replace(/\D/g, '');
+      if (!propriete) { toast('Identifiant numérique de la propriété GA4'); break; }
+      api(`/api/clients/${c.id}/intentions/mesure`, { propriete }).then(async () => { toast('Propriété enregistrée'); await chargerEtat(); render(); }).catch(e => toast(e.message));
+      break;
+    }
+    case 'ms-run': {
+      if (!c || !c.live) { toast(SANS_SERVEUR); break; }
+      api(`/api/clients/${c.id}/intentions/mesurer`).then(r => { const z = document.getElementById('job-zone'); if (z) z.innerHTML = jobBox(r.job); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Mesure à jour' : 'La mesure a échoué'); await chargerEtat(); render(); }); }).catch(e => toast(e.message));
+      break;
+    }
     case 'dns': toast('La ligne DNS ne répond pas encore : on réessaie toutes les heures'); break;
     case 'shopify': toast('Demande d’accès envoyée au client'); break;
-    case 'gads': toast('Connexion Google Ads'); break;
+    case 'gads': if (c) { naviguer('view:intentions'); } else toast('Choisissez un client d’abord'); break;
     case 'recapture': if (c && c.live) { api('/api/clients', { url: 'https://' + c.url }).then(async () => { await chargerEtat(); render(); }).catch(e => toast(e.message)); } else toast('Copie relancée : quelques minutes'); break;
     case 'report': toast('Rapport en préparation'); break;
     case 'send-report': toast('Rapport envoyé au client'); break;
@@ -2021,6 +2247,16 @@ document.addEventListener('input', e => {
   if (e.target.id === 'nt-why') S.ntWhy = e.target.value;
   if (e.target.id === 'nt-titre') S.ntTitre = e.target.value;
   if (e.target.id === 'url') S.urlSaisie = e.target.value;
+  const cid = S.ctx, ci = cid && cid !== 'home' ? byId(cid) : null;
+  if (ci) {
+    const st2 = intState(ci);
+    if (e.target.id === 'int-marques') st2.marques = e.target.value;
+    if (e.target.id === 'int-fq') { st2.filtreQ = e.target.value; st2.page = 0; }
+    if (e.target.id === 'cnx-compte') st2.compte = e.target.value;
+    if (e.target.id === 'cnx-camps') st2.campagnes = e.target.value;
+    if (e.target.id === 'sim-url') st2.simUrl = e.target.value;
+    if (e.target.id && e.target.id.startsWith('gen-')) st2.consignes[e.target.id.slice(4)] = e.target.value;
+  }
 });
 /* les deux captures défilent ensemble */
 let syncLock = false;

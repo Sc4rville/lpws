@@ -16,6 +16,7 @@ import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
 import { VariantSpec } from "../../engine/apply/spec.ts"
 import { analyser, EtatIntentions } from "../../engine/intent/analyse.ts"
 import { LIBELLES } from "../../engine/intent/schema.ts"
+import { etatIntentions } from "./intentions.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -98,10 +99,10 @@ export async function etat() {
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
       const resultats = await lireJson<Resultats | null>(fichiersDe(d).resultats, null)
-      const resDe = (id: string) => {
-        const { o, v } = comptes(resultats, id)
-        return o && v && o.n > 0 && v.n > 0 ? { o, v, luLe: resultats!.luLe, source: resultats!.source ?? "ga4" } : null
-      }
+      const resDe=(t:Test)=>{
+       const {o,v}=t.ciblage&&!t.experience?{o:null,v:null}:comptes(resultats,t.id,t.lanceLe,t.experience);
+       return o&&v&&o.n>0&&v.n>0?{o,v,luLe:resultats!.luLe,source:resultats!.source??'ga4'}:null;
+      };
       const audit = await lireJson<Audit | null>(fichiersDe(d).audit, null)
       const alertes = (await lireJson<Alerte[]>(fichiersDe(d).alertes, [])).slice(0, 10)
       const releves = await relevesDe(d)
@@ -150,19 +151,22 @@ export async function etat() {
           express: { etat: express.installe ? "ok" : "off",
             label: express.installe ? "Installé" : publie === false ? "Balise pas encore publiée" : "À installer",
             publie, verifie: dateFr(express.verifieLe), vitesse: "non mesurée", stopGtm: false,
+            capacite: express.capacite, mode: express.mode,
             steps: [1, express.installe ? 1 : 0, express.installe ? 1 : 0, express.installe ? 1 : 0],
             script: `<script src="${BASE_TAGS}/t/${clientSlug}.js" async></script>`, detail: express.detail },
           integral: { etat: "off", label: "Pas encore", hote: `lp.${site}`, steps: [0, 0, 0, 0] },
           natif: { etat: "na", label: "Pas une boutique Shopify" },
         },
         ads: null,
+        intentions: await etatIntentions(c, camp).catch(() => null),
+        intentionsJob: (() => { const j = [...jobs.values()].find((jb) => jb.type === "intentions" && jb.etat === "en cours" && jb.campagne === d); return j ? { id: j.id, sujet: j.sujet } : null })(),
         tests: tests.map((t) => ({
           id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe, t.finLe), potentiel: "Moyen", plan: t.plan, fin: dateFr(t.finLe),
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
           changes: t.edits.map((e) => ({ t: `Élément : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
-          res: resDe(t.id),
-          lanceLe: t.lanceLe, regle: t.regle,
+          res: resDe(t),
+          lanceLe: t.lanceLe, regle: t.regle, ciblage: t.ciblage, experience: t.experience,
         })),
       })
     }

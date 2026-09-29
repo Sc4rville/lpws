@@ -60,16 +60,30 @@ Le classement est **heuristique** : des motifs, un ordre de priorité, et un « 
 rangé à part (`aRevoir`) plutôt qu'un faux rangé avec les autres. C'est le socle sur lequel un
 skill pourra affiner — sa sortie passera par le même schéma.
 
-## Comment le tag s'en servira (pas encore câblé)
+## Comment le tag s'en sert (câblé)
 
-1. Le buyer colle une fois dans Google Ads le suffixe d'URL finale :
-   `lpws_kw={keyword}&lpws_mt={matchtype}&lpws_ag={adgroupid}&lpws_cp={campaignid}&lpws_dev={device}`
+1. Le buyer colle une fois dans Google Ads le suffixe d'URL finale
+   ([`schema.ts`](schema.ts) → `SUFFIXE_URL_FINALE`), qui garde `{keyword}` `{matchtype}`
+   `{adgroupid}` `{campaignid}` `{device}` `{network}`.
 2. Au clic, la page reçoit `?gclid=…&lpws_kw=jira+pricing&…`.
-3. Le tag lit `lpws_kw`, cherche dans `motsCles` d'`intents.json` (servi dans la config),
-   trouve `prix`, et ne considère que les variantes prévues pour cette intention. Le reste
-   ne change pas : répartition collante par gclid, témoin, stop.
-4. La mesure se fait par intention × variante : le tag pousse déjà la variante dans le
-   dataLayer ; il poussera aussi l'intention.
+3. Le tag appelle `choisirPourClic` ([`routage.ts`](routage.ts)) : mot-clé acheté → variante
+   prévue pour cette intention ; mot-clé inconnu, ambigu ou trafic non-Search → l'original.
+   Répartition collante par gclid, témoin, stop : inchangés.
+4. Le tag pousse `lpws_variante`, `lpws_intention`, `lpws_experience` ; `lpws_apercu` et
+   `lpws_hors_test` n'écrivent jamais de propriété utilisateur.
+
+## Côté serveur (`ui/server/intentions.ts`)
+
+| Route | Rôle |
+|---|---|
+| `GET  …/intentions` | analyse complète + état connexion/mesure, sans secrets |
+| `POST …/intentions/import` | CSV base64 ≤ 5 Mo → `creerEtat` ; l'invalide préserve l'existant |
+| `POST …/intentions/decisions` | `{revision, decisions}` ; révision périmée → 409 |
+| `POST …/intentions/generer` | job `intentions` → `personnaliser.ts --intention` |
+| `POST …/intentions/simuler` | projection hors ligne d'un clic (`choisirPourClic`), aucune mutation |
+| `POST …/intentions/connexion` | jeton aléatoire → script Google Ads ([`google-script.ts`](google-script.ts)) ; stocké en SHA-256, rendu une fois ; exige `LPWS_URL_PUBLIQUE` HTTPS + `LPWS_MOT_DE_PASSE` |
+| `POST /api/intents/<c>/<camp>/sync` | hors auth interface, Bearer + `timingSafeEqual`, ≤ 5 Mo, 1/min, campagnes du connecteur uniquement |
+| `GET  /api/intents/exemple.csv` | export synthétique téléchargeable |
 
 ## Limites, dites avant qu'on les découvre
 
@@ -81,6 +95,6 @@ skill pourra affiner — sa sortie passera par le même schéma.
   une, la majoritaire en clics. Les autres sont servies « à côté ». Restructurer les groupes
   d'annonces par intention est la vraie réponse — c'est le métier du buyer, on peut le lui
   suggérer.
-- [`ads-script.js`](ads-script.js) n'a **pas encore tourné** sur un vrai compte.
+- [`google-script.ts`](google-script.ts) n'a **pas encore tourné** sur un vrai compte.
 - [`exemple.csv`](exemple.csv) est **synthétique** : le format est celui de Google Ads, les
   chiffres sont inventés pour exercer le code.

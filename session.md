@@ -5,7 +5,7 @@
 > l'arbre complet = [docs/feuille-de-route.md](docs/feuille-de-route.md).
 
 ## Où on en est (2026-09-29)
-- **Variantes complètes en cours** : les signaux et constats du Brain reviennent dans le cockpit ;
+- **Variantes complètes fusionnées avec les intentions de master** : les signaux et constats du Brain reviennent dans le cockpit ;
   les pistes mènent à l'éditeur multi-éléments (texte, CTA, navigation et sections), validé par
   les ancres et les garde-fous. Le Brain peut proposer plusieurs éditions pour une hypothèse.
   La création présente deux choix : propositions de l'audit et des recherches, modifiables avant
@@ -17,7 +17,9 @@
   La destination d'un déplacement compte dans le delta ; une variante qui change une section
   non visée ne peut plus passer prête ni être lancée. La génération rédigée nécessite
   `claude -p`, absent et non authentifié sur cette VM ; l'échec s'affiche sans simulation.
-  À revalider après fusion avec `master` : les parcours UI et les tests de mesure et de verrou.
+  Les routes d'import, de décision, de génération et de mesure des intentions utilisent le même
+  éditeur complet ; les mutations partagent le verrou du client. À revalider sur la fusion :
+  parcours UI et test serveur dont le jeu de données ne comporte pas de baseline capturée.
 - **Le clone est l'ATELIER, pas la page livrée** : il sert à voir, diagnostiquer, construire et
   montrer une variante sans aucun accès. La livraison passe par trois voies : **Express** (tag GTM,
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),
@@ -43,8 +45,19 @@
 - **Vérif locale** : GitHub Actions est bloqué (facturation du compte) ; `npm run verif` rejoue
   la CI en local (typecheck · menage · tests · interface · 2 clones de démo fidèles, hors `clients/`).
 
+- **Intentions Google Ads (phase 1+2, non publié)** : rapport « termes de recherche » →
+  7 intentions → routes mot-clé → variantes ciblées (`engine/intent/`). Balise : routage au
+  clic par mot-clé acheté (`lpws_kw`…), `lpws_intention`/`lpws_experience` dans GA4, strict
+  fail-closed. Serveur : `ui/server/intentions.ts` (import, décisions, génération, simulateur,
+  connecteur script Google Ads en lecture seule, config mesure) ; verrou par client sur toute
+  mutation ; tests par intention = cycle de vie disjoint possible. Vue Intentions + audience
+  des tests dans l'UI. Pas encore prouvé : vrai compte Ads (suffixe, sync), vrai GTM, GA4.
+
 ## À faire (dans l'ordre)
-0. **Le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées), corrige, puis
+0. **Valider les intentions sur un vrai compte** : coller le suffixe d'URL finale, coller le
+   script Google Ads généré (ou importer l'export CSV), provisionner le compte de service GA4
+   et ajouter l'e-mail en lecteur, créer les 3 dimensions utilisateur, lancer un test ciblé.
+   Puis **le media buyer relit `engine/variant/annotations/`** (48 réponses justifiées), corrige, puis
    `npm run brain:eval` ; puis il lit les 3 propositions Relay dans l'interface.
 1. **Yann** : un vrai conteneur GTM (Express n'a jamais tourné via GTM, seulement par script direct),
    une vraie propriété GA4 (`customUser:lpws_variante`, `sessionKeyEventRate`), trancher la langue

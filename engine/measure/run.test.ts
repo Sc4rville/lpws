@@ -12,9 +12,11 @@ import { comptes, enregistrerExperiences } from "./experience.ts"
 test("lireRapport : une conversion est une session qui a converti, jamais plus que les sessions", () => {
   const brut = { rows: [
     { dimensionValues: [{ value: "controle" }], metricValues: [{ value: "100" }, { value: "0.25" }] },
-    { dimensionValues: [{ value: "v" }], metricValues: [{ value: "100" }, { value: "1.7" }] },
+    { dimensionValues: [{ value: "v" }], metricValues: [{ value: "100" }, { value: "1" }] },
   ] }
   assert.deepEqual(lireRapport(brut).map((l) => [l.version, l.sessions, l.conversions]), [["controle", 100, 25], ["v", 100, 100]])
+  brut.rows[1].metricValues[1].value = "1.7"
+  assert.throws(() => lireRapport(brut), /Métriques GA4 invalides/)
 })
 
 test("comptes : la fenêtre du test d'abord, le cumul sinon", () => {

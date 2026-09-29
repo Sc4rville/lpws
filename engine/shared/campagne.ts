@@ -92,9 +92,7 @@ export const Test = z.object({
   job: z.string().optional(),
   /** la règle du brain qui a produit ce test, si c'en est un */
   regle: z.string().optional(),
-  /** l'audience du test (les mots-clés qui routent vers lui) : absent = test général */
   ciblage: Ciblage.optional(),
-  /** l'identifiant du lancement en cours : isole la mesure des campagnes parallèles */
   experience: z.string().regex(/^[a-f0-9]{32}$/).optional(),
 })
 export type Test = z.infer<typeof Test>
@@ -127,9 +125,7 @@ export const Experience = z.object({
   verdict: z.string().optional(),
   /** la variante a été déployée à 100 % (reste vrai si l'original est remis ensuite) */
   deploye: z.boolean().optional(),
-  /** l'audience sur laquelle le test a collecté, figée au lancement */
   ciblage: Test.shape.ciblage,
-  /** le lancement mesuré */
   experience: Test.shape.experience,
 })
 export type Experience = z.infer<typeof Experience>
