@@ -32,7 +32,7 @@ export function bandesTouchees(arg: { bandes: string[]; ancres: string[] }): str
 export async function deltaParSection(
   reference: string, variante: string, bandes: Bande[], touchees: string[], seuil = SEUIL_SECTION,
 ): Promise<DeltaSections> {
-  const s = await diffParSection(reference, variante, bandes, seuil)
+  const s = await diffParSection(reference, variante, bandes, seuil, undefined, new Set(touchees))
   const changees = s.sections.filter((x) => !x.fidele).sort((a, b) => b.ratio - a.ratio)
     .map(({ anchor, titre, ratio }) => ({ anchor, titre, ratio }))
   const t = new Set(touchees)

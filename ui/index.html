@@ -2141,7 +2141,7 @@ document.addEventListener('click', e => {
       if (!c || !c.live) { toast(SANS_SERVEUR); break; }
       const i = act.dataset.int;
       api(`/api/clients/${c.id}/intentions/generer`, { intention: i, n: 3, consigne: document.getElementById('gen-' + i)?.value || '' })
-        .then(async r => { toast('LPWS écrit trois variantes pour cette intention'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Variantes proposées' : 'Aucune variante n’a passé les garde-fous'); await chargerEtat(); render(); }); })
+        .then(async r => { toast('LPWS écrit trois variantes pour cette intention'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Variantes proposées' : ((j.lignes || []).map(humaniser).filter(l => /ÉCHEC/.test(l)).pop() || 'Aucune variante n’a passé les garde-fous').replace(/^.*ÉCHEC — /, '')); await chargerEtat(); render(); }); })
         .catch(e => toast(e.message));
       break;
     }

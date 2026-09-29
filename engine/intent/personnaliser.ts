@@ -14,6 +14,7 @@ import { VariantSpec } from "../apply/spec.ts"
 import { campagne as fichiersDe } from "../shared/campagne.ts"
 import { lireCache, lireJson, lireValide, ecrireJson } from "../shared/json.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
+import { fail } from "../shared/log.ts"
 
 const ANGLES: Record<Intention, string> = {
   transaction: "Raccourcir le chemin vers l'action réellement proposée : achat, essai ou démo selon la page. Ne pas inventer d'essai gratuit, de disponibilité ou de réduction.",
@@ -101,4 +102,5 @@ if (estLance(import.meta.url)) {
   if (!dir) throw new Error("usage : tsx engine/intent/personnaliser.ts <campagne> --intention prix [--n 3] [--consigne texte]")
   process.env.LPWS_CAMPAGNE = dir
   await personnaliser(dir, { intention: args.option("--intention"), n: Number(args.option("--n") ?? 3), consigne: args.option("--consigne") ?? "", source: args.option("--source") })
+    .catch((e: Error) => fail("intent", e.message))
 }

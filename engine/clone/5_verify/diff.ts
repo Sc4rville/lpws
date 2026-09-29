@@ -101,11 +101,12 @@ const COUT_ABSENTE = 48 * COLONNES
 // à peu près égales, on garde la position la plus proche de la dérive déjà constatée
 const COUT_ECART = 0.02 * COLONNES
 
-/** le décalage d dans [centre − marge, centre + marge] qui rapproche le plus la bande du live */
-function recaler(sc: Float32Array, sl: Float32Array, hLive: number, y0: number, y1: number, centre: number, marge: number): number {
+/** le décalage d dans [centre − libre − marge, centre + marge] qui rapproche le plus la bande du live ;
+ *  après des bandes libres, la dérive attendue est inconnue : l'écart ne départage presque plus */
+function recaler(sc: Float32Array, sl: Float32Array, hLive: number, y0: number, y1: number, centre: number, marge: number, libre = 0): number {
   let meilleur = centre, cout = Infinity
   const lignes = Math.ceil((y1 - y0) / 2)
-  for (let d = centre - marge; d <= centre + marge; d++) {
+  for (let d = centre - libre - marge; d <= centre + marge; d++) {
     const a = Math.max(y0, -d), b = Math.min(y1, hLive - d)
     if (b <= a) continue
     let e = 0, vues = 0
@@ -113,23 +114,25 @@ function recaler(sc: Float32Array, sl: Float32Array, hLive: number, y0: number, 
       const ic = y * COLONNES, il = (y + d) * COLONNES
       for (let k = 0; k < COLONNES; k++) e += Math.abs(sc[ic + k] - sl[il + k])
     }
-    e = (e + Math.max(0, lignes - vues) * COUT_ABSENTE) / lignes + Math.abs(d - centre) * COUT_ECART
+    e = (e + Math.max(0, lignes - vues) * COUT_ABSENTE) / lignes + Math.abs(d - centre) * (libre ? COUT_ECART / 100 : COUT_ECART)
     if (e < cout) { cout = e; meilleur = d }
   }
   return meilleur
 }
 
-export async function diffParSection(livePath: string, clonePath: string, bandes: Bande[], seuil: number, marge = 600): Promise<DiffSections> {
+/** libres : bandes éditées (copiées, déplacées, réécrites) ; leur position ne recale pas les
+ *  suivantes, qui se cherchent aussi décalées de leur hauteur */
+export async function diffParSection(livePath: string, clonePath: string, bandes: Bande[], seuil: number, marge = 600, libres: ReadonlySet<string> = new Set()): Promise<DiffSections> {
   const live = PNG.sync.read(await readFile(livePath))
   const clone = PNG.sync.read(await readFile(clonePath))
   const width = Math.min(live.width, clone.width)
   const sl = signature(crop(live, width, live.height)), sc = signature(crop(clone, width, clone.height))
   const sections: DiffSection[] = [], nonJugees: string[] = [], ruptures: DiffSections["ruptures"] = []
-  let centre = 0, px = 0, diff = 0
+  let centre = 0, libre = 0, px = 0, diff = 0
   for (const b of [...bandes].sort((x, y) => x.y - y.y)) {
     const y0 = Math.max(0, b.y), y1 = Math.min(clone.height, b.y + b.h)
     if (y1 - y0 < 20) { nonJugees.push(b.anchor); continue }
-    const d = recaler(sc, sl, live.height, y0, y1, centre, marge)
+    const d = recaler(sc, sl, live.height, y0, y1, centre, marge, libre)
     const a = Math.max(y0, -d), z = Math.min(y1, live.height - d)
     const h = z - a
     let ratio = 1
@@ -143,7 +146,8 @@ export async function diffParSection(livePath: string, clonePath: string, bandes
     if (Math.abs(d - centre) > TOLERANCE_RUPTURE) ruptures.push({ avant: b.anchor, titre: b.titre, delta: d - centre })
     sections.push({ ...b, decalage: d, ratio, fidele: ratio <= seuil })
     px += (y1 - y0) * width; diff += ratio * (y1 - y0) * width
-    centre = d
+    if (libres.has(b.anchor)) libre += y1 - y0
+    else { centre = d; libre = 0 }
   }
   const fin = live.height - clone.height - centre
   if (sections.length && Math.abs(fin) > TOLERANCE_RUPTURE) ruptures.push({ avant: null, titre: "bas de page", delta: fin })
