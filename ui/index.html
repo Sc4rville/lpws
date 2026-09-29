@@ -624,7 +624,7 @@ const DEMO = [
       { id: 'preuve-au-dessus-du-pli', titre: 'La preuve client remonte sous le titre', etat: 'live', part: 50, jours: 5, potentiel: 'Fort',
         teste: 'Logos et études de cas passent de 4 700 px du haut à juste sous le titre. Menu et pied de page disparaissent, un bouton de démo suit la preuve.',
         pourquoi: 'Un visiteur froid décide de rester ou de partir dans les premières secondes : c’est là qu’il lui faut la réassurance.',
-        res: { o: { n: 3500, c: 101 }, v: { n: 3490, c: 124 } },
+        res: { o: { n: 3500, c: 101 }, v: { n: 3490, c: 116 } },
         changes: [
           { t: 'Menu retiré', w: 'Autant de sorties en moins sur une page de campagne.' },
           { t: 'Pied de page retiré', w: 'Hors sujet pour la campagne.' },
@@ -679,6 +679,11 @@ let CLIENTS = DEMO; let LIVE = false; let BASE = 'https://lpws.vercel.app'; let 
 const APP = 'https://lpws.46.225.146.226.sslip.io';
 const SANS_SERVEUR = `Cette démo tourne sans serveur : elle ne copie pas de page. Ouvrez l’application en local (npm run ui:serve) ou en ligne sur ${APP.replace('https://', '')}.`;
 const byId = id => CLIENTS.find(c => c.id === id);
+/** l'élément dans les mots du media buyer : h1, a ou p ne lui disent rien */
+const NOMS_ELEMENT = { h1: 'Titre', h2: 'Intertitre', h3: 'Sous-intertitre', h4: 'Sous-intertitre', h5: 'Sous-intertitre', h6: 'Sous-intertitre',
+  p: 'Texte', span: 'Texte', strong: 'Texte', small: 'Mention', li: 'Liste', blockquote: 'Citation', figcaption: 'Légende', label: 'Libellé',
+  a: 'Bouton ou lien', button: 'Bouton', nav: 'Menu', section: 'Section', header: 'En-tête', footer: 'Pied de page', img: 'Image', input: 'Champ' };
+const nomElement = t => NOMS_ELEMENT[t] || 'Texte';
 
 /* ---------- état ---------- */
 const S = { ctx: 'home', view: 'dash', test: null, openMode: null, mode: null };
@@ -1040,7 +1045,7 @@ function vTest(c) {
   const url = previewUrl(c, t);
   const o = imgOf(c), v = imgTest(c, t);
   const ex = c.connexion.express;
-  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="5" max="95" step="5" value="${t.part}" aria-label="Part du trafic"${live && c.live ? ' disabled title="La part d’un test en cours ne change pas : arrêtez-le puis relancez-le"' : ''}><span class="v" id="partv">${t.part} %</span></label>` : '';
+  const slider = (t.etat === 'live' || t.etat === 'pret' || t.etat === 'stop') ? `<label class="range btn lg" style="cursor:default"><span class="muted">Trafic sur la variante</span><input type="range" id="part" min="5" max="95" step="5" value="${t.part}" aria-label="Part du trafic"${live ? ' disabled title="La part d’un test en cours ne change pas : arrêtez-le puis relancez-le"' : ''}><span class="v" id="partv">${t.part} %</span></label>` : '';
   const principal = t.etat === 'prep' ? `<button class="btn lg" disabled>${I.clock(16)}En préparation</button>`
     : t.etat === 'echec' ? `<button class="btn lg" data-go="view:nouveau">${I.sparkle(16)}Refaire un test</button>`
     : live ? `<button class="btn lg stop" data-act="stop" data-test="${t.id}" data-client="${c.id}" title="Annulable pendant quelques secondes">${I.stop(16)}Arrêter : l’original reprend 100 %</button>`
@@ -1328,14 +1333,14 @@ function vNouveau(c) {
   const rows = !LIVE ? `<div class="empty"><b>Démo sans serveur</b>${esc(SANS_SERVEUR)}</div>`
     : !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
     : !liste.length ? '<div class="empty"><b>Aucun élément trouvé</b>La copie doit avoir abouti pour proposer des changements.</div>'
-    : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${edits[x.anchor] ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span>${edits[x.anchor] ? I.check(14) : ''}</button>`).join('')}</div>`;
+    : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${edits[x.anchor] ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(nomElement(x.tag))}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span>${edits[x.anchor] ? I.check(14) : ''}</button>`).join('')}</div>`;
   return `
     <div class="hd"><div><h2>Nouveau test</h2><div class="u">${esc(c.url)}</div><p class="lede">Une seule hypothèse, jusqu’à six éléments cohérents : textes, boutons, sections à déplacer, dupliquer, échanger ou retirer. L’original reste intact pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
     ${S.piste ? `<div class="card" style="margin-bottom:14px"><b>Piste du diagnostic · ${esc(S.piste.action)}</b><p>${esc(S.piste.signal)} · ${esc(S.piste.test?.consigne || '')}</p></div>` : ''}
     <div class="grid nt">
       <div class="card"><h3>1 · Les éléments à changer <span class="n">${selection.length} / 6</span></h3>${rows}</div>
       <div class="card"><h3>2 · La nouvelle version</h3>
-        ${selection.length ? selection.map(x => { const e = edits[x.anchor], blocs = ['nav', 'section'].includes(x.tag); const op = e.op || (blocs ? 'move' : 'set'); return `<div class="ch" style="display:block;margin-bottom:18px"><b>${esc(x.tag)} · ${esc(x.text)}</b>
+        ${selection.length ? selection.map(x => { const e = edits[x.anchor], blocs = ['nav', 'section'].includes(x.tag); const op = e.op || (blocs ? 'move' : 'set'); return `<div class="ch" style="display:block;margin-bottom:18px"><b>${esc(nomElement(x.tag))} · ${esc(x.text)}</b>
           <label class="fld" style="margin-top:10px">Action<select class="inp" data-edit="op" data-anchor="${esc(x.anchor)}">${(blocs ? [['move','Déplacer'],['duplicate','Dupliquer'],['swap','Échanger'],['remove','Retirer']] : [['set','Changer le texte'],['move','Déplacer'],['duplicate','Dupliquer'],['swap','Échanger'],['remove','Retirer']]).map(([v,l]) => `<option value="${v}" ${op === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           ${op === 'set' ? `<label class="fld" style="margin-top:8px">Nouveau texte<textarea class="inp" data-edit="text" data-anchor="${esc(x.anchor)}" rows="2" placeholder="Écrivez une version différente">${esc(e.text ?? '')}</textarea></label>` : op !== 'remove' ? `<label class="fld" style="margin-top:8px">${op === 'swap' ? 'Échanger avec' : 'Placer par rapport à'}<select class="inp" data-edit="target" data-anchor="${esc(x.anchor)}"><option value="">Choisir une cible…</option>${liste.filter(y => y.anchor !== x.anchor && (!blocs || ['nav','section'].includes(y.tag))).map(y => `<option value="${esc(y.anchor)}" ${e.target === y.anchor ? 'selected' : ''}>${esc(y.tag + ' · ' + y.text.slice(0, 75))}</option>`).join('')}</select></label>${op === 'swap' ? '' : `<label class="fld" style="margin-top:8px">Position<select class="inp" data-edit="position" data-anchor="${esc(x.anchor)}"><option value="before" ${e.position === 'before' ? 'selected' : ''}>Avant</option><option value="after" ${e.position !== 'before' ? 'selected' : ''}>Après</option></select></label>`}` : ''}
           </div>`; }).join('') : '<p class="muted">Sélectionnez des textes, boutons ou sections à gauche.</p>'}
@@ -1423,7 +1428,7 @@ function brainBloc(c) {
     <div class="ck"><span class="i">3</span><div><b>Parcours et preuve</b><div class="d">${m.sections.length} sections · ${m.nav.liens} liens de navigation · formulaire : ${m.formulaire.champs} champs · ${m.preuves.logos} logos · ${m.preuves.temoignages.nombre} témoignages · prix ${m.prix.visible ? 'visible' : 'non détecté'}</div></div></div>
     </div></div>`;
   if (tests.length) h += `<div class="sec"><h3>Pistes du diagnostic <span class="n">${tests.length}</span><span class="r"><button class="btn sm" data-go="view:campagne">Modifier la campagne</button></span></h3>
-    <div class="tests">${tests.slice(0, 8).map(k => `<div class="tc" style="cursor:default"><div class="chips"><span class="chip">${esc(nomRegle(k.id))}</span><span class="chip">Priorité ${esc(k.score)}</span><span class="chip">${esc(k.test?.cible || '')}</span></div><div class="t">${esc(k.action)}</div><div class="d"><b>Constat.</b> ${esc(k.signal)}</div><div class="d"><b>Pourquoi.</b> ${esc(k.pourquoi)}</div><div class="d"><b>À tester.</b> ${esc(k.test?.consigne || '')}</div><div class="d">${esc(k.sources.join(' · '))}</div><div class="f"><button class="btn sm" data-act="piste" data-regle="${esc(k.id)}">Construire cette variante</button></div></div>`).join('')}</div></div>`;
+    <div class="tests">${tests.slice(0, 8).map(k => `<div class="tc" style="cursor:default"><div class="chips"><span class="chip">${esc(nomRegle(k.id))}</span><span class="chip">${k.rang ? 'Piste n° ' + esc(k.rang) : 'Priorité ' + esc(k.score)}</span><span class="chip">${esc(k.test?.cible || '')}</span></div><div class="t">${esc(k.action)}</div><div class="d"><b>Constat.</b> ${esc(k.signal)}</div><div class="d"><b>Pourquoi.</b> ${esc(k.pourquoi)}</div><div class="d"><b>À tester.</b> ${esc(k.test?.consigne || '')}</div><div class="d">${esc(k.sources.join(' · '))}</div><div class="f"><button class="btn sm" data-act="piste" data-regle="${esc(k.id)}">Construire cette variante</button></div></div>`).join('')}</div></div>`;
   if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
     <div class="tests">${props.map(p => carteProposition(c, p)).join('')}</div></div>`;
   else if (c.diagnostic && !c.brainErreur) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées : construisez un test depuis une piste du diagnostic, ou modifiez la campagne. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
@@ -1995,7 +2000,7 @@ document.addEventListener('click', e => {
       const k = c.contexte || {};
       const corps = { niche: k.niche, panierMoyen: k.panierMoyen, marge: k.marge, limites: k.limites, annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
-      api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
+      api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { await chargerEtat(); const n = ((byId(c.id) || c).propositions || []).filter(p => !p.refusee).length; toast(j.etat !== 'ok' ? 'L’analyse a échoué' : n ? `${n} test${n > 1 ? 's' : ''} proposé${n > 1 ? 's' : ''}` : 'Aucun test proposé : voir le diagnostic'); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
       break;
     }
@@ -2109,7 +2114,9 @@ document.addEventListener('click', e => {
       if (S.ntEdits[anchor]) delete S.ntEdits[anchor];
       else if (Object.keys(S.ntEdits).length < 6) S.ntEdits[anchor] = { op: ['section', 'nav'].includes((S.textes?.[c.id] || []).find(x => x.anchor === anchor)?.tag) ? 'move' : 'set' };
       else { toast('Six changements au maximum par test'); break; }
-      render(); break;
+      { const m = document.getElementById('main'), y = m.scrollTop, l = document.getElementById('nt-liste'), yl = l ? l.scrollTop : 0;
+        render(); m.scrollTop = y; const l2 = document.getElementById('nt-liste'); if (l2) l2.scrollTop = yl; }
+      break;
     }
     case 'creer-test': {
       const titre = document.getElementById('nt-titre')?.value.trim(), why = document.getElementById('nt-why')?.value.trim();
