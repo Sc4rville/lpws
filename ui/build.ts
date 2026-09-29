@@ -72,4 +72,6 @@ await writeFile(OUT, await pageAvecStats(html.replace("/*THUMBS*/", `const IMG =
 await cp(join(ROOT, "ui", "assets"), join(dirname(OUT), "assets"), { recursive: true })
 // la landing page de démonstration (Relay) : la page à nous sur laquelle tout le parcours se rejoue
 await cp(join(ROOT, "ui", "demo"), join(dirname(OUT), "demo"), { recursive: true })
+// la landing LPWS (/site) : la vitrine du produit, démo animée comprise
+await cp(join(ROOT, "ui", "site"), join(dirname(OUT), "site"), { recursive: true })
 console.log(`ui/dist/index.html — ${files.length} captures, ${Math.round(total / 1024)} Ko d'images`)
