@@ -8,7 +8,7 @@ import { campagne as fichiersDe } from "../../engine/shared/campagne.ts"
 import { ROOT } from "./config.ts"
 import { etatIntentions, importerIntentions, deciderIntentions, connecter, authentifierSync, synchroniserCorps, simuler, propositionIntentions } from "./intentions.ts"
 
-let C = "", D = "", f: ReturnType<typeof fichiersDe>
+let C = "", D = "", f: ReturnType<typeof fichiersDe>, JETON = ""
 const CAMP = "search"
 const EXEMPLE = join(ROOT, "engine/intent/exemple.csv")
 const b64 = async () => (await readFile(EXEMPLE)).toString("base64")
@@ -53,6 +53,7 @@ test("connexion : jeton jamais stocké, script rendu une fois, HTTPS + mot de pa
   const r = await connecter(C, CAMP, { compte: "1234567890", campagnes: ["111", "222"] })
   assert.match(r.script, /AdsApp\.search/)
   const jeton = r.script.match(/LPWS_JETON = "([a-f0-9]{64})"/)![1]
+  JETON = jeton
   const conn = await lireJson<any>(f.intentsConnexion, null)
   assert.ok(conn.hachage && conn.hachage !== jeton && /^[a-f0-9]{64}$/.test(conn.hachage))
   assert.ok(!JSON.stringify(conn).includes(jeton))
@@ -68,25 +69,25 @@ test("sync : mauvais jeton 401, mauvais compte rejeté sans mutation, campagne n
   await assert.rejects(authentifierSync("../", CAMP, "x"), (e: any) => e.code === 404)
   const charge = (over: Record<string, unknown> = {}, termes: unknown[] = [{ terme: "t", motCle: "t", campagneId: "111", groupeId: "9", impressions: 10, clics: 3, cout: 1, conversions: 0 }]) =>
     Buffer.from(JSON.stringify({ source: { fichier: "s.json", format: "csv-script", langue: "en", compte: "1234567890", ...over }, importeLe: new Date().toISOString(), termes, ignorees: 0 }))
-  await assert.rejects(synchroniserCorps(C, CAMP, charge({ compte: "9999999999" })), (e: any) => e.code === 400)
-  await assert.rejects(synchroniserCorps(C, CAMP, charge({}, [{ terme: "t", motCle: "t", campagneId: "333", groupeId: "9", impressions: 1, clics: 1, cout: 0, conversions: 0 }])), (e: any) => e.code === 400)
-  await assert.rejects(synchroniserCorps(C, CAMP, charge({}, [{ terme: "t", motCle: "t", campagneId: "111", impressions: 1, clics: 1, cout: 0, conversions: 0 }])), (e: any) => e.code === 400)
+  await assert.rejects(synchroniserCorps(C, CAMP, charge({ compte: "9999999999" }), JETON), (e: any) => e.code === 400)
+  await assert.rejects(synchroniserCorps(C, CAMP, charge({}, [{ terme: "t", motCle: "t", campagneId: "333", groupeId: "9", impressions: 1, clics: 1, cout: 0, conversions: 0 }]), JETON), (e: any) => e.code === 400)
+  await assert.rejects(synchroniserCorps(C, CAMP, charge({}, [{ terme: "t", motCle: "t", campagneId: "111", impressions: 1, clics: 1, cout: 0, conversions: 0 }]), JETON), (e: any) => e.code === 400)
   const avant = await readFile(f.intents, "utf8")
   assert.equal(await readFile(f.intents, "utf8"), avant)
 })
 
 test("sync valide écrit l'état, puis la minute suivante est refusée 429", async () => {
-  const conn = await lireJson<any>(f.intentsConnexion, null)
   const r = await synchroniserCorps(C, CAMP, Buffer.from(JSON.stringify({
     source: { fichier: "s.json", format: "csv-script", langue: "en", compte: "1234567890", devise: "USD" },
     importeLe: new Date().toISOString(), ignorees: 0,
     termes: [{ terme: "chaussures", motCle: "chaussures", campagneId: "111", groupeId: "9", impressions: 10, clics: 4, cout: 2, conversions: 1 }],
-  })))
+  })), JETON)
   assert.deepEqual(r, { ok: true })
   const st = await etatIntentions(C, CAMP)
   assert.ok(st.connexion.derniereSync)
   assert.equal(st.analyse!.source.devise, "USD")
-  await assert.rejects(synchroniserCorps(C, CAMP, Buffer.from("{}")), (e: any) => e.code === 429)
+  await assert.rejects(synchroniserCorps(C, CAMP, Buffer.from("{}"), JETON), (e: any) => e.code === 429)
+  await assert.rejects(synchroniserCorps(C, CAMP, Buffer.from("{}"), "ancien-jeton-rotatif"), (e: any) => e.code === 401)
 })
 
 test("simuler : clic routé par mot-clé acheté, page inconnue → original", async () => {

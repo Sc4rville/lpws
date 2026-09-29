@@ -10,17 +10,18 @@ import { Contexte, texteAnnonce } from "../../engine/variant/contexte.ts"
 import { controler, texteDuHtml } from "../../engine/variant/garde.ts"
 import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
 import { VariantSpec } from "../../engine/apply/spec.ts"
-import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
+import { lireJson, ecrireJson, lireValide } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience, MOTIFS, estMotif } from "../../engine/measure/experience.ts"
 import { lireCompte, peutLancer } from "../../engine/compte/compte.ts"
 import { CLIENTS_ROOT } from "../../engine/shared/paths.ts"
 import { FACTURATION, FICHIER_COMPTE } from "./compte.ts"
-import { ROOT, TSX, BASE_TAGS, dossier } from "./config.ts"
+import { ROOT, DIST, TSX, BASE_TAGS, dossier } from "./config.ts"
 import { type Job, jobs, nouveauJob, dire, finir, lancer } from "./jobs.ts"
 import { construireTag, appliquerParts, publierTag, sonderBalise, ecrireConfigClient } from "./tag.ts"
 import { Ciblage } from "../../engine/intent/ciblage.ts"
 import { ciblagesSeCroisent } from "../../engine/intent/routage.ts"
+import { LIBELLES } from "../../engine/intent/schema.ts"
 import { verrouillerCampagne } from "./verrou.ts"
 
 /* ---------- onboarder une page : la capture, en sous-processus ---------- */
@@ -163,6 +164,8 @@ export async function creerTest(c: string, camp: string, entree: { titre: string
     const structure = (a: string) => ["nav", "section"].includes(autorises.get(a)?.tag ?? "")
     const deja = new Set<string>()
     for (const e of v.data.edits) {
+      for (const ancre of [e.anchor, e.before, e.after, e.with])
+        if (ancre && !autorises.has(ancre)) invalide(`Cible ${ancre} introuvable sur cette page.`)
       if (!autorises.has(e.anchor) || deja.has(e.anchor)) invalide(`Cible ${e.anchor} introuvable sur cette page ou sélectionnée deux fois.`)
       deja.add(e.anchor)
       if (e.op === "set" && (!e.text || e.text === autorises.get(e.anchor)!.text || structure(e.anchor))) invalide("Le nouveau texte doit changer une cible textuelle.")
@@ -186,10 +189,7 @@ export async function creerTest(c: string, camp: string, entree: { titre: string
     const nom = (a: string) => autorises.get(a)?.text ?? a
     const edits = v.data.edits.map((e) => ({ anchor: e.anchor, avant: nom(e.anchor),
       text: e.op === "set" ? e.text! : e.op === "remove" ? "Retiré" : e.op === "swap" ? `Échangé avec ${nom(e.with!)}` : `${e.op === "move" ? "Déplacé" : "Copié"} ${e.before ? "avant" : "après"} ${nom((e.before ?? e.after)!)}` }))
-    const job = nouveauJob("test")
     const teste = edits.map((e, i) => v.data.edits[i].op === "set" ? `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »` : `« ${e.avant.slice(0, 60)} » : ${e.text}`).join(" · ")
-    const test: Test = { id, titre: v.data.titre, teste, pourquoi: v.data.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, ciblage: v.data.ciblage }
-
     const spec = {
       nom: id,
       hypothese: `Si ${teste}, alors les conversions augmentent, parce que ${v.data.pourquoi}`.slice(0, 600).padEnd(20, "."),
@@ -204,6 +204,8 @@ export async function creerTest(c: string, camp: string, entree: { titre: string
     const specPath = fichiersDe(d).spec(id)
     const sv = VariantSpec.safeParse(spec)
     if (!sv.success) invalide("la spec produite est invalide : rien n’a été écrit (" + sv.error.issues.map((i) => i.path.join(".") || i.message).join(", ") + ")")
+    const job = nouveauJob("test")
+    const test: Test = { id, titre: v.data.titre, teste, pourquoi: v.data.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, ciblage: v.data.ciblage }
     tests.push(test)
     await ecrireJson(fichiersDe(d).tests, tests)
     await ecrireJson(specPath, spec)
@@ -277,9 +279,7 @@ export async function creerTestDepuisProposition(c: string, camp: string, nom: s
     const ciblage = ciblageValide(p.ciblage)
     const specPath = fichiersDe(d).spec(nom)
     if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
-    const sv = VariantSpec.safeParse(await lireJson<unknown>(specPath, {}))
-    if (!sv.success) throw Object.assign(new Error("la spec de cette proposition ne respecte plus le contrat des variantes"), { code: 400 })
-    const spec = sv.data
+    const spec = await lireValide(VariantSpec, specPath).catch((e: Error) => { throw Object.assign(new Error(e.message), { code: 409 }) })
     let tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
     if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
     tests = tests.filter((t) => t.id !== nom)
@@ -345,6 +345,23 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
     if (etat === "live" && deploye)
       throw Object.assign(new Error(`« ${deploye.titre} » est déployé sur cette page à 100 % : remettez l’original ou intégrez ce gagnant à la page avant de lancer un autre test.`), { code: 409 })
     const avant = await lireJson<Test[]>(fichiersDe(d).tests, [])
+    const slug = slugify((await lireJson<{ client?: string }>(fichiersDe(d).meta, {})).client ?? c)
+    const cfgF = fichiersDe(d).configTag(slug)
+    const fusionF = join(DIST, "v", `${slug}.json`)
+    const cfgAvant = await lireJson<unknown>(cfgF, undefined)
+    const fusionAvant = await lireJson<unknown>(fusionF, undefined)
+    const restaurer = async (raison: string) => {
+      const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
+      for (const o0 of avant) {
+        const o = all.find((x) => x.id === o0.id)
+        if (o) Object.assign(o, { etat: o0.etat, part: o0.part, lanceLe: o0.lanceLe, finLe: o0.finLe, plan: o0.plan, anciens: o0.anciens, retireLe: o0.retireLe, experience: o0.experience })
+      }
+      const cible = all.find((x) => x.id === id)
+      if (cible) cible.erreur = raison
+      await ecrireJson(fichiersDe(d).tests, all)
+      if (cfgAvant === undefined) await rm(cfgF, { force: true }); else await ecrireJson(cfgF, cfgAvant)
+      if (fusionAvant === undefined) await rm(fusionF, { force: true }); else await ecrireJson(fusionF, fusionAvant)
+    }
     const maintenant = new Date().toISOString()
     // seul un test qui collectait entre au journal : un test déjà arrêté a ses chiffres, on n'y touche plus
     const arretes = new Set<string>(), deployes = new Set<string>()
@@ -371,25 +388,19 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
       if (t.etat === "gagnant") { t.part = 0; t.retireLe = maintenant }
       cesse(t); t.etat = "stop"
     }
-    await ecrireJson(fichiersDe(d).tests, tests)
-    await appliquerParts(c, camp)
-    const restaurer = async (raison: string) => {
-      const all = await lireJson<Test[]>(fichiersDe(d).tests, [])
-      for (const o0 of avant) {
-        const o = all.find((x) => x.id === o0.id)
-        if (o) Object.assign(o, { etat: o0.etat, part: o0.part, lanceLe: o0.lanceLe, finLe: o0.finLe, plan: o0.plan, anciens: o0.anciens, retireLe: o0.retireLe, experience: o0.experience })
-      }
-      const cible = all.find((x) => x.id === id)
-      if (cible) cible.erreur = raison
-      await ecrireJson(fichiersDe(d).tests, all)
+    try {
+      await ecrireJson(fichiersDe(d).tests, tests)
       await appliquerParts(c, camp)
-      await ecrireConfigClient(c, camp)
+    } catch (e) {
+      try { await restaurer("Publication non confirmée ; état local restauré. Vérifiez la version en ligne. " + (e as Error).message.split("\n")[0]) } catch {}
+      throw e
     }
     const job = nouveauJob("config")
     ;(async () => {
       let publie = false
       try {
-        dire(job, etat === "live" ? `mise en ligne : ${t.part} % des visiteurs verront la variante` : etat === "gagnant" ? "déploiement : 100 % des visiteurs verront la variante" : "arrêt : l’original reprend 100 % du trafic")
+        const aud = t.ciblage ? `du trafic « ${LIBELLES[t.ciblage.intention]} »` : "du trafic"
+        dire(job, etat === "live" ? `mise en ligne : ${t.part} % ${aud} verra la variante` : etat === "gagnant" ? `déploiement : 100 % ${aud} verra la variante` : `arrêt : l’original reprend 100 % ${aud}`)
         // l'état affiché doit être l'état EN LIGNE : si la publication rate ou ne répond pas, on revient en arrière et on dit pourquoi
         try { publie = (await publierTag(job, c, camp)) === 0 }
         catch (e) { dire(job, `publication : ${(e as Error).message}`) }

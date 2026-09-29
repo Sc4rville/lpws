@@ -75,10 +75,18 @@ export function analyser(etat: EtatIntentions, client = "", campagne = "") {
   }).sort((a, b) => b.clics - a.clics || a.id.localeCompare(b.id))
   const clics = rapport.termes.reduce((s, t) => s + t.clics, 0)
   const routables = routes.filter((r) => r.intention).reduce((s, r) => s + r.clics, 0)
+  const parIntention = Object.fromEntries(Intention.options.map((intention) => {
+    const retenues = routes.filter((r) => r.intention === intention)
+    return [intention, {
+      clics: retenues.reduce((s, r) => s + r.clics, 0),
+      conversions: retenues.reduce((s, r) => s + r.conversions, 0),
+      routes: retenues.length,
+    }]
+  }))
   return {
     revision: empreinte({ revision: etat.revision, decisions }),
     importeLe: rapport.importeLe, source: rapport.source, groupes: groupes.groupes, routes,
-    clics, routables, couverture: clics ? routables / clics : null,
+    clics, routables, couverture: clics ? routables / clics : null, parIntention,
     notes: [
       "La requête réelle n'est pas disponible au clic. Le routage utilise le mot-clé acheté, jamais le texte de recherche du visiteur.",
       "Les chiffres décrivent les termes visibles du rapport, pas la totalité du trafic : Google masque certaines requêtes.",

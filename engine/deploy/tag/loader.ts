@@ -283,7 +283,8 @@ function annonce(version: string, applique: number, abandons: string[]): void {
     try { w.gtag("set", "user_properties", props) } catch { /* gtag absent ou cassé */ }
   }
   w.dataLayer.push({
-    event: attribution.apercu ? "lpws_apercu" : horsTest ? "lpws_hors_test" : "lpws_variante", ...props,
+    event: attribution.apercu ? "lpws_apercu" : horsTest ? "lpws_hors_test" : "lpws_variante",
+    ...(!attribution.apercu && !horsTest ? props : {}),
     lpws_editions: applique, lpws_abandons: abandons.length, lpws_mode: mode,
     lpws_apercu: attribution.apercu, lpws_motif: attribution.motif,
   })
