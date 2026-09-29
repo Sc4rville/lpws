@@ -170,7 +170,7 @@ createServer(async (req, res) => {
       if (seg[4] === "textes") return json(res, 200, await textes(c, camp))
       if (seg[4] === "tests" && !seg[5] && req.method === "POST") {
         const b = await body(req)
-        if (!b.titre || !Array.isArray(b.edits) || !b.edits.length || b.edits.some((e: any) => !e.anchor || !e.text)) return json(res, 400, { erreur: "Il faut un titre et au moins un texte à changer." })
+        if (!b.titre || !Array.isArray(b.edits) || !b.edits.length) return json(res, 400, { erreur: "Il faut un titre et au moins un changement." })
         const r = await creerTest(c, camp, { titre: String(b.titre), pourquoi: String(b.pourquoi || "le media buyer veut le vérifier"), edits: b.edits, ciblage: b.ciblage })
         return json(res, 202, { job: r.job.id, id: r.id })
       }

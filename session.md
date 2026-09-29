@@ -13,6 +13,8 @@
 - **Brain** (`engine/variant`) : signaux + jugements typés + 41 règles dans `regles.json` validé par schéma (dont 7 page produit/essai) → diagnostic → 3 variantes
   passées aux garde-fous (chiffre inventé, superlatif, « ! » : refus dans `variantes-refusees.json`).
   Jugement mesuré à 73 % contre 6 pages annotées (`npm run brain:eval`).
+  Test manuel multi-éléments : 1 à 6 changements (set, remove, move, duplicate, swap), garde-fous + variante propre
+  exigée avant lancement ; une piste du diagnostic présélectionne sa cible (bouton générique, preuve…).
   Décliner : chaque proposition donne à la demande 3 autres versions du même test (bouton « Décliner », `--decliner`).
   « Pas celui-là » prend un motif ; les refus du client sont relus à chaque écriture (textes refusés interdits).
 - **Mesure** : GA4 par fenêtre de test, un seul moteur stats (`engine/measure/stats.ts`, embarqué

@@ -9,7 +9,7 @@
  *
  * Les limites qu'on lui impose ne sont pas de la politesse, ce sont celles du brain :
  *   · n'écrire que ce que la page affirme déjà, jamais un chiffre, une garantie, un client ;
- *   · une variante = une hypothèse = une ou deux éditions, pas une nouvelle page ;
+ *   · une variante = une hypothèse cohérente, déclinée sur les éléments qui la portent ;
  *   · la langue de la page, le ton de la page, pas de superlatif ;
  *   · une ancre existante, sinon rien.
  *
@@ -58,7 +58,7 @@ const Proposition = z.object({
     with: z.string().optional(),
     as: z.string().optional(),
     pourquoi: z.string().min(3),
-  })).min(1).max(2),
+  })).min(1).max(5),
 })
 /* la liste se valide élément par élément : une proposition hors contrat ne doit pas emporter
  * les deux autres (constaté : un « pourquoi » trop court faisait tomber les trois variantes) */
@@ -85,9 +85,9 @@ function cadre(constats: Constat[], m: SignauxMecaniques, c: Contexte, langue: s
 
 RÈGLES ABSOLUES
 - N'écris que ce que la page ou l'annonce (créa comprise) affirment déjà. Aucun chiffre, aucune garantie, aucun nom de client, aucune promesse qui ne figure ni sur la page ni dans l'annonce. ${c.limites ? "Interdit par le client : " + c.limites + "." : ""}
-- Une variante = UNE hypothèse = 1 ou 2 éditions. Pas une nouvelle page.
+- Une variante = UNE hypothèse. Pour la rendre cohérente, change si nécessaire le titre, le sous-titre ET le bouton principal ensemble (jusqu'à 5 éditions). Un test ne mélange pas deux idées indépendantes.
 - Langue de la page : ${langue}. Ton de la page. Pas de superlatif, pas de point d'exclamation.
-- Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose.
+- Une édition vise une ANCRE de la liste ci-dessous, jamais autre chose. La cible du constat doit être éditée ; les autres éditions de texte ne servent qu'à soutenir la même promesse.
 ${AMPLEUR[regime]}
 - op "set" : remplace le texte (clé "text"). op "remove" : retire l'élément. op "move" : déplace l'ancre avant ("before") ou après ("after") une autre ancre. op "duplicate" : copie l'ancre et la pose "before"/"after" une autre, avec "as": un suffixe alphanumérique court. op "swap" : échange avec "with".
 - Le "titre" de la variante est ce que le buyer lira dans sa liste : court, dans ses mots (ex. « Le titre reprend la promesse de l'annonce »).
@@ -116,12 +116,13 @@ function boutonsProposes(m: SignauxMecaniques): SignauxMecaniques["ctas"] {
 function porteeDe(k: Constat, m: SignauxMecaniques): Portee {
   const t = k.test!
   const s = (xs: Array<string | undefined>) => new Set(xs.filter((x): x is string => !!x))
-  const ancres = t.cible === "titre" || t.cible === "sous-titre" ? s([m.hero.titreAnchor, m.hero.sousTitreAnchor])
-    : t.cible === "cta" ? s([...m.ctas.map((x) => x.anchor), m.hero.titreAnchor, m.hero.sousTitreAnchor])
+  const ancres = t.cible === "titre" ? s([m.hero.titreAnchor]) : t.cible === "sous-titre" ? s([m.hero.sousTitreAnchor])
+    : t.cible === "cta" ? s(m.ctas.map((x) => x.anchor))
     : t.cible === "nav" ? s([m.nav.anchor])
-    : t.cible === "section" ? s([...m.sections.map((x) => x.anchor), m.hero.titreAnchor, m.hero.sousTitreAnchor])
+    : t.cible === "section" ? s(m.sections.map((x) => x.anchor))
     : null
-  return { verbes: t.verbes, ancres: ancres && ancres.size ? ancres : null }
+  return { verbes: t.verbes, ancres: ancres && ancres.size ? ancres : null,
+    renforts: s([m.hero.titreAnchor, m.hero.sousTitreAnchor, ...boutonsProposes(m).map((x) => x.anchor)]) }
 }
 
 export type Refus = { regle: string; titre: string; raisons: string[]; edits: unknown[]; le: string }
@@ -227,12 +228,11 @@ export async function ecrireVariantes(
       const sec = m.sections.find((x) => x.anchor === a); if (sec) return `la section « ${sec.titre || "sans titre"} »`
       return `« ${(parAncre.get(a)?.text ?? a).slice(0, 50)} »`
     }
-    const e0 = p.edits[0]
-    const teste = e0.op === "set" ? `${nommer(e0.anchor)} devient « ${(e0.text ?? "").slice(0, 70)} »`
-      : e0.op === "remove" ? `Retirer ${nommer(e0.anchor)}`
-      : e0.op === "duplicate" ? `Dupliquer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
-      : e0.op === "swap" ? `Échanger ${nommer(e0.anchor)} et ${nommer(e0.with ?? "")}`
-      : `Déplacer ${nommer(e0.anchor)} ${e0.before ? "avant " + nommer(e0.before) : "après " + nommer(e0.after ?? "")}`
+    const teste = p.edits.map((e) => e.op === "set" ? `${nommer(e.anchor)} devient « ${(e.text ?? "").slice(0, 70)} »`
+      : e.op === "remove" ? `Retirer ${nommer(e.anchor)}`
+      : e.op === "duplicate" ? `Dupliquer ${nommer(e.anchor)} ${e.before ? "avant " + nommer(e.before) : "après " + nommer(e.after ?? "")}`
+      : e.op === "swap" ? `Échanger ${nommer(e.anchor)} et ${nommer(e.with ?? "")}`
+      : `Déplacer ${nommer(e.anchor)} ${e.before ? "avant " + nommer(e.before) : "après " + nommer(e.after ?? "")}`).join(" · ")
     sorties.push({ nom, regle: k.id, fichier, titre: p.titre, teste })
     for (const e of p.edits) if (e.text) dejaVus.set(normer(e.text), "est déjà proposé")
     step(SCOPE, `✓ ${p.titre} → ${fichier}`)

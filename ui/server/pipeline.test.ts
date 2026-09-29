@@ -104,3 +104,13 @@ test("creerTest : ciblage et entrée invalides = 400 ; le verrou couvre toute la
   const r2 = await creerTest(C, CAMP, { titre: "titre w", pourquoi: "pour vérifier l’effet", edits: [{ anchor: "e1", text: "x" }] })
   await fin(r2.job.id)
 })
+
+test("creerTest : variantes multi-éléments contrôlées (6 max, cible unique, destination exigée)", async () => {
+  const e = (n: number) => Array.from({ length: n }, (_, i) => ({ anchor: "e" + (i + 1), text: "nouveau " + i }))
+  const refuse = (edits: any[]) => assert.rejects(creerTest(C, CAMP, { titre: "multi", pourquoi: "pour vérifier l’effet", edits }), (x: any) => x.code === 400)
+  await refuse(e(7))
+  await refuse([{ anchor: "e1", text: "a" }, { anchor: "e1", op: "remove" }])
+  await refuse([{ anchor: "e1", op: "move" }])
+  await refuse([{ anchor: "e1", op: "swap", with: "e1" }])
+  await refuse([{ anchor: "e1", op: "rewrite", text: "x" }])
+})

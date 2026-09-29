@@ -110,6 +110,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   if (d.nonEvaluables.length) step(SCOPE, `  non évaluables : ${d.nonEvaluables.map((x) => x.id).join(", ")}`)
 
   // 4. écrire
+  if (!j && !opts.sansJugement) fail(SCOPE, "jugement indisponible : connecter claude -p pour rédiger les variantes ; les signaux et le diagnostic restent consultables")
   if (opts.sansVariantes) return { d, variantes: [] }
   const langue = langueDe(await readFile(f.capture, "utf8"))
   // les refus du buyer restent, spec comprise : ils sont la mémoire de ce qu'il ne veut pas (feuille de route 4.1)
@@ -122,6 +123,7 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   const propositions = versPropositions(variantes, d.tests)
   await ecrireJson(f.propositions, [...propositions, ...conservees])
   step(SCOPE, `${variantes.length} variante(s) prête(s) pour apply`)
+  if (d.tests.length && !variantes.length) fail(SCOPE, "aucune variante n'a passé les garde-fous (détail dans variantes-refusees.json)")
   return { d, variantes }
 }
 
