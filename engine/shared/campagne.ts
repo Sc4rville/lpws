@@ -27,6 +27,7 @@
  */
 import { join } from "node:path"
 import { z } from "zod"
+import { Ciblage } from "../intent/ciblage.ts"
 
 export function campagne(dir: string) {
   const baseline = join(dir, "baseline")
@@ -55,6 +56,8 @@ export function campagne(dir: string) {
     resultats: join(dir, "resultats.json"),
     experiences: join(dir, "experiences.json"),
     audit: join(dir, "audit.json"),
+    intents: join(dir, "intents", "etat.json"),
+    intentsConnexion: join(dir, "intents", "connexion.json"),
     surveillance: join(dir, "surveillance"),
     releve: (quand: string) => join(dir, "surveillance", `${quand}.json`),
     alertes: join(dir, "surveillance", "alertes.json"),
@@ -83,17 +86,21 @@ export const Test = z.object({
   /** l'horizon fixé AU LANCEMENT (engine/measure/stats.ts) : on ne le recalcule pas en regardant */
   plan: Plan.optional(),
   /** les lancements terminés qu'une relance a remplacés : leur fenêtre reste mesurable même sans ligne au journal */
-  anciens: z.array(z.object({ lanceLe: z.string(), finLe: z.string(), part: z.number(), plan: Plan.optional() })).optional(),
+  anciens: z.array(z.object({ lanceLe: z.string(), finLe: z.string(), part: z.number(), plan: Plan.optional(), experience: z.string().optional() })).optional(),
   edits: z.array(z.object({ anchor: z.string(), text: z.string(), avant: z.string() })),
   erreur: z.string().optional(),
   job: z.string().optional(),
   /** la règle du brain qui a produit ce test, si c'en est un */
   regle: z.string().optional(),
+  /** l'audience du test (les mots-clés qui routent vers lui) : absent = test général */
+  ciblage: Ciblage.optional(),
+  /** l'identifiant du lancement en cours : isole la mesure des campagnes parallèles */
+  experience: z.string().regex(/^[a-f0-9]{32}$/).optional(),
 })
 export type Test = z.infer<typeof Test>
 
 /** La balise Express vue sur la vraie page. */
-export type Express = { installe: boolean; verifieLe?: string; version?: string; mode?: string; detail?: string }
+export type Express = { installe: boolean; verifieLe?: string; version?: string; mode?: string; capacite?: string; detail?: string }
 
 const Compte = z.object({ n: z.number(), c: z.number() })
 
@@ -120,5 +127,9 @@ export const Experience = z.object({
   verdict: z.string().optional(),
   /** la variante a été déployée à 100 % (reste vrai si l'original est remis ensuite) */
   deploye: z.boolean().optional(),
+  /** l'audience sur laquelle le test a collecté, figée au lancement */
+  ciblage: Test.shape.ciblage,
+  /** le lancement mesuré */
+  experience: Test.shape.experience,
 })
 export type Experience = z.infer<typeof Experience>

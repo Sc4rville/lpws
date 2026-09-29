@@ -48,6 +48,8 @@ export const Terme = z.object({
   correspondance: z.enum(["exact", "expression", "large", "inconnue"]).default("inconnue"),
   campagne: z.string().optional(),
   groupeAnnonces: z.string().optional(),
+  campagneId: z.string().regex(/^\d+$/).optional(),
+  groupeId: z.string().regex(/^\d+$/).optional(),
   impressions: z.number().int().nonnegative().default(0),
   clics: z.number().int().nonnegative().default(0),
   /** en unité monétaire du compte (les micros de l'API sont convertis à l'import) */
@@ -63,6 +65,10 @@ export const Termes = z.object({
     langue: z.enum(["fr", "en"]),
     /** la période telle qu'écrite en tête d'export, si présente */
     periode: z.string().optional(),
+    compte: z.string().regex(/^\d{10}$/).optional(),
+    devise: z.string().regex(/^[A-Z]{3}$/).optional(),
+    debut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    fin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   }),
   importeLe: z.string(),
   termes: z.array(Terme).min(1),
@@ -126,4 +132,4 @@ export type Intents = z.infer<typeof Intents>
  * remplace les accolades à chaque clic ; le tag lit ensuite `lpws_kw` pour retrouver
  * l'intention. Les autres servent à la mesure. Aucun de ces paramètres n'est la requête.
  */
-export const SUFFIXE_URL_FINALE = "lpws_kw={keyword}&lpws_mt={matchtype}&lpws_ag={adgroupid}&lpws_cp={campaignid}&lpws_dev={device}"
+export const SUFFIXE_URL_FINALE = "lpws_kw={keyword}&lpws_mt={matchtype}&lpws_ag={adgroupid}&lpws_cp={campaignid}&lpws_dev={device}&lpws_net={network}"

@@ -14,6 +14,9 @@ import { grouper } from "./group.ts"
 import { SUFFIXE_URL_FINALE } from "./schema.ts"
 import { step, fail } from "../shared/log.ts"
 import { lireArgs } from "../shared/cli.ts"
+import { creerEtat } from "./analyse.ts"
+import { campagne as fichiersDe } from "../shared/campagne.ts"
+import { ecrireJson } from "../shared/json.ts"
 
 const SCOPE = "intent"
 const ROOT = resolve(import.meta.dirname, "..", "..")
@@ -24,6 +27,8 @@ const [fichier] = args.libres
 const client = opt("client"), campagne = opt("campagne")
 if (!fichier || !client || !campagne)
   fail(SCOPE, "usage : npm run intents -- <export.csv> --client <client> --campagne <campagne> [--marques a,b]")
+if (![client, campagne].every((s) => /^[\w-][\w.-]*$/.test(s)))
+  fail(SCOPE, "client et campagne doivent être des identifiants de dossier, sans séparateurs de chemin")
 const marques = (opt("marques") ?? "").split(",").map((s) => s.trim()).filter(Boolean)
 
 const t = await importer(resolve(fichier)).catch((e: Error) => fail(SCOPE, e.message))
@@ -36,6 +41,7 @@ const dir = join(ROOT, "clients", client, campagne, "intents")
 await mkdir(dir, { recursive: true })
 await writeFile(join(dir, "termes.json"), JSON.stringify(t, null, 2))
 await writeFile(join(dir, "intents.json"), JSON.stringify(intents, null, 2))
+await ecrireJson(fichiersDe(join(ROOT, "clients", client, campagne)).intents, creerEtat(t, marques))
 
 /* le tableau : une ligne par intention, du plus cliqué au moins cliqué */
 const fr = (n: number) => Math.round(n).toLocaleString("fr-FR")
