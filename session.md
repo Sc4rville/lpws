@@ -23,6 +23,8 @@
   démo Relay (https://lpws-app.vercel.app/demo/).
   Aucune « certitude » affichée : un test en ligne montre hausse, fourchette et ce qui reste avant
   l'horizon ; le calculateur passe par `STATS.planifier` comme le lancement.
+  Vitrine produit `ui/site/` (servie sur `/site`, copiée dans `ui/dist/site`) : démo animée en 4 temps
+  (capture, message match, test 50/50, verdict), titres légers, chiffres tabulaires.
 - **Instances** : la box (https://lpws.46.225.146.226.sslip.io, service `lpws-ui`) est **la seule
   qui publie** sur `lpws-app.vercel.app` ; en local, `LPWS_SANS_VERCEL=1`.
 - **Repo rangé le 2026-09-28** : racine = readme · CLAUDE · session ; docs en `recherche/` et

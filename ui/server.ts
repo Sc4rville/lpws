@@ -191,6 +191,7 @@ createServer(async (req, res) => {
         return json(res, 202, { job: (await lancerDeclinaison(c, camp, seg[5], await body(req))).id })
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
+    if (p === "/site" || p.startsWith("/site/")) return envoyerFichier(res, join(ROOT, "ui", "site"), decodeURIComponent(p.slice(6).replace(/^\//, "")) || "index.html")
     if (p.startsWith("/assets/")) return envoyerFichier(res, join(ROOT, "ui", "assets"), decodeURIComponent(p.slice(8)))
     if (p.startsWith("/files/")) return envoyerFichier(res, join(ROOT, CLIENTS_ROOT), decodeURIComponent(p.slice(7)))
     if ((seg[0] === "t" || seg[0] === "v") && seg[1])
