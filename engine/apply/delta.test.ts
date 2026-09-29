@@ -45,3 +45,14 @@ test("deltaParSection : une variante qui ne touche que sa section est propre", a
   assert.deepEqual(d.debordements, [])
   await rm(dir, { recursive: true })
 })
+
+test("deltaParSection : une section copiée plus haute que la marge ne fait pas déborder les suivantes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lpws-delta-"))
+  const base = join(dir, "base.png"), vari = join(dir, "variante.png")
+  await writeFile(base, PNG.sync.write(page([1, 2, 3, 4], 700)))
+  await writeFile(vari, PNG.sync.write(page([1, 2, 2, 3, 4], 700)))
+  const b = bandes(5, 700).map((x, i) => ({ ...x, anchor: ["s1", "s2", "s2-copie0", "s3", "s4"][i] }))
+  const d = await deltaParSection(base, vari, b, ["s2-copie0"])
+  assert.deepEqual(d.debordements, [])
+  await rm(dir, { recursive: true })
+})
