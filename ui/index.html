@@ -1396,7 +1396,7 @@ function carteProposition(c, p) {
     : S.decl === p.nom
     ? `<label class="fld" style="font-weight:600">D’autres versions de ce test<input class="inp" id="decl-consigne" maxlength="300" placeholder="Une consigne ? ex. plus court, parler de la livraison" value="${esc(S.declConsigne || '')}"><span class="muted" style="font-weight:400">Trois variantes différentes de celles déjà proposées, avec les mêmes garde-fous : rien que la page ou l’annonce n’affirme déjà.</span></label>
        <div class="f">${GO(I.sparkle(15) + 'Écrire 3 versions', `data-act="decliner" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-fermer">Annuler</button></div>`
-    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : 'title="Trois autres versions de ce test, à votre consigne"'}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refus-ouvrir" data-nom="${nom}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div>`;
+    : `<div class="f">${GO(I.play(15) + 'Créer ce test', `data-act="proposer" data-nom="${nom}" data-client="${c.id}"`)}${p.edits?.length ? `<button class="btn sm" data-act="nt-proposition" data-nom="${nom}" data-client="${c.id}" title="Ajuster les ${p.edits.length} changement${p.edits.length > 1 ? 's' : ''} avant de créer le test">Modifier</button>` : ''}<button class="btn sm" data-act="decliner-ouvrir" data-nom="${nom}" ${occupe ? 'disabled title="LPWS écrit déjà des versions pour cette page"' : 'title="Trois autres versions de ce test, à votre consigne"'}>${I.sparkle(14)}Décliner</button><button class="btn sm" data-act="refus-ouvrir" data-nom="${nom}" title="Retire cette proposition ; LPWS s’en souvient">Pas celui-là</button></div>`;
   const source = p.declineDe && (c.propositions || []).find(x => x.nom === p.declineDe);
   return `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(nomRegle(p.regle))}</span>${p.declineDe ? `<span class="chip" title="${esc(source ? 'Déclinée de « ' + source.titre + ' »' : 'Déclinaison')}">Déclinaison</span>` : ''}${p.sources.slice(0, 2).map(s => `<span class="chip">${esc(s)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div>${p.consigne ? `<div class="d"><b>Consigne.</b> ${esc(p.consigne)}</div>` : ''}<div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div>${pied}</div>`;
 }
@@ -2075,6 +2075,14 @@ document.addEventListener('click', e => {
       S.ntEdits = cible ? { [cible]: { op: k.test?.verbes?.[0] || 'set' } } : {};
       S.piste = k; S.ntTitre = k.action; S.ntWhy = k.pourquoi;
       S.view = 'nouveau'; render(); break;
+    }
+    case 'nt-proposition': {
+      const p = c?.propositions?.find(x => x.nom === act.dataset.nom);
+      const edits = (p?.edits || []).filter(e => e.anchor && ['set', 'remove', 'move', 'duplicate', 'swap'].includes(e.op) && (e.op !== 'set' || e.text));
+      if (!edits.length) { toast('Le détail de cette proposition est indisponible : créez-la telle quelle ou relancez l’analyse.'); break; }
+      if (edits.length < (p.edits || []).length) toast('Certains changements de cette proposition ne se modifient pas ici : ils ne sont pas repris.');
+      S.ntEdits = Object.fromEntries(edits.slice(0, 6).map(e => [e.anchor, { op: e.op, text: e.text, target: e.before || e.after || e.with, position: e.before ? 'before' : 'after' }]));
+      S.ntTitre = p.titre; S.ntWhy = p.pourquoi; S.ntIntention = p.ciblage?.intention; S.piste = null; S.view = 'nouveau'; render(); break;
     }
     case 'choisir': {
       const anchor = act.dataset.anchor;
