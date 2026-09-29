@@ -62,24 +62,14 @@ import { sessionPaiement, signatureValide, appliquerEvenement } from "../engine/
 import { capturer, textes, creerTest, lancerBrain, creerTestDepuisProposition, lancerDeclinaison, changerEtat, refuserProposition } from "./server/pipeline.ts"
 import { verifier } from "./server/tag.ts"
 import { etatIntentions, importerIntentions, deciderIntentions, genererVariantes, propositionIntentions, simuler, connecter, configurerMesure, mesurerIntentions, authentifierSync, synchroniserCorps } from "./server/intentions.ts"
+import { corpsJson, lireCorps } from "./server/http.ts"
+const body = corpsJson
 
 const SCOPE = "ui"
 const PORT = Number(process.env.PORT ?? 4700)
 const UI = join(ROOT, "ui", "index.html")
 
 /* ---------- http ---------- */
-const lireBrut = (req: IncomingMessage, max: number) => new Promise<Buffer>((ok, ko) => {
-  const lots: Buffer[] = []; let n = 0
-  req.on("data", (d: Buffer) => { n += d.length; if (n > max) { ko(Object.assign(new Error("corps trop volumineux"), { code: 413 })); req.destroy() } else lots.push(d) })
-  req.on("end", () => ok(Buffer.concat(lots)))
-  req.on("error", ko)
-})
-const body = async (req: IncomingMessage, max = 2_000_000) => {
-  const brut = await lireBrut(req, max)
-  try { return brut.length ? JSON.parse(brut.toString("utf8")) : {} }
-  catch { throw Object.assign(new Error("JSON invalide"), { code: 400 }) }
-}
-
 /** Hébergée en ligne, l'interface est derrière un mot de passe (LPWS_MOT_DE_PASSE) : un seul,
  *  partagé entre Yann et kabylesystem, le navigateur le retient. Sans la variable : rien ne change en local. */
 const MOT_DE_PASSE = process.env.LPWS_MOT_DE_PASSE ?? ""
@@ -95,14 +85,13 @@ function autorise(req: IncomingMessage, res: ServerResponse): boolean {
 
 createServer(async (req, res) => {
   try {
-    // le connecteur Google Ads Scripts a son jeton Bearer, pas le mot de passe de l'interface ;
-    // l'authentification passe avant la lecture du corps
     const segBrut = (req.url ?? "").split("?")[0].split("/").filter(Boolean).map(decodeURIComponent)
     if (req.method === "POST" && segBrut.length === 5 && segBrut[0] === "api" && segBrut[1] === "intents" && segBrut[4] === "sync") {
       const auth = req.headers.authorization ?? ""
-      await authentifierSync(segBrut[2], segBrut[3], auth.startsWith("Bearer ") ? auth.slice(7).trim() : undefined)
-      const brut = await lireBrut(req, 5_000_000)
-      return json(res, 200, await synchroniserCorps(segBrut[2], segBrut[3], brut))
+      const jeton = auth.startsWith("Bearer ") ? auth.slice(7).trim() : undefined
+      await authentifierSync(segBrut[2], segBrut[3], jeton)
+      const brut = await lireCorps(req, 5_000_000)
+      return json(res, 200, await synchroniserCorps(segBrut[2], segBrut[3], brut, jeton))
     }
     // Stripe n'a pas le mot de passe : sa requête est authentifiée par sa signature
     if (req.url === "/api/stripe/webhook" && req.method === "POST") {
@@ -175,8 +164,9 @@ createServer(async (req, res) => {
         return json(res, 202, { job: r.job.id, id: r.id })
       }
       if (seg[4] === "tests" && seg[5] && req.method === "POST") {
-        const b = await body(req)
-        const job = await changerEtat(c, camp, seg[5], b.etat === "live" || b.etat === "gagnant" ? b.etat : "stop", Number(b.part) || 50, b.reprise === true)
+        const b = (await body(req)) as Record<string, any>
+        if (!["live", "stop", "gagnant"].includes(b.etat)) return json(res, 400, { erreur: "État demandé inconnu." })
+        const job = await changerEtat(c, camp, seg[5], b.etat, b.part === undefined ? 50 : Number(b.part), b.reprise === true)
         return json(res, 202, { job: job.id })
       }
       if (seg[4] === "verifier" && req.method === "POST") return json(res, 202, { job: (await verifier(c, camp)).id })
@@ -187,7 +177,7 @@ createServer(async (req, res) => {
       }
       if (seg[4] === "surveiller" && req.method === "POST") return json(res, 202, { job: lancerSurveillance(dossier(c, camp)).id })
       if (seg[4] === "mandat" && req.method === "POST") {
-        const par = String((await body(req)).par ?? "").trim()
+        const par = String(((await body(req)) as Record<string, any>).par ?? "").trim()
         if (par.length < 2) return json(res, 400, { erreur: "Qui, chez le client, a donné le mandat ? (nom et fonction)" })
         const compte = await lireCompte(FICHIER_COMPTE)
         compte.mandats[c] = { par, signeLe: new Date().toISOString(), declaration: DECLARATION_MANDAT(await nomDuSite(dossier(c, camp), c), par) }
@@ -218,9 +208,9 @@ createServer(async (req, res) => {
       if (seg[4] === "propositions" && seg[5] && !seg[6] && req.method === "GET")
         return json(res, 200, await propositionIntentions(c, camp, seg[5]))
       if (seg[4] === "propositions" && seg[5] && seg[6] === "refuser" && req.method === "POST")
-        return json(res, 200, await refuserProposition(c, camp, seg[5], await body(req)))
+        return json(res, 200, await refuserProposition(c, camp, seg[5], await body(req) as { motif?: unknown; raison?: unknown }))
       if (seg[4] === "propositions" && seg[5] && seg[6] === "decliner" && req.method === "POST")
-        return json(res, 202, { job: (await lancerDeclinaison(c, camp, seg[5], await body(req))).id })
+        return json(res, 202, { job: (await lancerDeclinaison(c, camp, seg[5], (await body(req)) as { consigne?: unknown; n?: unknown })).id })
       if (seg[4] === "propositions" && seg[5] && req.method === "POST") { const r = await creerTestDepuisProposition(c, camp, seg[5]); return json(res, 202, { job: r.job.id, id: r.id }) }
     }
     if (p === "/site" || p.startsWith("/site/")) return envoyerFichier(res, join(ROOT, "ui", "site"), decodeURIComponent(p.slice(6).replace(/^\//, "")) || "index.html")
@@ -229,7 +219,10 @@ createServer(async (req, res) => {
     if ((seg[0] === "t" || seg[0] === "v") && seg[1])
       return envoyerFichier(res, join(DIST, seg[0]), decodeURIComponent(seg[1]), { "access-control-allow-origin": "*", "cache-control": "no-cache" })
     res.writeHead(404); res.end()
-  } catch (e) { json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e), action: (e as { action?: string })?.action }) }
+  } catch (e) {
+    if (Number((e as { code?: number })?.code) === 413) res.setHeader("connection", "close")
+    json(res, Number((e as { code?: number })?.code) || 500, { erreur: String((e as Error)?.message ?? e), action: (e as { action?: string })?.action })
+  }
 }).listen(PORT, process.env.LPWS_HOTE ?? "127.0.0.1", () => step(SCOPE, `interface → http://${process.env.LPWS_HOTE ?? "localhost"}:${PORT} · tag publié sur ${BASE_TAGS}`))
 
 if (process.env.LPWS_SURVEILLANCE) {

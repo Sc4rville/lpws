@@ -22,9 +22,16 @@ const err = (message: string, code = 400) => Object.assign(new Error(message), {
 
 const IMPORT = z.object({
   nom: z.string().max(180),
-  base64: z.string().max(7_000_000).regex(/^[A-Za-z0-9+/=\r\n]+$/, "base64 invalide"),
+  base64: z.string().max(7_000_000).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\r?\n?$|^$/, "base64 invalide"),
   marques: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
 })
+
+function base64Canonique(v: string): Buffer {
+  const compact = v.replace(/\r?\n/g, "")
+  const buf = Buffer.from(compact, "base64")
+  if (!compact.length || buf.toString("base64") !== compact) throw err("base64 invalide : le fichier n’a pas été lu correctement")
+  return buf
+}
 
 const DECISIONS = z.object({
   revision: z.string().regex(/^[a-f0-9]{32}$/),
@@ -43,9 +50,17 @@ type Connexion = { hachage: string; compte: string; campagnes: string[]; creeLe:
 type MesureFile = { propriete: string; compteDeService: string }
 
 export function publicDisponible(): boolean {
-  const u = process.env.LPWS_URL_PUBLIQUE ?? ""
-  const ok = u.startsWith("https://") && !u.includes("@") && !!process.env.LPWS_MOT_DE_PASSE
-  try { new URL(u); return ok } catch { return false }
+  if (!process.env.LPWS_MOT_DE_PASSE) return false
+  try {
+    const u = new URL(process.env.LPWS_URL_PUBLIQUE ?? "")
+    if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) return false
+    const h = u.hostname.toLowerCase()
+    if (h === "localhost" || h.endsWith(".localhost") || /^\d+\.\d+\.\d+\.\d+$/.test(h)
+      || h === "::1" || h === "[::1]" || /^\[(0:)+1\]$/.test(h)) return false
+    if (/^10\.|^127\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\.|^0\./.test(h)) return false
+    if (/^(fe80:|fc|fd)/i.test(h)) return false
+    return true
+  } catch { return false }
 }
 
 export async function etatIntentions(c: string, camp: string) {
@@ -79,8 +94,8 @@ export async function importerIntentions(c: string, camp: string, corps: unknown
   try {
     const v = IMPORT.safeParse(corps)
     if (!v.success) throw err("import invalide : " + ecarts(v.error))
-    const buf = Buffer.from(v.data.base64, "base64")
-    if (!buf.length || buf.length > 5_000_000) throw err("Export trop volumineux ou vide : 5 Mo maximum")
+    const buf = base64Canonique(v.data.base64)
+    if (buf.length > 5_000_000) throw err("Export trop volumineux : 5 Mo maximum")
     const etat = EtatIntentions.parse(creerEtat(importerBuffer(buf, v.data.nom || "export.csv"), v.data.marques))
     await ecrireJson(fichiersDe(d).intents, etat)
     return etatIntentions(c, camp)
@@ -185,19 +200,23 @@ export async function connecter(c: string, camp: string, corps: unknown) {
   if (!pub || !publicDisponible())
     throw err("La synchronisation automatique exige une instance publique en HTTPS avec accès privé (LPWS_URL_PUBLIQUE + LPWS_MOT_DE_PASSE). L’import CSV reste disponible localement.", 409)
   const jeton = randomBytes(32).toString("hex")
+  const script = scriptGoogleAds({ endpoint: `${pub.replace(/\/$/, "")}/api/intents/${c}/${camp}/sync`, jeton, compte: v.data.compte, campagnes: v.data.campagnes })
   const connexion: Connexion = {
     hachage: createHash("sha256").update(jeton).digest("hex"),
     compte: v.data.compte, campagnes: v.data.campagnes, creeLe: new Date().toISOString(),
   }
   const liberer = verrouillerCampagne(dirname(d))
-  try { await ecrireJson(fichiersDe(d).intentsConnexion, connexion) } finally { liberer() }
-  await chmod(fichiersDe(d).intentsConnexion, 0o600).catch(() => {})
-  return { script: scriptGoogleAds({ endpoint: `${pub.replace(/\/$/, "")}/api/intents/${c}/${camp}/sync`, jeton, compte: v.data.compte, campagnes: v.data.campagnes }) }
+  try {
+    await ecrireJson(fichiersDe(d).intentsConnexion, connexion)
+    await chmod(fichiersDe(d).intentsConnexion, 0o600)
+  } finally { liberer() }
+  return { script }
 }
 
 const dernieresSync = new Map<string, number>()
 
 export async function authentifierSync(c: string, camp: string, jeton: string | undefined): Promise<void> {
+  if (!jeton) throw err("jeton Bearer requis", 401)
   const connexion = await lireJson<Connexion | null>(fichiersDe(dossier(c, camp)).intentsConnexion, null)
   if (!connexion) throw err("connecteur non configuré", 404)
   const recu = createHash("sha256").update(jeton ?? "").digest()
@@ -205,24 +224,28 @@ export async function authentifierSync(c: string, camp: string, jeton: string | 
   if (recu.length !== attendu.length || !timingSafeEqual(recu, attendu)) throw err("jeton invalide", 401)
 }
 
-export async function synchroniserCorps(c: string, camp: string, brut: Buffer) {
+export async function synchroniserCorps(c: string, camp: string, brut: Buffer, jeton: string | undefined) {
   const d = dossier(c, camp)
   const f = fichiersDe(d)
-  const connexion = await lireJson<Connexion | null>(f.intentsConnexion, null)
-  if (!connexion) throw err("connecteur non configuré", 404)
-  const cle = `${c}/${camp}`
-  const derniere = dernieresSync.get(cle)
-  if (derniere !== undefined && Date.now() - derniere < 60_000) throw err("Une synchronisation a déjà eu lieu dans la minute : elle tourne au plus une fois par heure côté Google Ads.", 429)
-  let payload: unknown
-  try { payload = JSON.parse(brut.toString("utf8")) } catch { throw err("JSON invalide", 400) }
-  const r = Termes.safeParse(payload)
-  if (!r.success) throw err("rapport hors contrat", 400)
-  if (r.data.source.compte !== connexion.compte) throw err("le rapport ne correspond pas au compte du connecteur", 400)
-  const permises = new Set(connexion.campagnes)
-  for (const t of r.data.termes)
-    if (!t.campagneId || !permises.has(t.campagneId) || !t.groupeId) throw err("le rapport contient des lignes hors des campagnes du connecteur", 400)
   const liberer = verrouillerCampagne(dirname(d))
   try {
+    const connexion = await lireJson<Connexion | null>(f.intentsConnexion, null)
+    if (!connexion) throw err("connecteur non configuré", 404)
+    const recu = createHash("sha256").update(jeton ?? "").digest()
+    const attendu = Buffer.from(connexion.hachage, "hex")
+    if (recu.length !== attendu.length || !timingSafeEqual(recu, attendu)) throw err("jeton invalide", 401)
+    if (brut.length > 5_000_000) throw err("corps trop volumineux", 413)
+    const cle = `${c}/${camp}`
+    const derniere = dernieresSync.get(cle)
+    if (derniere !== undefined && Date.now() - derniere < 60_000) throw err("Une synchronisation a déjà eu lieu dans la minute : elle tourne au plus une fois par heure côté Google Ads.", 429)
+    let payload: unknown
+    try { payload = JSON.parse(brut.toString("utf8")) } catch { throw err("JSON invalide", 400) }
+    const r = Termes.safeParse(payload)
+    if (!r.success) throw err("rapport hors contrat", 400)
+    if (r.data.source.compte !== connexion.compte) throw err("le rapport ne correspond pas au compte du connecteur", 400)
+    const permises = new Set(connexion.campagnes)
+    for (const t of r.data.termes)
+      if (!t.campagneId || !permises.has(t.campagneId) || !t.groupeId) throw err("le rapport contient des lignes hors des campagnes du connecteur", 400)
     const ancien = existsSync(f.intents) ? await lireValide(EtatIntentions, f.intents) : null
     let etat: EtatIntentions
     try { etat = creerEtat(r.data, ancien?.marques ?? []) } catch (e) { throw err((e as Error).message, 400) }

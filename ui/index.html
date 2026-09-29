@@ -338,6 +338,11 @@ kbd{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-2);ba
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:-12px 0 28px}
 .kpis .stat{background:var(--paper);box-shadow:inset 0 1px 0 var(--edge),0 0 0 1px var(--hair),var(--shadow)}
 .nt{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.intent-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.intent-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.intent-steps{grid-template-columns:1fr}}
+.intent-steps .card p{overflow-wrap:anywhere}
+.tbl .tr>span{overflow-wrap:anywhere}
 
 /* ---------- tableau de score ---------- */
 .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
@@ -1050,7 +1055,7 @@ function vTest(c) {
     const vd = verdict(c, t); const s = vd.s2;
     const cpc = c.ads ? c.ads.cpc : null;
     const cpaO = cpc ? cpc * t.res.o.n / t.res.o.c : null, cpaV = cpc ? cpc * t.res.v.n / t.res.v.c : null;
-    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r">${t.res.source === 'exemple' || !t.res.luLe ? '<span class="chip">exemple</span>' : `<span class="chip ok"><span class="dot"></span>GA4 · lu le ${esc(new Date(t.res.luLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span>`}</span></h3>
+    results = `<div class="sec"><h3>Résultats <span class="n">${t.jours} jours</span><span class="r">${t.res.source === 'exemple' || !t.res.luLe ? '<span class="chip">Exemple, pas une mesure réelle</span>' : `<span class="chip ok"><span class="dot"></span>GA4 · lu le ${esc(new Date(t.res.luLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}</span>`}</span></h3>
       <div class="score">
         <div class="stat"><div class="l">Visiteurs</div><div class="v">${fr(t.res.v.n)}</div><div class="s">original ${fr(t.res.o.n)}</div></div>
         <div class="stat"><div class="l">Conversions</div><div class="v">${t.res.v.c}</div><div class="s">original ${t.res.o.c}</div></div>
@@ -1255,12 +1260,15 @@ function vGuide(c, m) {
 let ETAT_ERREUR = null;
 async function chargerEtat() {
   try {
-    const r = await fetch('/api/etat', { cache: 'no-store' }); if (!r.ok) throw 0;
+    const r = await fetch('/api/etat', { cache: 'no-store' });
+    if (!r.ok) throw Object.assign(new Error(), { statut: r.status });
     const d = await r.json(); CLIENTS = d.clients; LIVE = true; BASE = d.base || BASE; COMPTE = d.compte || null; ETAT_ERREUR = null;
     if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
   } catch (e) {
+    const statut = e && e.statut;
     if (LIVE) { ETAT_ERREUR = 'La connexion au serveur a été perdue : l’écran montre la dernière lecture connue.'; return; }
-    CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; }
+    if (statut === 404 || statut === 405 || location.protocol === 'file:') { CLIENTS = DEMO; LIVE = false; if (S.ctx !== 'home' && !byId(S.ctx)) { S.ctx = 'home'; S.view = 'dash'; } }
+    else ETAT_ERREUR = 'Le serveur LPWS ne répond pas correctement (code ' + (statut || 'réseau') + '). Réessayez — vos données restent sur l’instance.';
   }
 }
 async function api(path, data) {
@@ -1333,7 +1341,7 @@ function vNouveau(c) {
           </div>`; }).join('') : '<p class="muted">Sélectionnez des textes, boutons ou sections à gauche.</p>'}
         <label class="fld" style="margin-top:12px">Pourquoi ce test<input class="inp" id="nt-why" placeholder="ex. tenir la promesse de l’annonce jusqu’au clic" value="${esc(S.ntWhy || S.piste?.pourquoi || '')}"></label>
         <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="nt-titre" value="${esc(S.ntTitre || S.piste?.action || '')}"></label>
-        ${(() => { const a = c.intentions && c.intentions.analyse; if (!a) return ''; const ints = Object.keys(INTENTIONS_LIB).filter(i => a.routes.some(r => r.intention === i)); if (!ints.length) return ''; return `<label class="fld" style="margin-top:12px">Audience du test <span class="muted" style="font-weight:400">(par défaut : tout le trafic de la page)</span><select class="inp" id="nt-int"><option value="">Tout le trafic — test général</option>${ints.map(i => `<option value="${i}" ${S.ntIntention === i ? 'selected' : ''}>${INTENTIONS_LIB[i]} — ${fr(a.routes.filter(r => r.intention === i).reduce((x, r) => x + r.clics, 0))} clics visibles</option>`).join('')}</select></label>`; })()}
+        ${(() => { const a = c.intentions && c.intentions.analyse; if (!a) return ''; const ints = Object.keys(a.parIntention || {}).filter(i => a.parIntention[i].routes > 0); const sel = intState(c).ntIntention; if (!ints.length && !sel) return ''; return `<label class="fld" style="margin-top:12px">Audience du test <span class="muted" style="font-weight:400">(par défaut : tout le trafic de la page)</span><select class="inp" id="nt-int"><option value="">Tout le trafic — test général</option>${sel && !ints.includes(sel) ? `<option value="${esc(sel)}" selected disabled>Ciblage devenu indisponible</option>` : ''}${ints.map(i => `<option value="${i}" ${sel === i ? 'selected' : ''}>${INTENTIONS_LIB[i]} — ${fr(a.parIntention[i].clics)} clics routables</option>`).join('')}</select></label>`; })()}
         <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${selection.length ? GO(I.sparkle(16) + 'Créer le test', 'data-act="creer-test"') : ''}<span class="muted" id="nt-err"></span></div>
       </div>
     </div>`;
@@ -1344,7 +1352,9 @@ const TRAFICS = [['google-search', 'Google Search'], ['google-shopping', 'Google
 const SOCIAL = ['meta', 'tiktok', 'linkedin'];
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', trafic: 'google-search', accroche: '', visuel: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
+  const k = c.contexte || {}, a = k.annonce || {};
+  if (S.ctxForm?.client && S.ctxForm.client !== c.id) S.ctxForm = null;
+  const f = S.ctxForm || (S.ctxForm = { client: c.id, titre: a.titre || '', description: a.description || '', motsCles: (a.motsCles || []).join(', '), vente: k.vente || '', trafic: k.trafic || 'google-search', accroche: k.crea?.accroche || '', visuel: k.crea?.visuel || '', cible: k.cible || '', offre: k.offre || c.marque || '', visiteursMois: k.visiteursMois ? String(k.visiteursMois) : '', tauxConversion: k.tauxConversion ? String(k.tauxConversion).replace('.', ',') : '', cpc: k.cpc ? String(k.cpc).replace('.', ',') : '' });
   const social = SOCIAL.includes(f.trafic);
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
@@ -1749,9 +1759,8 @@ document.addEventListener('keydown', e => {
 });
 
 
-/* ---------- intentions Google Ads : le mot-clé acheté choisit la variante ---------- */
 const INT = {};
-const intState = c => INT[c.id] || (INT[c.id] = { filtreInt: '', filtreQ: '', page: 0, dec: {}, marques: '', compte: '', campagnes: '', consignes: {}, sim: null, perso: null });
+const intState = c => INT[c.id] || (INT[c.id] = { filtreInt: '', filtreQ: '', page: 0, dec: {}, decRevision: null, decStale: false, marques: '', compte: '', campagnes: '', consignes: {}, sim: null, perso: null, ntIntention: undefined });
 const SCRIPTS = {};
 const ETAPES_INT = [
   ['import', '1. Importer / synchroniser', 'Le rapport « termes de recherche » de Google Ads, ou le script de synchronisation'],
@@ -1759,10 +1768,10 @@ const ETAPES_INT = [
   ['variantes', '3. Personnaliser et tester', 'Une variante par intention validée, mesurée à part'],
   ['mesure', '4. Brancher et mesurer', 'La balise sur la page, GA4 branché, le suffixe dans Google Ads'],
 ];
-const etapesInt = { import: it => !!(it.analyse || it.connexion && it.connexion.configure),
+const etapesInt = { import: it => !!it.analyse,
   decisions: it => !!(it.analyse && it.analyse.routes.some(r => r.decision)),
   variantes: (it, c) => (c.propositions || []).some(p => p.ciblage) || c.tests.some(t => t.ciblage),
-  mesure: it => !!(it.mesure && it.mesure.configure) };
+  mesure: (it, c) => !!(it.mesure && it.mesure.configure && c.connexion.express.capacite === 'intent-v1' && c.connexion.express.mode === 'pilote' && c.tests.some(t => t.res)) };
 
 function cartePropCiblee(c, p) {
   const nom = esc(p.nom), dc = c.declinaison, ecrit = dc && dc.source === p.nom, occupe = !!dc;
@@ -1778,15 +1787,14 @@ function cartePropCiblee(c, p) {
      <label class="fld"><input class="inp" id="refus-raison" maxlength="300" placeholder="Ou en vos mots (facultatif)" value="${esc(S.refusRaison || '')}"></label>
      <div class="f"><button class="btn sm" data-act="refuser" data-nom="${nom}" data-client="${c.id}">Retirer</button><button class="btn sm" data-act="refus-fermer">Annuler</button></div>` : '';
   const p2 = st.perso && st.perso.nom === p.nom ? st.perso : null;
-  const editeur = p2 ? (p2.sets.length
-    ? `<div class="card" style="margin-top:10px">
-        ${p2.sets.map((e, i) => `<div class="fld" style="margin-top:10px"><span class="muted">Aujourd’hui : « ${esc(e.avant || '')} »</span><textarea class="inp" id="pe-text-${i}" rows="2">${esc(e.text)}</textarea></div>`).join('')}
-        ${p2.autres ? `<p class="muted">Cette proposition contient aussi des changements structurels (déplacer, retirer, ajouter) qui ne se règlent pas ici : ils resteront dans la variante telle quelle.</p>` : ''}
+  const editeur = p2 ? (p2.autres
+    ? `<div class="card" style="margin-top:10px"><p class="muted">Cette proposition contient des changements qui ne sont pas du simple texte (déplacer, retirer, ajouter, modifier un lien ou une image) : elle ne peut pas se régler ici. Créez-la telle quelle ou déclinez-la.</p><div class="f"><button class="btn sm" data-act="perso-fermer">Fermer</button></div></div>`
+    : `<div class="card" style="margin-top:10px">
+        ${p2.sets.map((e, i) => `<div class="fld" style="margin-top:10px"><span class="muted">Aujourd’hui : « ${esc(e.avant || '—')} »</span><textarea class="inp" id="pe-text-${i}" rows="2">${esc(e.text)}</textarea></div>`).join('')}
         <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="pe-titre" value="${esc(p2.titre)}"></label>
         <label class="fld" style="margin-top:12px">Pourquoi<input class="inp" id="pe-why" value="${esc(p2.pourquoi)}"></label>
         <div class="f" style="margin-top:14px">${GO(I.sparkle(16) + 'Créer ce test', `data-act="perso-creer" data-nom="${nom}" data-client="${c.id}"`)}<button class="btn sm" data-act="perso-fermer">Annuler</button></div>
-      </div>`
-    : `<div class="card" style="margin-top:10px"><p class="muted">Cette proposition ne contient pas de changement de texte simple : elle ne peut pas se régler ici.</p><div class="f"><button class="btn sm" data-act="perso-fermer">Fermer</button></div></div>`) : '';
+      </div>`) : '';
   const chip = p.ciblage ? `<span class="chip">${I.search(12)}${esc(INTENTIONS_LIB[p.ciblage.intention] || p.ciblage.intention)}</span>` : '';
   const source = p.declineDe && (c.propositions || []).find(x => x.nom === p.declineDe);
   return `<div class="tc" style="cursor:default"><div style="display:flex;gap:6px;flex-wrap:wrap">${chip}<span class="chip">${esc(nomRegle(p.regle))}</span>${p.declineDe ? `<span class="chip" title="${esc(source ? 'Déclinée de « ' + source.titre + ' »' : 'Déclinaison')}">Déclinaison</span>` : ''}${(p.sources || []).slice(0, 2).map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div><div class="t">${esc(p.titre)}</div><div class="d">${esc(p.teste)}</div><div class="d"><b>Pourquoi.</b> ${esc(p.pourquoi)}</div>${pied}${refus}${editeur}</div>`;
@@ -1801,20 +1809,23 @@ function vIntentions(c) {
   const devise = a && a.source && a.source.devise ? a.source.devise : null;
   const routes = a ? a.routes : [];
   const intentions = Object.keys(INTENTIONS_LIB);
-  const statsInt = i => routes.filter(r => r.intention === i).reduce((x, r) => ({ clics: x.clics + r.clics, conv: x.conv + r.conversions }), { clics: 0, conv: 0 });
-  const jobEnCours = c.intentionsJob ? `<div id="job-zone" style="margin-top:6px">${jobBox(c.intentionsJob.id)}</div>` : '<div id="job-zone"></div>';
+  const statsInt = i => (a && a.parIntention && a.parIntention[i]) || { clics: 0, conversions: 0, routes: [] };
+  const jobEnCours = (c.intentionsJob && c.intentionsJob.etat === 'en cours') ? `<div id="job-zone" style="margin-top:6px">${jobBox(c.intentionsJob.id)}</div>` : '<div id="job-zone"></div>'
+    + (c.intentionsJob && c.intentionsJob.etat === 'échec' ? `<div class="card" style="border-color:var(--bad);margin-top:6px"><p><b>La dernière écriture n’a pas abouti.</b> ${esc(((c.intentionsJob.lignes || []).slice(-1)[0]) || 'Détail dans le journal du job.')}</p></div>` : '')
+    + (c.intentionsErreur ? `<div class="card" style="border-color:var(--bad);margin-top:6px"><p><b>Le rapport intentions est illisible :</b> ${esc(c.intentionsErreur)}</p></div>` : '');
 
   const etape = (k, titre, sous) => { const f = etapesInt[k](it, c); return `<div class="card" style="padding:16px 18px"><div class="f" style="align-items:center"><span class="k" style="width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:${f ? 'var(--ok-bg)' : 'var(--paper-2)'};color:${f ? 'var(--ok)' : 'var(--muted)'};font-family:var(--mono);font-size:12px">${f ? I.check(11) : titre[0]}</span><b>${titre}</b></div><p class="muted" style="margin-top:6px;font-size:13px">${sous}</p></div>`; };
 
   const importBloc = `<div class="card"><h3>Importer le rapport « termes de recherche » <span class="r"><a class="btn sm" href="/api/intents/exemple.csv" download>Télécharger l’exemple synthétique</a></span></h3>
-    <p class="muted">Google Ads → Rapports → Termes de recherche → Exporter (CSV, avec Clics, Impressions, Coût, Conversions, et les colonnes Campagne/Groupe d’annonces + leurs identifiants). Le fichier reste sur cette machine.</p>
+    <p class="muted">Google Ads → Rapports → Termes de recherche → Exporter (CSV, avec Clics, Impressions, Coût, Conversions, et les colonnes Campagne/Groupe d’annonces + leurs identifiants). Le rapport est stocké sur votre instance LPWS.</p>
     <label class="fld" style="margin-top:12px">Fichier CSV<input class="inp" type="file" id="int-file" accept=".csv,text/csv"></label>
     <label class="fld" style="margin-top:10px">Noms de marque du client <span class="muted" style="font-weight:400">(séparés par des virgules : mieux classés en « marque »)</span><input class="inp" id="int-marques" value="${esc(st.marques)}" placeholder="ex. acme, acme pro"></label>
     <div class="f" style="margin-top:14px">${GO(I.sparkle(16) + 'Importer', 'data-act="int-import"')}<span class="muted" id="int-err"></span></div>
     ${a ? `<p class="muted" style="margin-top:12px">Dernier rapport : ${esc(a.source.fichier)} · ${fr(a.clics)} clics visibles · importé le ${esc(new Date(a.importeLe).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }))}${a.source.periode ? ' · ' + esc(a.source.periode) : ''}${a.source.compte ? ' · compte ' + esc(a.source.compte) : ''}${devise ? ' · montants en ' + esc(devise) : ''}</p>` : ''}
   </div>
   <div class="card"><h3>Synchronisation automatique <span class="r">${cx.configure ? '<span class="chip ok"><span class="dot"></span>Script généré' + (cx.derniereSync ? ' · dernière synchro le ' + esc(new Date(cx.derniereSync).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })) : ' · jamais synchronisé') : '<span class="chip">Non configurée</span>'}</span></h3>
-    <p class="muted">Un script en lecture seule dans Google Ads envoie les termes de la période à LPWS. Il ne modifie ni annonces ni enchères. ${cx.configure ? 'Générer à nouveau le script révoque l’ancien jeton.' : ''}</p>
+    <p class="muted">Un script en lecture seule dans Google Ads envoie les termes de la période à LPWS. Il ne modifie ni annonces ni enchères, et aucun jeton développeur n’est nécessaire. ${cx.configure ? 'Générer à nouveau le script révoque l’ancien jeton.' : ''}</p>
+    <p class="muted" style="margin-top:6px">Dans Google Ads → Scripts : collez-le, <b>Autoriser</b>, réglez la fréquence (toutes les heures ou quotidienne), puis <b>Exécuter</b> une première fois. Script secret : ne le partagez pas.</p>
     ${cx.publicDisponible ? `<label class="fld" style="margin-top:12px">Compte Google Ads (10 chiffres, sans tirets)<input class="inp mono" id="cnx-compte" inputmode="numeric" value="${esc(st.compte)}" placeholder="1234567890"></label>
     <label class="fld" style="margin-top:10px">Campagnes à synchroniser <span class="muted" style="font-weight:400">(identifiants, séparés par des virgules)</span><input class="inp mono" id="cnx-camps" value="${esc(st.campagnes)}" placeholder="123456789, 987654321"></label>
     <div class="f" style="margin-top:14px"><button class="btn pri" data-act="cnx-generer">${I.sparkle(15)}${cx.configure ? 'Régénérer le script (révoque l’ancien)' : 'Générer le script'}</button></div>
@@ -1825,14 +1836,14 @@ function vIntentions(c) {
 
   const metriques = a ? `<div class="kpis" style="margin:0 0 20px">
     <div class="stat"><div class="l">Clics visibles</div><div class="v">${fr(a.clics)}</div><div class="s">termes du rapport ; Google en masque une partie</div></div>
-    <div class="stat"><div class="l">Clics routables</div><div class="v">${fr(a.routables)}</div><div class="s">vers une intention validée</div></div>
+    <div class="stat"><div class="l">Clics routables</div><div class="v">${fr(a.routables)}</div><div class="s">routes retenues, ambigus exclus</div></div>
     <div class="stat"><div class="l">Couverture</div><div class="v">${a.couverture === null ? '—' : pct(a.couverture, 0)}</div><div class="s">part du trafic visible qui route</div></div>
   </div>` : '';
 
   const cartesInt = a ? `<div class="tests">${intentions.map(i => { const x = statsInt(i); const ok = routes.some(r => r.intention === i); return `<div class="tc" style="cursor:default">
-      <div style="display:flex;gap:6px;align-items:center"><b style="flex:1">${INTENTIONS_LIB[i]}</b><span class="chip ${ok ? 'ok' : ''}">${ok ? fr(x.clics) + ' clics' : 'aucun clic'}</span></div>
-      <div class="d">${x.conv ? fr(x.conv) + ' conversion' + (x.conv > 1 ? 's' : '') + ' historique' + (x.conv > 1 ? 's' : '') + ' sur les termes visibles' : 'Pas de conversion observée sur ces termes'}</div>
-      <div class="f">${ok ? GO(I.sparkle(14) + 'Proposer 3 variantes', `data-act="gen-intent" data-int="${i}"`) : `<button class="btn sm" disabled title="${c.contexte ? 'Aucune route validée pour cette intention : tranchez les mots-clés à l’étape 2' : 'Décrivez d’abord la campagne (vue Variantes)'}">${I.sparkle(14)}Proposer 3 variantes</button>`}</div>
+      <div style="display:flex;gap:6px;align-items:center"><b style="flex:1">${INTENTIONS_LIB[i]}</b><span class="chip ${ok ? 'ok' : ''}">${ok ? fr(x.clics) + ' clics routables' : 'aucune route retenue'}</span></div>
+      <div class="d">${x.conversions ? fr(x.conversions) + ' conversion' + (x.conversions > 1 ? 's' : '') + ' historique' + (x.conversions > 1 ? 's' : '') + ' sur les routes retenues' : 'Pas de conversion historique sur les routes retenues'}</div>
+      <div class="f">${ok && c.contexte && !c.intentionsJob ? GO(I.sparkle(14) + 'Proposer 3 variantes', `data-act="gen-intent" data-int="${i}"`) : `<button class="btn sm" disabled title="${!ok ? 'Aucune route validée pour cette intention : tranchez les mots-clés à l’étape 2' : !c.contexte ? 'Décrivez d’abord l’annonce pour que les variantes parlent la langue de la campagne' : 'LPWS écrit déjà pour cette page'}">${I.sparkle(14)}Proposer 3 variantes</button>`}${ok && !c.contexte ? `<button class="btn sm" data-go="view:campagne">Décrire l’annonce</button>` : ''}</div>
       ${ok ? `<input class="inp" id="gen-${i}" placeholder="Consigne facultative : ex. parler de la livraison" value="${esc(st.consignes[i] || '')}" style="margin-top:8px">` : ''}
     </div>`; }).join('')}</div>` : '';
 
@@ -1855,7 +1866,7 @@ function vIntentions(c) {
       <span><select class="inp" data-intdec="${r.id}" style="max-width:220px"><option value="_" ${st.dec[r.id] === undefined ? 'selected' : ''}>${r.intention ? INTENTIONS_LIB[r.intention] + (r.decision ? ' (validée)' : ' (auto)') : r.suggestion ? 'À trancher — suggestion : ' + INTENTIONS_LIB[r.suggestion] : 'À trancher'}</option>${intentions.map(i => `<option value="${i}" ${st.dec[r.id] === i ? 'selected' : ''}>${INTENTIONS_LIB[i]}</option>`).join('')}<option value="" ${st.dec[r.id] === null ? 'selected' : ''}>Exclure</option></select></span>
     </div>`).join('')}</div>
     <div class="f" style="margin-top:14px;justify-content:space-between"><span class="muted">Page ${st.page + 1}/${nbPages}</span><span class="f"><button class="btn sm" data-act="int-page" data-d="-1" ${st.page === 0 ? 'disabled' : ''}>Précédente</button><button class="btn sm" data-act="int-page" data-d="1" ${st.page >= nbPages - 1 ? 'disabled' : ''}>Suivante</button></span></div>
-    <div class="f" style="margin-top:14px">${Object.keys(st.dec).length ? GO(I.check(16) + 'Enregistrer les décisions', 'data-act="int-save"') : ''}<span class="muted" id="int-dec-err"></span></div>
+    <div class="f" style="margin-top:14px">${st.decStale ? `<span class="chip warn">Le rapport a changé depuis vos choix : ils n’ont pas été appliqués.</span><button class="btn sm" data-act="int-dec-drop">Abandonner ces décisions et recharger</button>` : Object.keys(st.dec).length ? GO(I.check(16) + 'Enregistrer les décisions', 'data-act="int-save"') : ''}<span class="muted" id="int-dec-err"></span></div>
   </div>` : '';
 
   const propsCiblees = (c.propositions || []).filter(p => p.ciblage);
@@ -1864,12 +1875,19 @@ function vIntentions(c) {
   const blocTests = testsCibles.length ? `<div class="sec"><h3>Tests par intention <span class="n">${testsCibles.length}</span></h3><div class="tests">${testsCibles.map(t => testCard(c, t)).join('')}</div></div>` : '';
 
   const sim = st.sim;
-  const exemples = [`https://${c.url}?lpws_kw=exemple+de+mot-cle&lpws_mt=e&lpws_cp=123456789&lpws_ag=987654321`, `https://${c.url}`];
+  const src = c.sourceUrl || ('https://' + c.url);
+  let exSim = '';
+  try {
+    const r0 = a ? a.routes.find(r => r.intention) : null;
+    if (r0) { const u0 = new URL(src); u0.searchParams.set('lpws_kw', r0.motCle); u0.searchParams.set('lpws_mt', 'e'); if (r0.campagneId) u0.searchParams.set('lpws_cp', r0.campagneId); if (r0.groupeId) u0.searchParams.set('lpws_ag', r0.groupeId); exSim = u0.toString(); }
+  } catch {}
+  let lienApercu = null;
+  try { const t0 = c.tests.find(t => t.etat === 'pret' || t.etat === 'live' || t.etat === 'stop'); if (t0) { const u1 = new URL(src); u1.searchParams.set('lpws', t0.id); lienApercu = u1.toString(); } } catch {}
   const simBloc = `<div class="card"><h3>Simuler un clic</h3>
     <p class="muted">Collez l’adresse de la page avec ses paramètres Google Ads (<span class="mono">lpws_kw</span> = le mot-clé acheté, jamais la requête) : LPWS dit quelle variante ce clic verrait. Rien n’est mesuré ni servi : c’est une projection hors ligne.</p>
-    <div class="f" style="margin-top:12px"><input class="inp mono" id="sim-url" style="flex:1;min-width:240px" placeholder="${esc(exemples[0])}" value="${esc(st.simUrl || '')}"><button class="btn pri" data-act="simuler">Simuler</button></div>
-    ${sim ? `<p style="margin-top:12px">${sim.nom ? `Ce clic verrait <b>${esc(sim.nom)}</b> — intention « ${esc(sim.intention)} ».` : `Ce clic verrait l’original : ${esc(sim.motif)}.`} ${sim.actuelle && sim.actuelle.nom ? `<span class="muted">La configuration locale servirait « ${esc(sim.actuelle.nom)} » (non prouvée déployée).</span>` : ''}</p>` : ''}
-    <p class="muted" style="margin-top:10px">Aperçu hors mesure : <a href="https://${esc(c.url)}?lpws=ID-DU-TEST" target="_blank" rel="noopener" class="mono">https://${esc(c.url)}?lpws=…</a></p>
+    <div class="f" style="margin-top:12px"><input class="inp mono" id="sim-url" style="flex:1;min-width:240px" placeholder="${esc(exSim || src)}" value="${esc(st.simUrl || '')}"><button class="btn pri" data-act="simuler">Simuler</button></div>
+    ${sim ? `<p style="margin-top:12px">${sim.nom ? `Projection : ce clic verrait la variante <b>${esc(INTENTIONS_LIB[sim.intention] || sim.nom)}</b> (intention « ${esc(sim.intention)} »).` : `Ce clic verrait l’original : ${esc(sim.motif)}.`} ${sim.actuelle ? `<span class="muted">${sim.actuelle.nom ? `La configuration locale servirait « ${esc(sim.actuelle.nom)} »` : 'La configuration locale servirait l’original'} (non prouvée déployée).</span>` : ''}</p>` : ''}
+    ${lienApercu ? `<p class="muted" style="margin-top:10px">Aperçu hors mesure : <a href="${esc(lienApercu)}" target="_blank" rel="noopener" class="mono">${esc(lienApercu)}</a></p>` : ''}
   </div>`;
 
   const check4 = `<div class="card"><h3>Brancher et mesurer</h3>
@@ -1877,14 +1895,14 @@ function vIntentions(c) {
     <div class="ck off"><span class="i">${I.copy(12)}</span><div><b>Le suffixe d’URL finale dans Google Ads</b><div class="d">à coller une fois (compte ou campagne), après vos paramètres UTM existants s’il y en a :</div><div class="code" style="margin-top:8px">${esc(it.suffixe || '')}</div><div class="f" style="margin-top:8px"><button class="btn sm" data-copy="${esc(it.suffixe || '')}" data-msg="Suffixe copié">Copier le suffixe</button></div></div></div>
     <div class="ck ${ms.configure ? '' : 'off'}"><span class="i">${ms.configure ? I.check(12) : I.stop(12)}</span><div><b>GA4 branché</b><div class="d">${ms.configure ? `propriété ${esc(ms.propriete || '')}` : 'identifiant numérique de la propriété GA4 du client'}${ms.serviceEmail ? ` · ajoutez <span class="mono">${esc(ms.serviceEmail)}</span> en lecteur de la propriété` : ''}${ms.configure ? '' : ms.serviceDisponible ? '' : ' · compte de service non provisionné sur cette instance'}</div>
       <div class="f" style="margin-top:8px"><input class="inp mono" id="ms-prop" placeholder="ID de propriété GA4" style="max-width:180px" inputmode="numeric"><button class="btn sm" data-act="ms-save">Enregistrer</button><button class="btn sm" data-act="ms-run" ${ms.configure ? '' : 'disabled title="Enregistrez la propriété d’abord"'}>Mesurer maintenant</button></div>
-      <div class="d" style="margin-top:6px">Dans GA4 → Admin → Définitions personnalisées : trois dimensions UTILISATEUR <span class="mono">lpws_variante</span>, <span class="mono">lpws_intention</span>, <span class="mono">lpws_experience</span>, remplies par l’événement <span class="mono">lpws_variante</span> (les aperçus <span class="mono">lpws_apercu</span> n’y entrent pas ; le consentement CMP reste tel quel). GA4 compte sous 24–48 h. Les conversions importées dans Google Ads restent globales, pas par variante.</div></div></div>
+      <div class="d" style="margin-top:6px">Dans GTM : trois variables de couche de données <span class="mono">lpws_variante</span>, <span class="mono">lpws_intention</span>, <span class="mono">lpws_experience</span> ; dans la balise GA, mappez-les aux propriétés utilisateur du même nom ; déclencheur : événement personnalisé <b>exactement</b> <span class="mono">lpws_variante</span> — jamais <span class="mono">lpws_apercu</span> ni <span class="mono">lpws_hors_test</span> ; le consentement CMP reste en place. Puis dans GA4 → Admin → Définitions personnalisées : les trois mêmes dimensions en portée UTILISATEUR. GA4 compte sous 24–48 h ; les conversions importées dans Google Ads restent globales, pas par variante.</div></div></div>
   </div>`;
 
   return `
     <div class="hd"><div><h2>Intentions Google Ads</h2><div class="u">${esc(c.url)}</div>
       <p class="lede"><b>Une recherche, une page plus pertinente.</b> La requête exacte reste privée. LPWS utilise le mot-clé acheté pour choisir une variante validée.</p></div>
       <div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
-    <div class="kpis" style="margin:-8px 0 20px">${ETAPES_INT.map(([k, t, s2]) => etape(k, t, s2)).join('')}</div>
+    <div class="intent-steps" style="margin:-8px 0 20px">${ETAPES_INT.map(([k, t, s2]) => etape(k, t, s2)).join('')}</div>
     ${jobEnCours}
     <div class="sec"><h3>1 · Importer / synchroniser</h3><div class="grid g2">${importBloc}</div></div>
     <div class="sec"><h3>2 · Relire les intentions</h3>${a ? metriques + tableRoutes : '<div class="empty"><b>Pas encore de rapport</b>Importez l’export « termes de recherche » de Google Ads à l’étape 1, ou configurez la synchronisation.</div>'}</div>
@@ -1974,7 +1992,8 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
+      const k = c.contexte || {};
+      const corps = { niche: k.niche, panierMoyen: k.panierMoyen, marge: k.marge, limites: k.limites, annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
@@ -2102,9 +2121,11 @@ document.addEventListener('click', e => {
       if (!titre || !why || !edits.length || edits.some(e => e.op === 'set' ? !e.text : e.op !== 'remove' && !S.ntEdits[e.anchor].target)) { if (err) err.textContent = 'Nommez le test, expliquez pourquoi et complétez chaque changement.'; break; }
       if (err) err.textContent = 'Création…';
       const a2 = c.intentions && c.intentions.analyse;
-      const ciblage = S.ntIntention && a2 ? { intention: S.ntIntention, revision: a2.revision, routes: a2.routes.filter(r => r.intention === S.ntIntention).map(r => ({ motCle: r.motCle, campagneId: r.campagneId, groupeId: r.groupeId })) } : undefined;
+      const ni = intState(c).ntIntention;
+      if (ni && (!a2 || !(a2.parIntention && a2.parIntention[ni] && a2.parIntention[ni].routes > 0))) { if (err) err.textContent = 'Cette intention n’a plus de routes validées : rechargez la vue Intentions ou repassez en test général.'; break; }
+      const ciblage = ni && a2 ? { intention: ni, revision: a2.revision, routes: a2.routes.filter(r => r.intention === ni).map(r => ({ motCle: r.motCle, campagneId: r.campagneId, groupeId: r.groupeId })) } : undefined;
       api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits, ciblage })
-        .then(async r => { S.ntEdits = {}; S.piste = null; S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
+        .then(async r => { S.ntEdits = {}; S.piste = null; S.ntWhy = S.ntTitre = undefined; intState(c).ntIntention = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
         .catch(e => { if (err) err.textContent = e.message; });
       break;
     }
@@ -2130,18 +2151,26 @@ document.addEventListener('click', e => {
     case 'int-save': {
       if (!c) break;
       const st2 = intState(c), a = c.intentions && c.intentions.analyse;
-      if (!a || !Object.keys(st2.dec).length) break;
-      api(`/api/clients/${c.id}/intentions/decisions`, { revision: a.revision, decisions: st2.dec })
-        .then(async () => { st2.dec = {}; toast('Décisions enregistrées'); await chargerEtat(); render(); })
-        .catch(e => { if (e.message && /409|changé|rechargez/i.test(e.message)) { toast(e.message); chargerEtat().then(render); } else { const z = document.getElementById('int-dec-err'); if (z) z.textContent = e.message; else toast(e.message); } });
+      if (!a || !Object.keys(st2.dec).length || st2.decStale) break;
+      api(`/api/clients/${c.id}/intentions/decisions`, { revision: st2.decRevision || a.revision, decisions: st2.dec })
+        .then(async () => { st2.dec = {}; st2.decRevision = null; toast('Décisions enregistrées'); await chargerEtat(); render(); })
+        .catch(async e => {
+          if (e.message && /409|changé|rechargez/i.test(e.message)) { st2.decStale = true; await chargerEtat(); render(); }
+          else { const z = document.getElementById('int-dec-err'); if (z) z.textContent = e.message; else toast(e.message); }
+        });
       break;
+    }
+    case 'int-dec-drop': {
+      if (!c) break;
+      const st2 = intState(c); st2.dec = {}; st2.decRevision = null; st2.decStale = false;
+      chargerEtat().then(render); break;
     }
     case 'int-page': { if (!c) break; intState(c).page = Math.max(0, intState(c).page + (+act.dataset.d || 0)); render(); break; }
     case 'gen-intent': {
       if (!c || !c.live) { toast(SANS_SERVEUR); break; }
       const i = act.dataset.int;
       api(`/api/clients/${c.id}/intentions/generer`, { intention: i, n: 3, consigne: document.getElementById('gen-' + i)?.value || '' })
-        .then(async r => { toast('LPWS écrit trois variantes pour cette intention'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Variantes proposées' : ((j.lignes || []).map(humaniser).filter(l => /ÉCHEC/.test(l)).pop() || 'Aucune variante n’a passé les garde-fous').replace(/^.*ÉCHEC — /, '')); await chargerEtat(); render(); }); })
+        .then(async r => { toast('LPWS écrit trois variantes pour cette intention'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Variantes proposées' : ((j.lignes || []).map(humaniser).filter(l => /ÉCHEC|erreur|refus/i.test(l)).pop() || 'Aucune variante n’a passé les garde-fous').replace(/^.*ÉCHEC — /, '')); await chargerEtat(); render(); }); })
         .catch(e => toast(e.message));
       break;
     }
@@ -2150,8 +2179,9 @@ document.addEventListener('click', e => {
       fetch(`/api/clients/${c.id}/intentions/propositions/${encodeURIComponent(act.dataset.nom)}`, { cache: 'no-store' })
         .then(r => r.json()).then(r => {
           if (r.erreur) { toast(r.erreur); return; }
-          const sets = (r.spec.edits || []).filter(e => (e.op || 'set') === 'set').map(e => ({ anchor: e.anchor, text: e.text || '', avant: '' }));
-          intState(c).perso = { nom: r.proposition.nom, titre: r.proposition.titre, pourquoi: r.proposition.pourquoi, sets, autres: (r.spec.edits || []).length - sets.length, ciblage: r.proposition.ciblage };
+          const tous = r.spec.edits || [];
+          const sets = tous.filter(e => (e.op || 'set') === 'set').map(e => ({ anchor: e.anchor, text: e.text || '', avant: (e.attendu && e.attendu.text) || '' }));
+          intState(c).perso = { nom: r.proposition.nom, titre: r.proposition.titre, pourquoi: r.proposition.pourquoi, sets, autres: tous.length - sets.length, ciblage: r.proposition.ciblage };
           render();
         }).catch(e => toast(e.message));
       break;
@@ -2160,9 +2190,9 @@ document.addEventListener('click', e => {
     case 'perso-creer': {
       if (!c) break;
       const p = intState(c).perso; if (!p) break;
-      const edits = p.sets.map((e, i) => ({ anchor: e.anchor, text: (document.getElementById('pe-text-' + i)?.value || '').trim() })).filter(e => e.text);
+      const edits = p.sets.map((e, i) => ({ anchor: e.anchor, text: (document.getElementById('pe-text-' + i)?.value || '').trim() }));
       const titre = (document.getElementById('pe-titre')?.value || '').trim(), why = (document.getElementById('pe-why')?.value || '').trim();
-      if (!titre || !edits.length) { toast('Il faut un nom et au moins un texte.'); break; }
+      if (!titre || edits.length !== p.sets.length || edits.some(e => !e.text)) { toast('Il faut un nom et un texte pour chaque édition.'); break; }
       api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why || p.pourquoi, edits, ciblage: p.ciblage })
         .then(async r => { intState(c).perso = null; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
         .catch(e => toast(e.message));
@@ -2216,12 +2246,14 @@ document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.intdec !== undefined) {
     const c = byId(S.ctx); if (!c) return;
     const v = e.target.value, st2 = intState(c);
+    const a = c.intentions && c.intentions.analyse;
+    if (!st2.decRevision && a) st2.decRevision = a.revision;
     if (v === '_') delete st2.dec[e.target.dataset.intdec]; else st2.dec[e.target.dataset.intdec] = v === '' ? null : v;
     render(); return;
   }
   if (e.target.id === 'int-fint') { const c = byId(S.ctx); if (c) { intState(c).filtreInt = e.target.value; intState(c).page = 0; render(); } return; }
   if (e.target.id === 'int-fq') { const c = byId(S.ctx); if (c) { intState(c).page = 0; render(); } return; }
-  if (e.target.id === 'nt-int') { S.ntIntention = e.target.value || undefined; return; }
+  if (e.target.id === 'nt-int') { const c = byId(S.ctx); if (c) intState(c).ntIntention = e.target.value || undefined; return; }
   if (e.target.dataset.edit === 'op') { S.ntEdits[e.target.dataset.anchor].op = e.target.value; render(); return; }
   if (e.target.id !== 'part') return;
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);

@@ -147,8 +147,9 @@ export async function etat() {
           natif: { etat: "na", label: "Pas une boutique Shopify" },
         },
         ads: null,
-        intentions: await etatIntentions(c, camp).catch(() => null),
-        intentionsJob: (() => { const j = [...jobs.values()].find((jb) => jb.type === "intentions" && jb.etat === "en cours" && jb.campagne === d); return j ? { id: j.id, sujet: j.sujet } : null })(),
+        sourceUrl: meta?.source ?? null,
+        ...(await etatIntentions(c, camp).then((x) => ({ intentions: { ...x, job: undefined }, intentionsErreur: null })).catch((e: Error) => ({ intentions: null, intentionsErreur: e.message.split("\n")[0] }))),
+        intentionsJob: (() => { const j = [...jobs.values()].reverse().find((jb) => (jb.type === "intentions" || jb.type === "mesure") && jb.campagne === d); return j ? { id: j.id, sujet: j.sujet, etat: j.etat, lignes: j.etat === "échec" ? j.lignes.slice(-3) : [] } : null })(),
         tests: tests.map((t) => ({
           id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe, t.finLe), potentiel: "Moyen", plan: t.plan, fin: dateFr(t.finLe),
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,

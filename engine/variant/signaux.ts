@@ -18,6 +18,8 @@ import { join } from "node:path"
 import { z } from "zod"
 
 export const Cta = z.object({ anchor: z.string(), texte: z.string(), href: z.string(), y: z.number(), auDessusDuPli: z.boolean() })
+/** un élément de la page tel qu'un constat peut le citer : son ancre data-lpws et son texte exact */
+const Element = z.object({ anchor: z.string().optional(), texte: z.string() })
 
 export const SignauxMecaniques = z.object({
   hero: z.object({
@@ -29,15 +31,20 @@ export const SignauxMecaniques = z.object({
   ctas: z.array(Cta),
   ctaAuDessusDuPliMobile: z.boolean(),
   ctaAuDessusDuPliDesktop: z.boolean(),
-  nav: z.object({ presente: z.boolean(), liens: z.number(), anchor: z.string().optional() }),
+  nav: z.object({ presente: z.boolean(), liens: z.number(), anchor: z.string().optional(), textes: z.array(z.string()) }),
   formulaire: z.object({
     present: z.boolean(), champs: z.number(), obligatoires: z.number(), telephoneObligatoire: z.boolean(), y: z.number().nullable(),
+    anchor: z.string().optional(),
+    /** le bouton qui envoie le formulaire, et le champ téléphone s'il y en a un */
+    bouton: Element.nullable(), telephone: Element.nullable(),
   }),
   preuves: z.object({
     avis: z.object({ presents: z.boolean(), nombre: z.number().nullable(), note: z.number().nullable() }),
     temoignages: z.object({ nombre: z.number(), avecNom: z.number(), avecFonction: z.number(), avecChiffre: z.number() }),
     logos: z.number(),
     compteurZero: z.boolean(),
+    /** le texte du compteur à zéro tel que la page l'affiche (« 0 reviews ») */
+    compteurZeroExtrait: z.string(), compteurZeroAnchor: z.string().optional(),
   }),
   prix: z.object({ visible: z.boolean(), valeurs: z.array(z.string()) }),
   garantie: z.object({ presente: z.boolean(), extrait: z.string() }),
@@ -54,10 +61,15 @@ export const SignauxMecaniques = z.object({
     paiementFractionne: z.array(z.string()),
     prixBarre: z.object({ present: z.boolean(), referenceMentionnee: z.boolean() }),
     tailles: z.object({ selecteur: z.boolean(), guide: z.boolean() }),
-    sansCarte: z.object({ mentionne: z.boolean(), auDessusDuPli: z.boolean(), extrait: z.string() }),
+    sansCarte: z.object({ mentionne: z.boolean(), auDessusDuPli: z.boolean(), extrait: z.string(), anchor: z.string().optional() }),
   }),
-  /** marqueurs de confiance de paiement lus sur la page (texte, alt, aria) */
-  paiement: z.object({ marqueurs: z.array(z.string()) }),
+  /** marqueurs de confiance de paiement lus sur la page (texte, alt, aria), et le tunnel de
+   *  paiement lui-même : un prix affiché n'en est pas un, il faut un panier, un passage en
+   *  caisse ou des champs de carte. `element` = le premier élément du tunnel trouvé. */
+  paiement: z.object({
+    marqueurs: z.array(z.string()),
+    tunnel: z.object({ panier: z.boolean(), checkout: z.boolean(), champsCarte: z.boolean(), element: Element.nullable() }),
+  }),
   /** ce que la page charge pour mesurer : sans aucun tag, aucune conversion ne peut remonter */
   mesure: z.object({ gtm: z.boolean(), gtag: z.boolean(), meta: z.boolean(), autres: z.array(z.string()) }),
   /** LCP médian de la vraie page, en ms ; null si la page n'a pas pu être mesurée */
@@ -104,10 +116,16 @@ function lirePage(hauteurPli: number) {
   // l'en-tête qui le contient (et le logo avec) — retirer « la navigation » retirait tout l'en-tête
   const nav = document.querySelector("nav[data-lpws]") ?? document.querySelector("header[data-lpws]")
   const navLiens = nav ? nav.querySelectorAll("a").length : 0
+  const navTextes = nav ? [...nav.querySelectorAll("a")].map((a) => norme(a.textContent || "")).filter(Boolean).slice(0, 12) : []
 
   const form = [...document.querySelectorAll("form")].find(visible) ?? null
   const champs = form ? [...form.querySelectorAll("input:not([type=hidden]),select,textarea")] : []
   const obligatoires = champs.filter((c) => (c as HTMLInputElement).required || c.getAttribute("aria-required") === "true")
+  const lpws = (e: Element | null | undefined) => e?.getAttribute("data-lpws") || e?.closest("[data-lpws]")?.getAttribute("data-lpws") || undefined
+  const libelle = (c: Element) => norme(c.getAttribute("placeholder") || c.getAttribute("aria-label") || c.getAttribute("name") || "")
+  const estTel = (c: Element) => /tel|phone|téléphone/i.test((c.getAttribute("type") || "") + (c.getAttribute("name") || "") + (c.getAttribute("placeholder") || "") + (c.getAttribute("aria-label") || ""))
+  const champTel = champs.find(estTel)
+  const envoi = form ? form.querySelector("button:not([type=button]):not([type=reset]),input[type=submit]") : null
   const telephone = champs.some((c) => /tel|phone|téléphone/i.test((c.getAttribute("type") || "") + (c.getAttribute("name") || "") + (c.getAttribute("placeholder") || "") + (c.getAttribute("aria-label") || "")) && ((c as HTMLInputElement).required || c.getAttribute("aria-required") === "true"))
 
   // preuves : avis (note / nombre), témoignages (citations avec nom/fonction/chiffre), logos
@@ -128,7 +146,11 @@ function lirePage(hauteurPli: number) {
     .map((b) => [...b.children].filter((k) => visible(k) && !k.querySelector("img,svg") && norme(k.textContent || "").length > 1 && norme(k.textContent || "").length <= 30).length)
     .filter((n) => n >= 3).reduce((a, n) => a + n, 0)
   const logos = logosImg + logosTexte
-  const compteurZero = /\b0\s*(avis|reviews?|partages?|shares?|commentaires?|comments?)\b/i.test(corps)
+  const compteurZeroM = corps.match(/\b0\s*(avis|reviews?|partages?|shares?|commentaires?|comments?)\b/i)
+  const compteurZero = !!compteurZeroM
+  const reZero = /\b0\s*(avis|reviews?|partages?|shares?|commentaires?|comments?)\b/i
+  const compteurEl = compteurZeroM ? [...document.querySelectorAll("[data-lpws]")].filter((e) => visible(e) && reZero.test(norme(e.textContent || "")))
+    .sort((a, b) => (a.textContent || "").length - (b.textContent || "").length)[0] : undefined
 
   const prixValeurs = corps.match(/(€\s?\d[\d\s.,]*|\d[\d\s.,]*\s?€|\$\s?\d[\d.,]*|\d[\d.,]*\s?\$)(\s?\/\s?(mois|mo|month|an|year|user|utilisateur))?/gi)?.slice(0, 8) ?? []
   const garantieM = corps.match(/[^.]{0,60}(garantie|satisfait ou remboursé|money[- ]back|remboursement|guarantee|refund|retour gratuit|free returns)[^.]{0,60}/i)
@@ -160,7 +182,7 @@ function lirePage(hauteurPli: number) {
     paiementFractionne: fractionne,
     prixBarre: { present: barres.length > 0, referenceMentionnee: reference },
     tailles: { selecteur: selecteurTaille, guide: guideTailles },
-    sansCarte: { mentionne: sansCarteEl.length > 0 || reSansCarte.test(corps), auDessusDuPli: sansCarteEl.some((e) => y(e) < hauteurPli), extrait: norme(sansCarteEl[0]?.textContent || "").slice(0, 120) },
+    sansCarte: { mentionne: sansCarteEl.length > 0 || reSansCarte.test(corps), auDessusDuPli: sansCarteEl.some((e) => y(e) < hauteurPli), extrait: norme(sansCarteEl[0]?.textContent || "").slice(0, 120), anchor: lpws(sansCarteEl[0]) },
   }
 
   const phrases = corps.split(/[.!?]+\s/).filter((p) => p.trim().length > 0)
@@ -169,6 +191,20 @@ function lirePage(hauteurPli: number) {
   const fonctionnalites = [...document.querySelectorAll('section li, [class*="feature" i] li, [class*="feature" i] h3, [class*="feature" i] h4')].filter(visible).length
   const perso = /\{\s*(company|entreprise|first ?name|prénom)\s*\}|\bBonjour [A-Z][a-z]+\b/i.test(corps)
   const altTexte = [...document.querySelectorAll("img[alt], [aria-label]")].map((e) => e.getAttribute("alt") || e.getAttribute("aria-label") || "").join(" ")
+  /* le tunnel de paiement : panier, passage en caisse, champs de carte ; un prix affiché n'en est pas un */
+  const reCaisse = /^(checkout|check out|proceed to checkout|place (your )?order|pay now|complete (your )?(order|purchase)|view (your )?(cart|bag|basket)|go to (cart|bag|basket)|passer (la )?commande|valider (ma |la |votre )?commande|finaliser (ma |la |votre )?commande|payer|paiement|voir (le |mon |votre )?panier|mon panier)\b/i
+  const actions = [...document.querySelectorAll("a,button,input[type=submit]")].filter(visible)
+  const caisse = actions.find((e) => reCaisse.test(norme(e.textContent || (e as HTMLInputElement).value || ""))
+    || /\/(checkout|cart|panier|commande|basket)(\/|\?|#|$)/i.test(e.getAttribute("href") || ""))
+  const carte = [...document.querySelectorAll("input,iframe")].find((e) => /cc-(number|exp|csc)/i.test(e.getAttribute("autocomplete") || "")
+    || /card.?number|cardnumber|num[ée]ro de carte|\bcvc\b|\bcvv\b|cryptogramme/i.test((e.getAttribute("name") || "") + " " + (e.getAttribute("placeholder") || "") + " " + (e.getAttribute("aria-label") || ""))
+    || (e.tagName === "IFRAME" && /js\.stripe\.com|checkoutshopper|braintreegateway|checkout\.com|adyen/i.test(e.getAttribute("src") || "")))
+  const premierTunnel = carte ?? caisse ?? boutonAchat
+  const tunnel = {
+    panier: !!boutonAchat || !!caisse && /cart|panier|bag|basket/i.test(norme(caisse.textContent || "") + (caisse.getAttribute("href") || "")),
+    checkout: !!caisse, champsCarte: !!carte,
+    element: premierTunnel ? { anchor: lpws(premierTunnel), texte: norme(premierTunnel.textContent || (premierTunnel as HTMLInputElement).value || premierTunnel.getAttribute("placeholder") || premierTunnel.getAttribute("aria-label") || "").slice(0, 80) } : null,
+  }
   const paiementMarqueurs = [...new Set(((corps + " " + altTexte).match(/paiement s[ée]curis[ée]|secure (?:checkout|payment)|\bssl\b|3-?d ?secure|\bvisa\b|mastercard|paypal|apple pay|google pay|\bstripe\b|chiffr[ée]e?s?|encrypted/gi) ?? []).map((x) => x.toLowerCase()))].slice(0, 8)
 
   return {
@@ -176,12 +212,15 @@ function lirePage(hauteurPli: number) {
       sousTitre: norme(sousTitre?.textContent || ""), sousTitreAnchor: sousTitre?.getAttribute("data-lpws") || undefined,
       y: h1 ? y(h1) : 0, chiffres: chiffresHero },
     ctas,
-    nav: { presente: !!nav, liens: navLiens, anchor: nav?.getAttribute("data-lpws") || undefined },
-    formulaire: { present: !!form, champs: champs.length, obligatoires: obligatoires.length, telephoneObligatoire: telephone, y: form ? y(form) : null },
+    nav: { presente: !!nav, liens: navLiens, anchor: nav?.getAttribute("data-lpws") || undefined, textes: navTextes },
+    formulaire: { present: !!form, champs: champs.length, obligatoires: obligatoires.length, telephoneObligatoire: telephone, y: form ? y(form) : null,
+      anchor: form?.getAttribute("data-lpws") || undefined,
+      bouton: envoi ? { anchor: lpws(envoi), texte: norme(envoi.textContent || (envoi as HTMLInputElement).value || "") } : null,
+      telephone: champTel ? { anchor: lpws(champTel), texte: libelle(champTel) } : null },
     preuves: {
       avis: { presents: avisPresents, nombre: avisTexte ? Number(avisTexte[1].replace(/[^\d]/g, "")) || null : null, note: noteTexte ? Number(noteTexte[1].replace(",", ".")) : null },
       temoignages: { nombre: temoignages.length, avecNom: tNom, avecFonction: tFonction, avecChiffre: tChiffre },
-      logos, compteurZero,
+      logos, compteurZero, compteurZeroExtrait: compteurZeroM?.[0] ?? "", compteurZeroAnchor: compteurEl?.getAttribute("data-lpws") || undefined,
     },
     prix: { visible: prixValeurs.length > 0, valeurs: prixValeurs.map((p) => p.trim()) },
     garantie: { presente: !!garantieM, extrait: norme(garantieM?.[0] || "").slice(0, 120) },
@@ -189,7 +228,7 @@ function lirePage(hauteurPli: number) {
     lisibilite: { mots: mots.length, motsParPhrase: phrases.length ? Math.round(mots.length / phrases.length) : 0, motsLongs },
     fonctionnalitesListees: fonctionnalites,
     personnalisationIdentite: perso,
-    paiement: { marqueurs: paiementMarqueurs },
+    paiement: { marqueurs: paiementMarqueurs, tunnel },
     commerce,
   }
 }

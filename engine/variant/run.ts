@@ -28,8 +28,8 @@ import { dirname } from "node:path"
 import { Contexte } from "./contexte.ts"
 import { extraireSignaux, SignauxMecaniques } from "./signaux.ts"
 import { corpsDe, juger, SignauxJuges } from "./jugement.ts"
-import { diagnostiquer, type Constat, type Diagnostic } from "./diagnostic.ts"
-import { ecrireVariantes, type RefusBuyer, type VarianteProduite } from "./variantes.ts"
+import { diagnostiquer, numeroter, type Constat, type Diagnostic } from "./diagnostic.ts"
+import { ecrirePropositions, ecrireVariantes, type RefusBuyer, type VarianteProduite } from "./variantes.ts"
 import { langueDe } from "./garde.ts"
 import { FAMILLES } from "./regles.ts"
 import { step, fail, timed } from "../shared/log.ts"
@@ -45,6 +45,16 @@ export type Proposition = {
   nom: string; titre: string; teste: string; regle: string; score: number; pourquoi: string; signal: string
   sources: string[]; bilan?: Constat["bilan"]; fichier: string; proposeLe: string; refusee?: boolean; declineDe?: string; consigne?: string
   ciblage?: Ciblage
+  /** l'ordre dans lequel lire et lancer les propositions de l'analyse : 1 = la première */
+  rang?: number
+  /** le rang de sa piste parmi les tests du diagnostic (1 = la mieux classée), sur `pistes` */
+  rangPiste?: number; pistes?: number
+  /** pourquoi cette piste a été retenue, en clair */
+  retenue?: string
+  /** combien d'éditions, sur quelles ancres ; multi-éléments = au moins deux ancres */
+  changements?: number; ancres?: string[]; multiElements?: boolean
+  /** la règle en général, et les éléments de la page que le constat cite */
+  principe?: string; elements?: Constat["elements"]
 }
 
 /** ce que l'interface montre au buyer : la proposition, sa raison, sa source — il choisit */
@@ -52,7 +62,9 @@ const versPropositions = (variantes: VarianteProduite[], tests: Diagnostic["test
   variantes.map((v) => {
     const k = tests.find((x) => x.id === v.regle)
     return { nom: v.nom, titre: v.titre, teste: v.teste, regle: v.regle, score: k?.score ?? 0,
-      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString(), ...plus }
+      pourquoi: k?.pourquoi ?? "", signal: k?.signal ?? "", sources: k?.sources ?? [], bilan: k?.bilan, fichier: v.fichier, proposeLe: new Date().toISOString(),
+      rangPiste: k?.rang, pistes: tests.length, retenue: v.retenue, changements: v.changements, ancres: v.ancres, multiElements: v.ancres.length >= 2,
+      principe: k?.principe, elements: k?.elements, ...plus }
   })
 
 export async function brain(campagne: string, opts: { refaire?: boolean; sansJugement?: boolean; sansVariantes?: boolean } = {}) {
@@ -68,11 +80,13 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
 
   // 1. compter
   let m: SignauxMecaniques
-  // un cache d'avant un nouveau capteur ne passe plus le schéma : on recompte, on ne plante pas
-  const cache = opts.refaire ? null : await lireCache(SignauxMecaniques, f.signaux)
+  const date = async (x: string) => (await stat(x)).mtimeMs
+  // une capture plus récente que les signaux les périme ; un cache d'avant un nouveau capteur ne passe plus le schéma : on recompte, on ne plante pas
+  const recapture = existsSync(f.signaux) && await date(f.capture) > await date(f.signaux)
+  const cache = opts.refaire || recapture ? null : await lireCache(SignauxMecaniques, f.signaux)
   if (cache) { m = cache; step(SCOPE, "signaux : cache") }
   else {
-    if (!opts.refaire && existsSync(f.signaux)) step(SCOPE, "signaux : le cache date d'avant un nouveau capteur, on recompte")
+    if (!opts.refaire && existsSync(f.signaux)) step(SCOPE, recapture ? "signaux : la page a été recapturée depuis, on recompte" : "signaux : le cache date d'avant un nouveau capteur, on recompte")
     m = await timed(SCOPE, "signaux mécaniques (deux tailles d'écran)", () => extraireSignaux(base))
     await ecrireJson(f.signaux, m)
   }
@@ -82,7 +96,6 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   let j: SignauxJuges | null = null
   if (!opts.sansJugement) {
     // le jugement compare la page à l'annonce : une annonce ou une capture plus récente que lui le périme
-    const date = async (x: string) => (await stat(x)).mtimeMs
     const perime = existsSync(f.jugement) && Math.max(await date(f.contexte), await date(f.capture)) > await date(f.jugement)
     if (perime && !opts.refaire) step(SCOPE, "jugement : l'annonce ou la capture a changé depuis, on rejuge")
     j = opts.refaire || perime ? null : await lireCache(SignauxJuges, f.jugement)
@@ -99,13 +112,14 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   const h = await historique(dirname(campagne))
   const eviter = aEviter(h)
   d.ecartes = d.tests.filter((k) => eviter.has(k.id)).map((k) => ({ id: k.id, signal: k.signal, raison: eviter.get(k.id)! }))
-  d.tests = d.tests.filter((k) => !eviter.has(k.id))
+  d.tests = numeroter(d.tests.filter((k) => !eviter.has(k.id)))
   await ecrireJson(f.diagnostic, d)
   step(SCOPE, `diagnostic : ${d.tests.length} test(s) possible(s), ${d.conseils.length} conseil(s), ${d.nonEvaluables.length} non évaluable(s), régime ${d.regime}`)
   const bilan = (k: { bilan?: { gagnes: number; perdus: number; nuls: number } }) =>
     k.bilan ? ` (nos tests : ${k.bilan.gagnes} gagné(s), ${k.bilan.perdus} perdu(s), ${k.bilan.nuls} nul(s))` : ""
-  for (const k of d.tests) step(SCOPE, `  TEST    ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}${bilan(k)}`)
-  for (const k of d.conseils) step(SCOPE, `  CONSEIL ${String(k.score).padStart(3)}   [${FAMILLES[k.famille]}] ${k.signal}`)
+  for (const k of d.tests) step(SCOPE, `  TEST    n°${k.rang} ${String(k.score).padStart(3)} ${k.strategique ? "★" : " "} [${FAMILLES[k.famille]}] ${k.signal}${bilan(k)}`)
+  for (const k of d.conseils) step(SCOPE, `  CONSEIL n°${k.rang} ${String(k.score).padStart(3)}   [${FAMILLES[k.famille]}] ${k.signal}`)
+  for (const k of d.horsNiche) step(SCOPE, `  HORS NICHE ${k.id} (règle ${k.niches.join("/")}) : ${k.signal}`)
   for (const k of d.ecartes) step(SCOPE, `  ÉCARTÉ  ${k.id} : ${k.raison}`)
   if (d.nonEvaluables.length) step(SCOPE, `  non évaluables : ${d.nonEvaluables.map((x) => x.id).join(", ")}`)
 
@@ -118,11 +132,16 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   const conservees = anciennes.filter((p) => p.refusee || p.ciblage)
   const testsExistants = await lireJson<Array<{ id: string }>>(f.tests, [])
   const lecons = await leconsDe(h.lecons)
-  const variantes = await timed(SCOPE, "écriture des variantes (sur le plan)", () =>
-    ecrireVariantes(campagne, d.tests, m, ctx, langue, d.regime, { lecons, reserves: [...conservees.map((p) => p.nom), ...testsExistants.map((t) => t.id)] }))
-  const propositions = versPropositions(variantes, d.tests)
+  const { variantes, bilan: ecriture } = await timed(SCOPE, "écriture des variantes (sur le plan)", () =>
+    ecrirePropositions(campagne, d.tests, m, ctx, langue, d.regime, { lecons, reserves: [...conservees.map((p) => p.nom), ...testsExistants.map((t) => t.id)] }))
+  const propositions = versPropositions(variantes, d.tests).map((p, i) => ({ ...p, rang: i + 1 }))
   await ecrireJson(f.propositions, [...propositions, ...conservees])
-  step(SCOPE, `${variantes.length} variante(s) prête(s) pour apply`)
+  // le bilan d'écriture rejoint le diagnostic : l'écran d'analyse dit combien, et pourquoi pas trois
+  d.ecriture = ecriture
+  await ecrireJson(f.diagnostic, d)
+  step(SCOPE, `${variantes.length} variante(s) prête(s) pour apply sur ${ecriture.objectif} visée(s)${ecriture.multiElements ? ", dont au moins une multi-éléments" : ""}`)
+  for (const p of propositions) step(SCOPE, `  n°${p.rang} [${p.regle}, piste ${p.rangPiste}/${p.pistes}${p.multiElements ? `, ${p.ancres!.length} éléments` : ""}] ${p.titre} : ${p.teste}`)
+  if (ecriture.manque) step(SCOPE, `  moins que prévu : ${ecriture.manque}`)
   if (d.tests.length && !variantes.length) fail(SCOPE, "aucune variante n'a passé les garde-fous (détail dans variantes-refusees.json)")
   return { d, variantes }
 }

@@ -29,6 +29,8 @@ test("analyse : clics exacts, périmètres séparés, zéro clic sans influence"
     ["12", "prix", 30, 2.5], ["99", "alternative", 5, 1],
   ])
   assert.equal(ciblagePour(etat, "prix").routes.length, 1)
+  assert.deepEqual(a.parIntention.prix, { clics: 30, conversions: 2.5, routes: 1 })
+  assert.deepEqual(a.parIntention.information, { clics: 0, conversions: 0, routes: 0 })
 })
 
 test("analyse : majorité n'est pas certitude, mélange et identifiants absents à confirmer", () => {
@@ -48,6 +50,7 @@ test("analyse : majorité n'est pas certitude, mélange et identifiants absents 
   assert.equal(b.routables, 100)
   assert.equal(b.couverture, 100 / 150)
   assert.equal(b.routes[0].intention, "information")
+  assert.deepEqual(b.parIntention.information, { clics: 100, conversions: 2, routes: 1 })
   assert.notEqual(a.revision, b.revision)
 })
 
