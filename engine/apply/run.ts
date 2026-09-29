@@ -91,7 +91,10 @@ export async function applyVariant(baseline: string, specPath: string) {
     ] as const) {
       if (!existsSync(join(vdir, fichier))) continue
       const shot = join(vdir, label === "desktop" ? "variant.png" : "variant.mobile.png")
-      const ancres = [...new Set(rapport.journal.flatMap((j) => [j.anchor, j.dans ?? ""]).filter(Boolean))]
+      const ancres = [...new Set([
+        ...rapport.journal.flatMap((j) => [j.anchor, j.dans ?? ""]),
+        ...spec.edits.flatMap((e) => [e.before, e.after, e.with]),
+      ].filter((a): a is string => !!a))]
       const { positions, bandes, touchees } = await shoot(vdir, baseline, fichier, viewport, shot, ancres)
       // le desktop fait foi pour l'affichage du journal
       if (label === "desktop")

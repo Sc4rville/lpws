@@ -90,6 +90,15 @@ async function pipelineTest(job: Job, c: string, camp: string, id: string, base:
     dire(job, "1 · la variante : on applique le changement sur la copie et on la photographie")
     let code = await lancer(job, TSX, [join(ROOT, "engine/apply/run.ts"), base, specPath])
     if (code !== 0) { await maj({ etat: "echec", erreur: "La variante n’a pas pu être produite : " + job.lignes.slice(-3).join(" / ") }); finir(job, false); return }
+    const verdict = await lireJson<{ propre?: boolean | null; sections?: Record<string, { debordements?: string[] }> }>(
+      join(fichiersDe(d).variante(id), "variant.json"), {})
+    if (verdict.propre === false) {
+      const debordements = Object.entries(verdict.sections ?? {}).flatMap(([vue, section]) =>
+        (section.debordements ?? []).map((anchor) => `${anchor} (${vue})`))
+      await maj({ etat: "echec", erreur: `La variante modifie aussi des sections non visées : ${debordements.join(", ")}. Vérifiez l’aperçu et adaptez les changements avant de lancer.` })
+      finir(job, false)
+      return
+    }
     dire(job, "2 · le tag : on retrouve chaque cible sur la vraie page et on prépare la balise")
     code = await construireTag(job, c, camp)
     if (code !== 0) { await maj({ etat: "echec", erreur: "La cible n’a pas été retrouvée sur la page en ligne : " + job.lignes.slice(-4).join(" / ") }); finir(job, false); return }
@@ -233,6 +242,9 @@ export async function changerEtat(c: string, camp: string, id: string, etat: "li
   /* LE MANDAT, PUIS LE PALIER : rien ne part en ligne sur un site dont le propriétaire n'a pas
    * mandaté le buyer (docs/recherche/business-model.md §7). Le palier ne limite qu'en SaaS. */
   if (etat === "live") {
+    const verdict = await lireJson<{ propre?: boolean | null }>(join(fichiersDe(d).variante(id), "variant.json"), {})
+    if (verdict.propre === false)
+      throw Object.assign(new Error("Cette variante modifie des sections non visées : relisez le delta et corrigez-la avant de lancer le test."), { code: 409 })
     const compte = await lireCompte(FICHIER_COMPTE)
     const droit = FACTURATION ? await peutLancer(compte, c, join(ROOT, CLIENTS_ROOT))
       : compte.mandats[c] ? { ok: true as const } : { ok: false as const, action: "mandat" as const, raison: "Aucun mandat déclaré pour ce client : LPWS ne met rien en ligne sur un site sans l’accord écrit de son propriétaire. Déclarez-le une fois, puis lancez." }
