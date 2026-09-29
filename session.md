@@ -4,7 +4,13 @@
 > le vérifie). L'historique = `git log` ; le détail des contributions = [docs/journal/](docs/journal/) ;
 > l'arbre complet = [docs/feuille-de-route.md](docs/feuille-de-route.md).
 
-## Où on en est (2026-09-28)
+## Où on en est (2026-09-29)
+- **Variantes complètes en cours** : les signaux et constats du Brain reviennent dans le cockpit ;
+  les pistes mènent à l'éditeur multi-éléments (texte, CTA, navigation et sections), validé par
+  les ancres et les garde-fous. Le Brain peut proposer plusieurs éditions pour une hypothèse.
+- **À vérifier sur le parcours réel** : capture, analyse, variante et aperçu ; la génération
+  rédigée nécessite `claude -p`, absent et non authentifié sur cette VM. L'absence de modèle
+  s'affiche comme un échec, sans proposition simulée.
 - **Le clone est l'ATELIER, pas la page livrée** : il sert à voir, diagnostiquer, construire et
   montrer une variante sans aucun accès. La livraison passe par trois voies : **Express** (tag GTM,
   prouvé : HubSpot 9/9, Atlassian 9/9, monday 3/3), **Intégral** (relais DNS, à construire),

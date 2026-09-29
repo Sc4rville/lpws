@@ -1,10 +1,13 @@
 /** pipeline.ts : onboarder une page, lister ses textes, créer un test (à la main ou depuis le brain), le lancer ou l'arrêter. */
-import { mkdir, rm } from "node:fs/promises"
+import { mkdir, readFile, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { lancerNavigateur, UA } from "../../engine/shared/navigateur.ts"
 import { marque, slugify } from "../../engine/shared/paths.ts"
-import { Contexte } from "../../engine/variant/contexte.ts"
+import { Contexte, texteAnnonce } from "../../engine/variant/contexte.ts"
+import { controler, texteDuHtml } from "../../engine/variant/garde.ts"
+import { VariantSpec } from "../../engine/apply/spec.ts"
+import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
 import { lireJson, ecrireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { enregistrerExperiences, marquerDeploye, planAuLancement, retirerExperience } from "../../engine/measure/experience.ts"
@@ -37,9 +40,16 @@ export async function capturer(url: string): Promise<{ job: Job; client: string;
 type Texte = { anchor: string; tag: string; text: string; top: number }
 export async function textes(c: string, camp: string): Promise<Texte[]> {
   const base = fichiersDe(dossier(c, camp)).baseline
-  const cache = join(base, "textes-v2.json")
+  const cache = join(base, "textes-v3.json")
+  const enrichir = async (out: Texte[]): Promise<Texte[]> => {
+    const m = await lireJson<SignauxMecaniques | null>(fichiersDe(dossier(c, camp)).signaux, null)
+    const structures: Texte[] = [m?.nav.presente && m.nav.anchor ? { anchor: m.nav.anchor, tag: "nav", text: "Navigation principale", top: 0 } : null,
+      ...m?.sections.map((s) => ({ anchor: s.anchor, tag: "section", text: s.titre || "Section sans titre", top: s.y })) ?? []]
+      .filter((x): x is Texte => x !== null && !!x.anchor && !out.some((t) => t.anchor === x.anchor))
+    return [...out, ...structures]
+  }
   const deja = await lireJson<Texte[] | null>(cache, null)
-  if (deja) return deja
+  if (deja) return enrichir(deja)
   if (!existsSync(join(base, "capture.html"))) return []
   const browser = await lancerNavigateur()
   try {
@@ -63,7 +73,7 @@ export async function textes(c: string, camp: string): Promise<Texte[]> {
       return res.sort((a, b) => a.prio - b.prio || a.top - b.top).slice(0, 60).map(({ prio, ...x }) => x)
     })
     await ecrireJson(cache, out)
-    return out
+    return enrichir(out)
   } finally { await browser.close() }
 }
 
@@ -90,33 +100,62 @@ async function pipelineTest(job: Job, c: string, camp: string, id: string, base:
     finir(job, true, { id })
 }
 
-export async function creerTest(c: string, camp: string, entree: { titre: string; pourquoi: string; edits: Array<{ anchor: string; text: string }> }) {
+type EditionBuyer = { anchor: string; op?: "set" | "remove" | "move" | "swap" | "duplicate"; text?: string; before?: string; after?: string; with?: string }
+export async function creerTest(c: string, camp: string, entree: { titre: string; pourquoi: string; edits: EditionBuyer[] }) {
   const d = dossier(c, camp); const base = fichiersDe(d).baseline
+  const txt = await textes(c, camp)
+  const autorises = new Map(txt.map((t) => [t.anchor, t]))
+  const invalide = (message: string): never => { throw Object.assign(new Error(message), { code: 400 }) }
+  if (!entree.titre?.trim() || !entree.pourquoi?.trim() || !Array.isArray(entree.edits) || !entree.edits.length || entree.edits.length > 6)
+    invalide("Nommez le test, expliquez pourquoi et choisissez entre 1 et 6 changements.")
+  const deja = new Set<string>()
+  for (const e of entree.edits) {
+    if (!e || typeof e.anchor !== "string" || !autorises.has(e.anchor) || deja.has(e.anchor)) invalide("Une cible est introuvable ou sélectionnée deux fois.")
+    deja.add(e.anchor)
+    const op = e.op ?? "set"
+    if (!["set", "remove", "move", "swap", "duplicate"].includes(op)) invalide("Opération non prise en charge.")
+    if (op === "set" && (!e.text?.trim() || e.text.trim() === autorises.get(e.anchor)?.text || ["nav", "section"].includes(autorises.get(e.anchor)!.tag))) invalide("Le nouveau texte doit changer une cible textuelle.")
+    const destination = e.before ?? e.after ?? e.with
+    if (["move", "duplicate", "swap"].includes(op) && (!destination || !autorises.has(destination) || destination === e.anchor)) invalide("Choisissez une autre cible de la page pour déplacer, copier ou échanger.")
+    if (["nav", "section"].includes(autorises.get(e.anchor)!.tag) && destination && !["nav", "section"].includes(autorises.get(destination)!.tag))
+      invalide("Un bloc entier doit être placé par rapport à un autre bloc entier.")
+    if (["move", "duplicate"].includes(op) && !!e.before === !!e.after) invalide("Choisissez avant ou après une autre cible.")
+  }
+  const contexte = Contexte.safeParse(await lireJson<unknown>(fichiersDe(d).contexte, null))
+  const signaux = await lireJson<SignauxMecaniques | null>(fichiersDe(d).signaux, null)
+  const raisons = controler(entree.edits.map((e) => ({ ...e, op: e.op ?? "set" })), {
+    page: texteDuHtml(await readFile(fichiersDe(d).capture, "utf8")),
+    annonce: contexte.success ? texteAnnonce(contexte.data) : "",
+    avant: new Map(txt.map((t) => [t.anchor, t.text])),
+    boutons: new Set(signaux?.ctas.map((x) => x.anchor) ?? txt.filter((t) => t.tag === "button").map((t) => t.anchor)),
+  })
+  if (raisons.length) invalide("Changement refusé : " + raisons.join(" ; "))
   const tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   let id = slugify(entree.titre).slice(0, 40) || "test"
   while (tests.some((t) => t.id === id)) id += "-2"
   const empreintes = await lireJson<Array<{ a: string; role: string; text: string }>>(fichiersDe(d).ancres, [])
-  const txt = await textes(c, camp)
-  const edits = entree.edits.map((e) => ({ anchor: e.anchor, text: e.text, avant: txt.find((t) => t.anchor === e.anchor)?.text ?? "" }))
-  const job = nouveauJob("test")
-  const teste = edits.map((e) => `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »`).join(" · ")
-  const test: Test = { id, titre: entree.titre, teste, pourquoi: entree.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id }
-  tests.push(test)
-  await ecrireJson(fichiersDe(d).tests, tests)
-
+  const editions = entree.edits.map((e) => ({ ...e, op: e.op ?? "set", text: e.text?.trim(), pourquoi: entree.pourquoi.trim(),
+    ...(e.op === "duplicate" ? { as: "b" } : {}),
+    attendu: (() => { const emp = empreintes.find((x) => x.a === e.anchor); return emp ? { role: emp.role, text: emp.text } : undefined })() }))
+  const edits = editions.map((e) => ({ anchor: e.anchor, avant: autorises.get(e.anchor)!.text,
+    text: e.op === "set" ? e.text! : e.op === "remove" ? "Retiré" : e.op === "swap" ? `Échangé avec ${autorises.get(e.with!)?.text}` : `${e.op === "move" ? "Déplacé" : "Copié"} ${e.before ? "avant" : "après"} ${autorises.get((e.before ?? e.after)!)?.text}` }))
+  const teste = edits.map((e, i) => editions[i].op === "set" ? `« ${e.avant.slice(0, 60)} » devient « ${e.text.slice(0, 60)} »` : `« ${e.avant.slice(0, 60)} » : ${e.text}`).join(" · ")
   const spec = {
     nom: id,
     hypothese: `Si ${teste}, alors les conversions augmentent, parce que ${entree.pourquoi}`.slice(0, 600).padEnd(20, "."),
     metrique: "conversions Google Ads sur le trafic payant",
     risque: "test défini à la main par le media buyer : à relire avant lancement",
     diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${entree.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer : pas de règle KB" },
-    edits: edits.map((e) => {
-      const emp = empreintes.find((x) => x.a === e.anchor)
-      return { anchor: e.anchor, op: "set", text: e.text, pourquoi: entree.pourquoi, ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
-    }),
+    edits: editions,
   }
+  const verifie = VariantSpec.safeParse(spec)
+  if (!verifie.success) invalide("Ce test ne respecte pas le contrat des variantes : " + verifie.error.issues.map((x) => x.message).join(" ; "))
   const specPath = fichiersDe(d).spec(id)
-  await ecrireJson(specPath, spec)
+  await ecrireJson(specPath, verifie.data)
+  const job = nouveauJob("test")
+  const test: Test = { id, titre: entree.titre, teste, pourquoi: entree.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id }
+  tests.push(test)
+  await ecrireJson(fichiersDe(d).tests, tests)
 
   pipelineTest(job, c, camp, id, base, specPath)
   return { job, id }
@@ -127,7 +166,11 @@ export async function lancerBrain(c: string, camp: string, contexte: unknown): P
   const d = dossier(c, camp)
   const v = Contexte.safeParse(contexte)
   if (!v.success) throw Object.assign(new Error("Il manque au moins ce que promet l’annonce et comment se conclut la vente : " + v.error.issues.map((i) => i.path.join(".")).join(", ")), { code: 400 })
+  if ([...jobs.values()].some((j) => j.type === "brain" && j.campagne === d && j.etat === "en cours"))
+    throw Object.assign(new Error("Une analyse est déjà en cours pour cette page."), { code: 409 })
   await ecrireJson(fichiersDe(d).contexte, v.data)
+  const refusees = (await lireJson<Array<{ refusee?: boolean }>>(fichiersDe(d).propositions, [])).filter((p) => p.refusee)
+  await ecrireJson(fichiersDe(d).propositions, refusees)
   const job = nouveauJob("brain")
   job.campagne = d
   ;(async () => {
@@ -169,12 +212,12 @@ export async function creerTestDepuisProposition(c: string, camp: string, nom: s
   if (!p) throw Object.assign(new Error("proposition inconnue"), { code: 404 })
   const specPath = fichiersDe(d).spec(nom)
   if (!existsSync(specPath)) throw Object.assign(new Error("la spec de cette proposition a disparu"), { code: 404 })
-  const spec = await lireJson<any>(specPath, {})
+  const spec = VariantSpec.parse(await lireJson<unknown>(specPath, {}))
   let tests = await lireJson<Test[]>(fichiersDe(d).tests, [])
   if (tests.some((t) => t.id === nom && t.etat !== "echec")) throw Object.assign(new Error("ce test existe déjà"), { code: 409 })
   tests = tests.filter((t) => t.id !== nom)
   const txt = await textes(c, camp)
-  const edits = (spec.edits ?? []).map((e: any) => ({ anchor: e.anchor, text: e.text ?? `${e.op} ${e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
+  const edits = spec.edits.map((e) => ({ anchor: e.anchor!, text: e.op === "set" ? e.text ?? "Attribut modifié" : `${e.op} ${e.with ? "avec " + e.with : e.before ? "avant " + e.before : e.after ? "après " + e.after : ""}`.trim(), avant: txt.find((t) => t.anchor === e.anchor)?.text ?? e.attendu?.text ?? "" }))
   const job = nouveauJob("test")
   tests.push({ id: nom, titre: p.titre, teste: p.teste, pourquoi: p.pourquoi, etat: "prep", part: 0, creeLe: new Date().toISOString(), edits, job: job.id, regle: p.regle })
   await ecrireJson(fichiersDe(d).tests, tests)

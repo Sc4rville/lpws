@@ -974,7 +974,7 @@ function vDash(c) {
     // s'affichait ici à tort (constaté sur HubSpot avec un test arrêté et une copie à 99,9 %)
     : c.live && c.capture.ok !== null ? (() => { const d = c.tests.find(t => t.etat === 'stop'); return d
         ? `<div class="live calm"><div style="display:flex;gap:6px">${chipEtat(d)}${chipPot(d)}</div><h3>${esc(d.titre)}</h3><div class="say">${esc(d.teste)} : arrêté, l’original reçoit 100 % du trafic.</div><div class="act">${GO(I.play(16) + 'Relancer ce test', `data-act="launch" data-test="${d.id}" data-client="${c.id}"`)}<button class="btn" data-go="view:nouveau">${I.sparkle(15)}Nouveau test</button></div></div>`
-        : `<div class="live calm"><span class="chip">Prête pour un test</span><h3>${esc(c.marque)} est prête</h3><div class="say">Changez un titre ou un bouton, lancez : l’original reste intact pour les autres visiteurs.</div><div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div></div>`; })()
+        : `<div class="live calm"><span class="chip">Prête pour un test</span><h3>${esc(c.marque)} est prête</h3><div class="say">Changez ensemble l’accroche, la preuve, le bouton ou l’ordre des sections : l’original reste intact pour les autres visiteurs.</div><div class="act">${GO(I.sparkle(16) + 'Nouveau test', 'data-go="view:nouveau"')}</div></div>`; })()
     : c.shopify ? `<div class="live calm"><span class="chip warn"><span class="dot"></span>Accès à demander</span><h3>Un test attend la boutique</h3><div class="say">Le client vous ajoute comme collaborateur en un clic, et le test part sur sa fiche produit : panier et paiement intacts.</div><div class="act">${GO(I.send(16) + 'Envoyer la demande d’accès', 'data-act="shopify"')}<button class="btn" data-go="guide:natif">Comment ça marche ${I.arrow(15)}</button></div></div>`
     : `<div class="live calm"><span class="chip">${c.capture.ok === false ? 'Copie en cours de mise au point' : 'Copie à relancer'}</span><h3>${esc(c.nom)} arrive</h3><div class="say">${esc(c.capture.cause)}</div><div class="act"><button class="btn" data-go="view:page">Voir la page ${I.arrow(15)}</button></div></div>`;
   return `
@@ -1292,22 +1292,25 @@ function vAjout(premiere = false) {
 }
 function vNouveau(c) {
   const liste = (S.textes || {})[c.id];
-  const choix = S.choix && liste ? liste.find(x => x.anchor === S.choix) : null;
+  const edits = S.ntEdits || (S.ntEdits = {});
+  const selection = (liste || []).filter(x => edits[x.anchor]);
   const rows = !LIVE ? `<div class="empty"><b>Démo sans serveur</b>${esc(SANS_SERVEUR)}</div>`
     : !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
-    : !liste.length ? '<div class="empty"><b>Aucun texte trouvé</b>La copie doit avoir abouti pour proposer des textes.</div>'
-    : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${S.choix === x.anchor ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span></button>`).join('')}</div>`;
-  const genre = choix ? (choix.tag.startsWith('h') ? 'titre' : choix.tag === 'p' ? 'texte' : 'bouton') : '';
+    : !liste.length ? '<div class="empty"><b>Aucun élément trouvé</b>La copie doit avoir abouti pour proposer des changements.</div>'
+    : `<div class="list" id="nt-liste">${liste.map(x => `<button class="li" data-act="choisir" data-anchor="${esc(x.anchor)}" style="${edits[x.anchor] ? 'background:var(--pill);color:var(--pill-ink)' : ''}"><span class="chip" style="flex:none">${esc(x.tag)}</span><span class="t" style="min-width:0;overflow-wrap:anywhere;font-weight:500">${esc(x.text)}</span>${edits[x.anchor] ? I.check(14) : ''}</button>`).join('')}</div>`;
   return `
-    <div class="hd"><div><h2>Nouveau test</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez un texte de la page, écrivez celui que vous voulez tester. L’original reste tel quel pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    <div class="hd"><div><h2>Construire une variante</h2><div class="u">${esc(c.url)}</div><p class="lede">Choisissez les éléments qui portent la même idée : promesse, preuve, CTA ou ordre des sections. L’original reste visible pour les autres visiteurs.</p></div><div class="act"><button class="btn" data-go="view:dash">${I.back(16)}Retour</button></div></div>
+    ${S.piste ? `<div class="card" style="margin-bottom:14px"><b>Piste du Brain · ${esc(S.piste.action)}</b><p>${esc(S.piste.signal)} · ${esc(S.piste.test?.consigne || '')}</p></div>` : ''}
     <div class="grid nt">
-      <div class="card"><h3>1 · Le texte à changer</h3>${rows}</div>
+      <div class="card"><h3>1 · Les éléments à changer <span class="n">${selection.length} / 6</span></h3>${rows}</div>
       <div class="card"><h3>2 · La nouvelle version</h3>
-        ${choix ? `<p class="muted" style="margin-bottom:12px">Aujourd’hui : « ${esc(choix.text)} »</p>` : '<p class="muted">Choisissez d’abord un texte à gauche.</p>'}
-        <label class="fld">Nouveau ${genre || 'texte'}<textarea class="inp" id="nt-text" rows="3" ${choix ? '' : 'disabled'}>${choix ? esc(S.ntText ?? choix.text) : ''}</textarea></label>
-        <label class="fld" style="margin-top:12px">Pourquoi ce changement<input class="inp" id="nt-why" placeholder="ex. reprendre la promesse de l’annonce" value="${esc(S.ntWhy || '')}" ${choix ? '' : 'disabled'}></label>
-        <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="nt-titre" value="${esc(S.ntTitre || (choix ? 'Nouveau ' + genre : ''))}" ${choix ? '' : 'disabled'}></label>
-        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${choix ? GO(I.sparkle(16) + 'Créer le test', 'data-act="creer-test"') : ''}<span class="muted" id="nt-err"></span></div>
+        ${selection.length ? selection.map(x => { const e = edits[x.anchor], blocs = ['nav', 'section'].includes(x.tag); const op = e.op || (blocs ? 'move' : 'set'); return `<div class="ch" style="display:block;margin-bottom:18px"><b>${esc(x.tag)} · ${esc(x.text)}</b>
+          <label class="fld" style="margin-top:10px">Action<select class="inp" data-edit="op" data-anchor="${esc(x.anchor)}">${(blocs ? [['move','Déplacer'],['duplicate','Dupliquer'],['swap','Échanger'],['remove','Retirer']] : [['set','Changer le texte'],['move','Déplacer'],['duplicate','Dupliquer'],['swap','Échanger'],['remove','Retirer']]).map(([v,l]) => `<option value="${v}" ${op === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          ${op === 'set' ? `<label class="fld" style="margin-top:8px">Nouveau texte<textarea class="inp" data-edit="text" data-anchor="${esc(x.anchor)}" rows="2" placeholder="Écrivez une version différente">${esc(e.text ?? '')}</textarea></label>` : op !== 'remove' ? `<label class="fld" style="margin-top:8px">${op === 'swap' ? 'Échanger avec' : 'Placer par rapport à'}<select class="inp" data-edit="target" data-anchor="${esc(x.anchor)}"><option value="">Choisir une cible…</option>${liste.filter(y => y.anchor !== x.anchor && (!blocs || ['nav','section'].includes(y.tag))).map(y => `<option value="${esc(y.anchor)}" ${e.target === y.anchor ? 'selected' : ''}>${esc(y.tag + ' · ' + y.text.slice(0, 75))}</option>`).join('')}</select></label>${op === 'swap' ? '' : `<label class="fld" style="margin-top:8px">Position<select class="inp" data-edit="position" data-anchor="${esc(x.anchor)}"><option value="before" ${e.position === 'before' ? 'selected' : ''}>Avant</option><option value="after" ${e.position !== 'before' ? 'selected' : ''}>Après</option></select></label>`}` : ''}
+          </div>`; }).join('') : '<p class="muted">Sélectionnez des textes, boutons ou sections à gauche.</p>'}
+        <label class="fld" style="margin-top:12px">Pourquoi ce test<input class="inp" id="nt-why" placeholder="ex. tenir la promesse de l’annonce jusqu’au clic" value="${esc(S.ntWhy || S.piste?.pourquoi || '')}"></label>
+        <label class="fld" style="margin-top:12px">Nom du test<input class="inp" id="nt-titre" value="${esc(S.ntTitre || S.piste?.action || '')}"></label>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${selection.length ? GO(I.sparkle(16) + 'Créer le test', 'data-act="creer-test"') : ''}<span class="muted" id="nt-err"></span></div>
       </div>
     </div>`;
 }
@@ -1317,7 +1320,7 @@ const TRAFICS = [['google-search', 'Google Search'], ['google-shopping', 'Google
 const SOCIAL = ['meta', 'tiktok', 'linkedin'];
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', trafic: 'google-search', accroche: '', visuel: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
+  const f = S.ctxForm || (S.ctxForm = { titre: c.contexte?.annonce?.titre || '', description: c.contexte?.annonce?.description || '', motsCles: (c.contexte?.annonce?.motsCles || []).join(', '), vente: c.contexte?.vente || '', trafic: c.contexte?.trafic || 'google-search', accroche: c.contexte?.crea?.accroche || '', visuel: c.contexte?.crea?.visuel || '', cible: c.contexte?.cible || '', offre: c.contexte?.offre || c.marque || '', visiteursMois: c.contexte?.visiteursMois || '', tauxConversion: c.contexte?.tauxConversion || '', cpc: c.contexte?.cpc || '', panierMoyen: c.contexte?.panierMoyen || '', marge: c.contexte?.marge ?? '', limites: c.contexte?.limites || '' });
   const social = SOCIAL.includes(f.trafic);
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
@@ -1344,6 +1347,9 @@ function vCampagne(c) {
           ${champ('visiteursMois', 'Visiteurs par mois sur cette page', 'En dessous d’un certain volume, un petit test ne peut pas conclure : LPWS proposera des changements plus francs.', 'inputmode="numeric" placeholder="60000"')}
           ${champ('tauxConversion', 'Taux de conversion actuel (%)', 'Il fixe la durée de chaque test avant de le lancer.', 'inputmode="decimal" placeholder="2,5"')}
           ${champ('cpc', 'CPC moyen (€)', 'Pour traduire chaque résultat en coût par conversion, dans le rapport client.', 'inputmode="decimal" placeholder="1,80"')}
+          ${champ('panierMoyen', 'Panier ou contrat moyen (€)', 'Pour vérifier si la preuve, le prix et le risque sont à la hauteur.', 'inputmode="decimal"')}
+          ${champ('marge', 'Marge (%)', 'Pour éviter une promesse ou une remise qui détruirait la marge.', 'inputmode="decimal"')}
+          ${champ('limites', 'Ce que la marque ne peut pas promettre', 'LPWS en tient compte dans les variantes.', 'placeholder="Ex. pas de garantie de résultat"')}
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${GO(I.sparkle(16) + 'Lancer l’analyse', 'data-act="contexte"')}<span class="muted" id="ctx-err"></span></div>
       </div>
@@ -1378,10 +1384,18 @@ function brainBloc(c) {
   if (c.brainEnCours) return `<div class="sec"><div class="live calm"><span class="chip"><span class="dot pulse"></span>Analyse en cours</span><h3>LPWS lit la page et écrit trois variantes</h3><div class="say">Une à deux minutes. La page reste utilisable.</div><div id="job-zone" style="margin-top:14px">${jobBox(c.brainJob)}</div></div></div>`;
   if (!c.contexte) return `<div class="sec"><div class="live calm"><span class="chip">Diagnostic</span><h3>Dites-nous ce que promet l’annonce</h3><div class="say">LPWS compare la page à l’annonce, relève ce qui freine, et propose trois tests avec leur raison. Deux réponses, trente secondes.</div><div class="act">${GO(I.sparkle(16) + 'Décrire la campagne', 'data-go="view:campagne"')}</div></div></div>`;
   const props = c.propositions || [], conseils = (c.diagnostic && c.diagnostic.conseils) || [];
-  let h = '';
+  const tests = (c.diagnostic && c.diagnostic.tests) || [], m = c.signaux;
+  let h = c.brainErreur ? `<div class="sec"><div class="card" style="border-color:var(--bad)"><h3>L’analyse n’a pas abouti</h3><p>${esc(c.brainErreur)}</p><button class="btn sm" data-go="view:campagne">Relancer l’analyse</button></div></div>` : '';
+  if (m) h += `<div class="sec"><h3>Ce que LPWS a relevé sur la page</h3><div class="card">
+    <div class="ck"><span class="i">1</span><div><b>Promesse visible</b><div class="d">${esc(m.hero.titre || 'Aucun titre détecté')}${m.hero.sousTitre ? ' · ' + esc(m.hero.sousTitre) : ''}</div></div></div>
+    <div class="ck"><span class="i">2</span><div><b>Appels à l’action · ${m.ctas.length}</b><div class="d">${esc(m.ctas.slice(0, 5).map(x => '« ' + x.texte + ' »' + (x.auDessusDuPli ? ' (visible)' : ' (sous le pli)')).join(' · ') || 'Aucun bouton détecté')} · mobile : ${m.ctaAuDessusDuPliMobile ? 'visible' : 'sous le pli'}</div></div></div>
+    <div class="ck"><span class="i">3</span><div><b>Parcours et preuve</b><div class="d">${m.sections.length} sections · ${m.nav.liens} liens de navigation · formulaire : ${m.formulaire.champs} champs · ${m.preuves.logos} logos · ${m.preuves.temoignages.nombre} témoignages · prix ${m.prix.visible ? 'visible' : 'non détecté'}</div></div></div>
+    </div></div>`;
+  if (tests.length) h += `<div class="sec"><h3>Pistes du diagnostic <span class="n">${tests.length}</span><span class="r"><button class="btn sm" data-go="view:campagne">Modifier la campagne</button></span></h3>
+    <div class="tests">${tests.slice(0, 8).map(k => `<div class="tc" style="cursor:default"><div class="chips"><span class="chip">${esc(nomRegle(k.id))}</span><span class="chip">Priorité ${esc(k.score)}</span><span class="chip">${esc(k.test?.cible || '')}</span></div><div class="t">${esc(k.action)}</div><div class="d"><b>Constat.</b> ${esc(k.signal)}</div><div class="d"><b>Pourquoi.</b> ${esc(k.pourquoi)}</div><div class="d"><b>À tester.</b> ${esc(k.test?.consigne || '')}</div><div class="d">${esc(k.sources.join(' · '))}</div><div class="f"><button class="btn sm" data-act="piste" data-regle="${esc(k.id)}">Construire cette variante</button></div></div>`).join('')}</div></div>`;
   if (props.length) h += `<div class="sec"><h3>LPWS propose ${props.length} test${props.length > 1 ? 's' : ''} <span class="r"><button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></span></h3>
     <div class="tests">${props.map(p => carteProposition(c, p)).join('')}</div></div>`;
-  else if (c.diagnostic) h += `<div class="sec"><div class="card"><h3>Rien à tester de plus pour l’instant</h3><p>Les propositions ont toutes été créées, ou aucun constat ne se traduit en test. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
+  else if (c.diagnostic && !c.brainErreur) h += `<div class="sec"><div class="card"><h3>Pas de variante rédigée pour l’instant</h3><p>Utilisez les pistes du diagnostic pour construire un test, ou modifiez la campagne. <button class="btn sm" data-go="view:campagne">${I.sliders(14)}Modifier la campagne</button></p></div></div>`;
   const ec = (c.diagnostic && c.diagnostic.ecartes) || [];
   if (ec.length) h += `<div class="sec"><div class="card"><h3>Pas re-proposé <span class="n">${ec.length}</span><span class="r"><button class="btn sm" data-go="view:suivi">Historique</button></span></h3>${ec.map(e => `<div class="ck off"><span class="i">${I.minus(12)}</span><div><b>${esc(nomRegle(e.id))}</b><div class="d">${esc(e.raison)}</div></div></div>`).join('')}</div></div>`;
   if (conseils.length) h += `<div class="sec"><h3>À transmettre au client <span class="n">${conseils.length}</span><span class="r"><button class="btn sm" data-act="rapport" data-client="${c.id}">${I.copy ? I.copy(14) : ''}Copier le rapport</button></span></h3>
@@ -1741,7 +1755,7 @@ function go(spec) {
   for (const part of spec.split(';')) {
     const [k, v] = part.split(':');
     if (k === 'ctx') { S.ctx = v; S.view = 'dash'; S.test = null; S.openMode = null; }
-    else if (k === 'view') { S.view = v; }
+    else if (k === 'view') { S.view = v; if (v === 'nouveau') S.piste = null; }
     else if (k === 'test') { S.view = 'test'; S.test = v; }
     else if (k === 'guide') { S.view = 'guide'; S.mode = v; S.openMode = v; }
   }
@@ -1759,7 +1773,7 @@ document.addEventListener('click', e => {
     naviguer(g.dataset.go); return;
   }
   const pk = e.target.closest('[data-pick]');
-  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','accroche','visuel','cible','offre','visiteursMois','tauxConversion','cpc']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
+  if (pk) { S.ctxForm = S.ctxForm || {}; S.ctxForm[pk.dataset.pick] = pk.dataset.v; for (const id of ['titre','description','motsCles','accroche','visuel','cible','offre','visiteursMois','tauxConversion','cpc','panierMoyen','marge','limites']) { const el = document.getElementById('cf-' + id); if (el) S.ctxForm[id] = el.value; } renderMain(); return; }
   const cp = e.target.closest('[data-copy]');
   if (cp) { copier(cp.dataset.copy, cp.dataset.msg); return; }
   const act = e.target.closest('[data-act]');
@@ -1791,7 +1805,7 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
+      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined, panierMoyen: g('panierMoyen') ? parseFloat(g('panierMoyen').replace(',', '.')) : undefined, marge: g('marge') ? parseFloat(g('marge').replace(',', '.')) : undefined, limites: g('limites') || undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
@@ -1878,14 +1892,34 @@ document.addEventListener('click', e => {
       api('/api/compte', corps).then(async () => { toast('Compte enregistré'); await chargerEtat(); render(); }).catch(e => { const z = document.getElementById('cp-err'); if (z) z.textContent = e.message; else toast(e.message); });
       break;
     }
-    case 'choisir': S.choix = act.dataset.anchor; S.ntText = undefined; render(); break;
+    case 'piste': {
+      if (!c) break;
+      const k = c.diagnostic?.tests.find(x => x.id === act.dataset.regle), m = c.signaux;
+      if (!k || !m) break;
+      const cible = k.test?.cible === 'titre' ? m.hero.titreAnchor : k.test?.cible === 'sous-titre' ? m.hero.sousTitreAnchor
+        : k.test?.cible === 'cta' ? m.ctas[0]?.anchor : k.test?.cible === 'nav' ? m.nav.anchor : m.sections[0]?.anchor;
+      S.ntEdits = cible ? { [cible]: { op: k.test?.verbes?.[0] || 'set' } } : {};
+      S.piste = k; S.ntTitre = k.action; S.ntWhy = k.pourquoi; S.view = 'nouveau'; render(); break;
+    }
+    case 'choisir': {
+      const anchor = act.dataset.anchor;
+      S.ntEdits = S.ntEdits || {};
+      if (S.ntEdits[anchor]) delete S.ntEdits[anchor];
+      else if (Object.keys(S.ntEdits).length < 6) S.ntEdits[anchor] = { op: ['section', 'nav'].includes((S.textes?.[c.id] || []).find(x => x.anchor === anchor)?.tag) ? 'move' : 'set' };
+      else { toast('Six changements au maximum par test'); break; }
+      render(); break;
+    }
     case 'creer-test': {
-      const titre = document.getElementById('nt-titre')?.value.trim(), text = document.getElementById('nt-text')?.value.trim(), why = document.getElementById('nt-why')?.value.trim();
+      const titre = document.getElementById('nt-titre')?.value.trim(), why = document.getElementById('nt-why')?.value.trim();
+      const edits = Object.entries(S.ntEdits || {}).map(([anchor, e]) => ({ anchor, op: e.op,
+        ...(e.op === 'set' ? { text: e.text?.trim() } : {}),
+        ...(e.op === 'swap' ? { with: e.target } : {}),
+        ...(['move','duplicate'].includes(e.op) ? { [e.position || 'after']: e.target } : {}) }));
       const err = document.getElementById('nt-err');
-      if (!titre || !text) { if (err) err.textContent = 'Il faut un nom et un texte.'; break; }
+      if (!titre || !why || !edits.length || edits.some(e => e.op === 'set' ? !e.text : e.op !== 'remove' && !S.ntEdits[e.anchor].target)) { if (err) err.textContent = 'Nommez le test, expliquez pourquoi et complétez chaque changement.'; break; }
       if (err) err.textContent = 'Création…';
-      api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits: [{ anchor: S.choix, text }] })
-        .then(async r => { S.choix = null; S.ntText = S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
+      api(`/api/clients/${c.id}/tests`, { titre, pourquoi: why, edits })
+        .then(async r => { S.ntEdits = {}; S.piste = null; S.ntWhy = S.ntTitre = undefined; await chargerEtat(); S.view = 'test'; S.test = r.id; render(); })
         .catch(e => { if (err) err.textContent = e.message; });
       break;
     }
@@ -1899,6 +1933,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset.edit === 'op') { S.ntEdits[e.target.dataset.anchor].op = e.target.value; render(); return; }
   if (e.target.id !== 'part') return;
   const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test);
   if (!t || t.etat !== 'live') return;
@@ -1909,6 +1944,7 @@ document.addEventListener('change', e => {
   if (focus) document.getElementById('part').focus({ preventScroll: true });
 });
 document.addEventListener('input', e => {
+  if (e.target.dataset.edit) { const a = e.target.dataset.anchor; if (S.ntEdits?.[a]) S.ntEdits[a][e.target.dataset.edit] = e.target.value; return; }
   if (e.target.id === 'k-q') { K.q = e.target.value; K.i = 0; dessinerK(); return; }
   if (e.target.id === 'part') { const c = byId(S.ctx); const t = c && c.tests.find(x => x.id === S.test); if (t) t.part = +e.target.value; document.getElementById('partv').textContent = e.target.value + ' %'; return; }
   if (e.target.id?.startsWith('ss-')) calcSS();
@@ -1918,7 +1954,6 @@ document.addEventListener('input', e => {
   if (e.target.id === 'decl-consigne') S.declConsigne = e.target.value;
   if (e.target.id === 'refus-raison') S.refusRaison = e.target.value;
   if (e.target.id === 'host') { const c = byId(S.ctx); if (c) c.connexion.integral.hote = e.target.value; }
-  if (e.target.id === 'nt-text') S.ntText = e.target.value;
   if (e.target.id === 'nt-why') S.ntWhy = e.target.value;
   if (e.target.id === 'nt-titre') S.ntTitre = e.target.value;
   if (e.target.id === 'url') S.urlSaisie = e.target.value;

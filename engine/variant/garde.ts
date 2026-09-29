@@ -67,7 +67,7 @@ export type EditPropose = {
 }
 
 /** Ce que la règle permet de viser : ses verbes, et les ancres de sa cible. */
-export type Portee = { verbes: string[]; ancres: Set<string> | null }
+export type Portee = { verbes: string[]; ancres: Set<string> | null; renforts?: Set<string> }
 
 export type CadreGarde = {
   /** le texte visible de la page (capture desktop) */
@@ -118,9 +118,13 @@ const norme = (s: string) => s.normalize("NFKC").replace(/[’‘]/g, "'").repla
 /** Les raisons de refuser une proposition ; liste vide = elle passe. */
 export function controler(edits: EditPropose[], g: CadreGarde, portee?: Portee): string[] {
   const raisons: string[] = []
-  if (portee) for (const e of edits) {
-    if (!portee.verbes.includes(e.op)) raisons.push(`${e.anchor} : verbe « ${e.op} » hors de ceux de la règle (${portee.verbes.join(", ")})`)
-    if (portee.ancres && !portee.ancres.has(e.anchor)) raisons.push(`${e.anchor} : hors de la cible de la règle`)
+  if (portee) {
+    if (portee.ancres && !edits.some((e) => portee.ancres!.has(e.anchor))) raisons.push("aucune édition ne vise la cible du constat")
+    for (const e of edits) {
+      const renfort = e.op === "set" && !portee.ancres?.has(e.anchor) && portee.renforts?.has(e.anchor)
+      if (!portee.verbes.includes(e.op) && !renfort) raisons.push(`${e.anchor} : verbe « ${e.op} » hors de ceux de la règle (${portee.verbes.join(", ")})`)
+      if (portee.ancres && !portee.ancres.has(e.anchor) && !renfort) raisons.push(`${e.anchor} : hors de la cible de la règle`)
+    }
   }
   const page = norme(g.page), source = page + " " + norme(g.annonce)
   const nombresAutorises = new Set(nombresDe(source))

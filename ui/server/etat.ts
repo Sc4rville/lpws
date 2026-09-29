@@ -12,6 +12,7 @@ import { type Audit } from "../../engine/audit/audit.ts"
 import { historique as relevesDe, type Alerte } from "../../engine/surveille/surveille.ts"
 import { historique, comptes } from "../../engine/measure/experience.ts"
 import type { Resultats } from "../../engine/measure/run.ts"
+import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -70,10 +71,12 @@ export async function etat() {
       // le brain : ce que le buyer a dit de la campagne, ce que la machine en a conclu, ce qu'elle propose
       const contexte = await lireJson<any>(fichiersDe(d).contexte, null)
       const diag = await lireJson<any>(fichiersDe(d).diagnostic, null)
+      const signaux = await lireJson<SignauxMecaniques | null>(fichiersDe(d).signaux, null)
       // un test en échec libère sa proposition : le buyer peut la retenter après correction
       const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
       const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
+      const dernierBrain = [...jobs.values()].filter((jb) => jb.type === "brain" && jb.campagne === d).at(-1)
       const brainEnCours = !!brainJob
       const declJob = [...jobs.values()].find((jb) => jb.type === "decliner" && jb.etat === "en cours" && jb.campagne === d)
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
@@ -113,6 +116,9 @@ export async function etat() {
         capture,
         job: captureEnCours ? encours!.job : undefined,
         contexte,
+        signaux: signaux ? { hero: signaux.hero, ctas: signaux.ctas, nav: signaux.nav, formulaire: signaux.formulaire,
+          preuves: signaux.preuves, sections: signaux.sections, prix: signaux.prix, commerce: signaux.commerce,
+          ctaAuDessusDuPliMobile: signaux.ctaAuDessusDuPliMobile } : null,
         diagnostic: diag ? { faitLe: diag.faitLe, regime: diag.regime, tests: diag.tests, conseils: diag.conseils, nonEvaluables: diag.nonEvaluables?.length ?? 0, ecartes: diag.ecartes ?? [] } : null,
         audit, alertes,
         surveillance: releves[0] ? { dernier: releves[0].quand, releves: releves.length, concordance: releves[0].concordance?.score ?? null, lcpMs: releves[0].lcpMs,
@@ -121,7 +127,7 @@ export async function etat() {
         propositions,
         // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
         experiences: (await historique(cdir)).experiences.sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 20),
-        brainEnCours, brainJob: brainJob?.id,
+        brainEnCours, brainJob: brainJob?.id, brainErreur: dernierBrain?.etat === "échec" ? dernierBrain.lignes.slice(-4).join(" · ") : null,
         declinaison: declJob ? { job: declJob.id, source: declJob.sujet } : null,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
@@ -136,7 +142,7 @@ export async function etat() {
         tests: tests.map((t) => ({
           id: t.id, titre: t.titre, etat: t.etat, part: t.part, jours: joursDepuis(t.lanceLe, t.finLe), potentiel: "Moyen", plan: t.plan, fin: dateFr(t.finLe),
           teste: t.teste, pourquoi: t.pourquoi, erreur: t.erreur, job: t.job,
-          changes: t.edits.map((e) => ({ t: `Texte modifié : avant : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
+          changes: t.edits.map((e) => ({ t: `Élément : « ${e.avant.slice(0, 80)}${e.avant.length > 80 ? "…" : ""} »`, q: e.text, w: t.pourquoi })),
           imgUrl: existsSync(join(fichiersDe(d).variante(t.id), "variant.png")) ? `/files/${c}/${camp}/variants/${t.id}/variant.png` : null,
           res: resDe(t.id),
           lanceLe: t.lanceLe, regle: t.regle,
