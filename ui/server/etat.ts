@@ -13,6 +13,7 @@ import { historique as relevesDe, type Alerte } from "../../engine/surveille/sur
 import { historique, comptes } from "../../engine/measure/experience.ts"
 import type { Resultats } from "../../engine/measure/run.ts"
 import { etatIntentions } from "./intentions.ts"
+import type { SignauxMecaniques } from "../../engine/variant/signaux.ts"
 
 /** Le nom affiché au buyer : ce que le site dit de lui-même (og:site_name, puis le segment du
  *  <title> qui ressemble au domaine), sinon le domaine. L'identifiant du dossier, lui, ne bouge pas. */
@@ -71,11 +72,13 @@ export async function etat() {
       // le brain : ce que le buyer a dit de la campagne, ce que la machine en a conclu, ce qu'elle propose
       const contexte = await lireJson<any>(fichiersDe(d).contexte, null)
       const diag = await lireJson<any>(fichiersDe(d).diagnostic, null)
+      const signaux = await lireJson<SignauxMecaniques | null>(fichiersDe(d).signaux, null)
       // un test en échec libère sa proposition : le buyer peut la retenter après correction
       const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
       const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
+      const dernierBrain = [...jobs.values()].filter((jb) => jb.type === "brain" && jb.campagne === d).at(-1)
       const declJob = [...jobs.values()].find((jb) => jb.type === "decliner" && jb.etat === "en cours" && jb.campagne === d)
       // les chiffres viennent de GA4 (famille measure) : sans eux, l'écran dit « pas encore de
       // données » au lieu d'inventer
@@ -122,7 +125,10 @@ export async function etat() {
         propositions,
         // la mémoire : ce qui a déjà été testé sur toutes les pages de ce client, et comment ça a fini
         experiences: (await historique(cdir)).experiences.sort((a, b) => b.arreteLe.localeCompare(a.arreteLe)).slice(0, 20),
-        brainEnCours, brainJob: brainJob?.id,
+        signaux: signaux ? { hero: signaux.hero, ctas: signaux.ctas, nav: signaux.nav, formulaire: signaux.formulaire,
+          preuves: signaux.preuves, sections: signaux.sections, prix: signaux.prix, commerce: signaux.commerce,
+          ctaAuDessusDuPliMobile: signaux.ctaAuDessusDuPliMobile } : null,
+        brainEnCours, brainJob: brainJob?.id, brainErreur: dernierBrain?.etat === "échec" ? dernierBrain.lignes.slice(-4).join(" · ") : null,
         declinaison: declJob ? { job: declJob.id, source: declJob.sujet } : null,
         connexion: {
           express: { etat: express.installe ? "ok" : "off",
