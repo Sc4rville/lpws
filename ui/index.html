@@ -1352,7 +1352,9 @@ const TRAFICS = [['google-search', 'Google Search'], ['google-shopping', 'Google
 const SOCIAL = ['meta', 'tiktok', 'linkedin'];
 const VENTES = [['libre-service', 'En libre-service', 'essai, inscription, achat sans humain'], ['commercial', 'Avec un commercial', 'démo, devis, rendez-vous'], ['achat', 'Achat en ligne', 'panier et paiement, e-commerce']];
 function vCampagne(c) {
-  const f = S.ctxForm || (S.ctxForm = { titre: '', description: '', motsCles: '', vente: '', trafic: 'google-search', accroche: '', visuel: '', cible: '', offre: c.marque || '', visiteursMois: '', tauxConversion: '', cpc: '' });
+  const k = c.contexte || {}, a = k.annonce || {};
+  if (S.ctxForm?.client && S.ctxForm.client !== c.id) S.ctxForm = null;
+  const f = S.ctxForm || (S.ctxForm = { client: c.id, titre: a.titre || '', description: a.description || '', motsCles: (a.motsCles || []).join(', '), vente: k.vente || '', trafic: k.trafic || 'google-search', accroche: k.crea?.accroche || '', visuel: k.crea?.visuel || '', cible: k.cible || '', offre: k.offre || c.marque || '', visiteursMois: k.visiteursMois ? String(k.visiteursMois) : '', tauxConversion: k.tauxConversion ? String(k.tauxConversion).replace('.', ',') : '', cpc: k.cpc ? String(k.cpc).replace('.', ',') : '' });
   const social = SOCIAL.includes(f.trafic);
   const champ = (id, label, aide, extra = '') => `<label class="fld">${label}<input class="inp" id="cf-${id}" value="${esc(f[id] || '')}" ${extra}>${aide ? `<span class="muted" style="font-weight:400">${aide}</span>` : ''}</label>`;
   return `
@@ -1990,7 +1992,8 @@ document.addEventListener('click', e => {
     case 'contexte': {
       if (!c) break;
       const f = S.ctxForm || {}; const g = id => (document.getElementById('cf-' + id) || {}).value || '';
-      const corps = { annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
+      const k = c.contexte || {};
+      const corps = { niche: k.niche, panierMoyen: k.panierMoyen, marge: k.marge, limites: k.limites, annonce: { titre: g('titre'), description: g('description') || undefined, motsCles: g('motsCles').split(',').map(x => x.trim()).filter(Boolean) }, crea: g('accroche').trim().length >= 3 ? { accroche: g('accroche').trim(), visuel: g('visuel').trim() || undefined } : undefined, vente: f.vente, trafic: f.trafic || 'google-search', cible: g('cible') || undefined, offre: g('offre') || undefined, visiteursMois: g('visiteursMois') ? Number(g('visiteursMois').replace(/\D/g, '')) : undefined, tauxConversion: g('tauxConversion') ? parseFloat(g('tauxConversion').replace(',', '.')) || undefined : undefined, cpc: g('cpc') ? parseFloat(g('cpc').replace(',', '.')) || undefined : undefined };
       if (!corps.annonce.titre || !corps.vente) { const z = document.getElementById('ctx-err'); if (z) z.textContent = 'Il manque le titre de l’annonce ou le mode de vente.'; break; }
       api(`/api/clients/${c.id}/contexte`, corps).then(async r => { S.ctxForm = null; S.view = 'dash'; toast('Analyse lancée : une à deux minutes'); await chargerEtat(); render(); suivreJob(r.job, async j => { toast(j.etat === 'ok' ? 'Trois tests proposés' : 'L’analyse a échoué'); await chargerEtat(); render(); }); })
         .catch(e => { const z = document.getElementById('ctx-err'); if (z) z.textContent = e.message; else toast(e.message); });
