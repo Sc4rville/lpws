@@ -60,8 +60,8 @@
 4. **Intégral** : spike sur une vraie page WordPress/Webflow, seulement si un client le demande.
 5. **Shopify** : compte Partner + boutique de dev (Yann), puis backend `?view=`.
 6. Comptes et droits sur l'interface (un mot de passe partagé aujourd'hui).
-7. Incohérences media buyer restantes : client nommé « 0 » quand la page est sur une IP ; « Ce que vous
-   vendez » pré-rempli avec la marque ; journal brut visible pendant l'analyse ; promesse vitrine ≠ test démo.
+7. Incohérences media buyer restantes : « Ce que vous vendez » pré-rempli avec la marque ; promesse de
+   l'annonce de la vitrine ≠ test démo ; « Answer every customer 2x faster » (le modèle a perdu « message »).
 
 ## Blocages / parking
 - `lpws-app.vercel.app` périmée (d'avant le 28/09 19:25) : ce projet Vercel est sur le compte de la box,

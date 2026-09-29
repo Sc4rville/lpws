@@ -1287,7 +1287,12 @@ const ETAPES = [['clone/1_acquire', 'Copie de la page'], ['clone/2_styles', 'Sty
 function humaniser(l) {
   if (l.startsWith('$')) return '';
   const m = l.match(/^\[([^\]]+)\]\s*(.*)$/); if (!m) return l.trim();
-  const e = ETAPES.find(([k]) => m[1].startsWith(k)); return (e && e[1] ? e[1] + ' : ' : '') + m[2];
+  // la cuisine interne du Brain (listes de règles, appels au modèle) ne regarde pas le buyer
+  if (/^\s*(non évaluables|cibles retenues|appel \d|réponse du modèle|HORS NICHE)/i.test(m[2])) return '';
+  const texte = m[2].replace(/^\s*(TEST|CONSEIL)\s+(n°\d+)\s+\d+\s*★?\s*/, (_, k, n) => (k === 'TEST' ? 'Test ' : 'Conseil ') + n + ' · ')
+    .replace(/\s*\((?:[a-z]{2,3}-[a-z0-9-]+)(?:\s*·\s*[a-z]{2,3}-[a-z0-9-]+)*\)/g, '')
+    .replace(/\[[a-z]{2,3}-[a-z0-9-]+,\s*([^\]]+)\]/g, '($1)');
+  const e = ETAPES.find(([k]) => m[1].startsWith(k)); return (e && e[1] ? e[1] + ' : ' : '') + texte;
 }
 const jobBox = id => `<div class="card" id="job-card" data-job="${id}" style="margin-top:14px"><div style="display:flex;align-items:center;gap:10px"><span class="dot pulse" style="background:var(--warn)"></span><b id="job-etat">En cours…</b></div><div class="mono muted" id="job-lignes" style="margin-top:10px;white-space:pre-wrap;line-height:1.6;max-height:200px;overflow:auto"></div></div>`;
 function suivreJob(id, fin) {

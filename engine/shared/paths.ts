@@ -19,6 +19,9 @@ export const CLIENTS_ROOT = "clients"
  */
 export function marque(url: string): string {
   const hote = new URL(url).hostname.replace(/^www\./, "")
+  // une page servie en local (IP, localhost) n'a pas de marque dans son adresse : « 127.0.0.1 »
+  // donnait le client « 0 ». Le vrai nom arrive avec l'analyse de la page.
+  if (/^(localhost|.+\.localhost|\d{1,3}(\.\d{1,3}){3}|\[[0-9a-f:.]+\])$/i.test(hote)) return "local"
   // on retire le TLD (et le TLD composé type .co.uk) : "atlassian.com" → "atlassian"
   const parts = hote.split(".")
   const garde = parts.length > 2 && parts.at(-2)!.length <= 3 ? parts.slice(0, -2) : parts.slice(0, -1)
