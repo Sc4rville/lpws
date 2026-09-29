@@ -75,7 +75,7 @@ export async function etatIntentions(c: string, camp: string) {
   if (cheminSA) {
     try { serviceEmail = JSON.parse(await readFile(cheminSA, "utf8")).client_email } catch { serviceEmail = undefined }
   }
-  const job = [...jobs.values()].find((j) => j.type === "intentions" && j.campagne === d)
+  const job = [...jobs.values()].reverse().find((j) => j.type === "intentions" && j.campagne === d)
   return {
     analyse, suffixe: SUFFIXE_URL_FINALE,
     connexion: {

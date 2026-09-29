@@ -30,6 +30,11 @@ after(async () => {
 test("import : le CSV exemple produit un état, un CSV invalide préserve l'existant", async () => {
   const r = await importerIntentions(C, CAMP, { nom: "exemple.csv", base64: await b64(), marques: ["jira"] })
   assert.ok(r.analyse && r.analyse.routes.length > 0)
+  for (const x of Object.values<any>(r.analyse!.parIntention ?? {})) {
+    assert.equal(typeof x.clics, "number")
+    assert.equal(typeof x.conversions, "number")
+    assert.equal(typeof x.routes, "number")
+  }
   const avant = await readFile(f.intents, "utf8")
   await assert.rejects(importerIntentions(C, CAMP, { nom: "x", base64: Buffer.from("pas un csv").toString("base64"), marques: [] }))
   assert.equal(await readFile(f.intents, "utf8"), avant)

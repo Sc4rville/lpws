@@ -31,7 +31,7 @@ before(async () => {
   await mkdir(join(D, "specs"), { recursive: true })
   await mkdir(join(D, "tags", "v"), { recursive: true })
   await ecrireJson(f.meta, { client: C, source: "https://lptest.example/" })
-  await ecrireJson(f.ancres, [{ a: "e1", tag: "p", role: "text", text: "ancien texte" }])
+  await ecrireJson(f.ancres, [{ a: "e1", tag: "p", role: "text", text: "ancien texte" }, { a: "e2", tag: "p", role: "text", text: "autre texte" }])
 })
 after(async () => {
   await rm(join(ROOT, "clients", C), { recursive: true, force: true })
@@ -107,10 +107,26 @@ test("creerTest : ciblage et entrée invalides = 400 ; le verrou couvre toute la
 
 test("creerTest : variantes multi-éléments contrôlées (6 max, cible unique, destination exigée)", async () => {
   const e = (n: number) => Array.from({ length: n }, (_, i) => ({ anchor: "e" + (i + 1), text: "nouveau " + i }))
-  const refuse = (edits: any[]) => assert.rejects(creerTest(C, CAMP, { titre: "multi", pourquoi: "pour vérifier l’effet", edits }), (x: any) => x.code === 400)
+  const refuse = async (edits: any[]) => {
+    const testsAvant = await lireJson<Test[]>(f.tests, [])
+    const jobsAvant = jobs.size
+    await assert.rejects(creerTest(C, CAMP, { titre: "multi", pourquoi: "pour vérifier l’effet", edits }), (x: any) => x.code === 400)
+    assert.equal(jobs.size, jobsAvant)
+    assert.deepEqual(await lireJson<Test[]>(f.tests, []), testsAvant)
+  }
   await refuse(e(7))
   await refuse([{ anchor: "e1", text: "a" }, { anchor: "e1", op: "remove" }])
   await refuse([{ anchor: "e1", op: "move" }])
   await refuse([{ anchor: "e1", op: "swap", with: "e1" }])
   await refuse([{ anchor: "e1", op: "rewrite", text: "x" }])
+  await refuse([{ anchor: "e1", op: "move", after: "e9" }, { anchor: "e2", text: "b" }])
+  await refuse([{ anchor: "e1", op: "swap", with: "e9" }, { anchor: "e2", op: "duplicate", after: "e2" }])
+  await refuse([{ anchor: "e1", op: "duplicate", before: "e1" }])
+  const ok = await creerTest(C, CAMP, { titre: "multi ok", pourquoi: "pour vérifier l’effet", edits: [
+    { anchor: "e1", op: "set", text: "texte changé" },
+    { anchor: "e2", op: "move", after: "e1" },
+  ] })
+  await fin(ok.job.id)
+  const t = (await lireJson<Test[]>(f.tests, [])).find((x) => x.titre === "multi ok")
+  assert.ok(t && t.edits.length === 2)
 })

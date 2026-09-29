@@ -1472,7 +1472,7 @@ function apresRendu() {
   const c = S.ctx === 'home' ? null : byId(S.ctx);
   const recharger = async () => { await chargerEtat(); render(); };
   if (S.view === 'test' && c) { const t = c.tests.find(x => x.id === S.test); if (t && t.etat === 'prep' && t.job) suivreJob(t.job, recharger); }
-  if (S.view === 'intentions' && c && c.intentionsJob) suivreJob(c.intentionsJob.id, recharger);
+  if (S.view === 'intentions' && c && c.intentionsJob && c.intentionsJob.etat === 'en cours') suivreJob(c.intentionsJob.id, recharger);
   if (S.view === 'dash' && c && c.job) suivreJob(c.job, recharger);
   if (S.view === 'nouveau' && c) chargerTextes(c);
   if (S.view === 'audit' && S.auditJob && !S.auditRes) suivreJob(S.auditJob, j => { S.auditRes = j.resultat || null; S.auditErr = j.etat === 'ok' ? '' : (j.lignes || []).slice(-1)[0]; S.auditJob = null; if (S.view === 'audit') render(); });
@@ -1809,7 +1809,7 @@ function vIntentions(c) {
   const devise = a && a.source && a.source.devise ? a.source.devise : null;
   const routes = a ? a.routes : [];
   const intentions = Object.keys(INTENTIONS_LIB);
-  const statsInt = i => (a && a.parIntention && a.parIntention[i]) || { clics: 0, conversions: 0, routes: [] };
+  const statsInt = i => (a && a.parIntention && a.parIntention[i]) || { clics: 0, conversions: 0, routes: 0 };
   const jobEnCours = (c.intentionsJob && c.intentionsJob.etat === 'en cours') ? `<div id="job-zone" style="margin-top:6px">${jobBox(c.intentionsJob.id)}</div>` : '<div id="job-zone"></div>'
     + (c.intentionsJob && c.intentionsJob.etat === 'échec' ? `<div class="card" style="border-color:var(--bad);margin-top:6px"><p><b>La dernière écriture n’a pas abouti.</b> ${esc(((c.intentionsJob.lignes || []).slice(-1)[0]) || 'Détail dans le journal du job.')}</p></div>` : '')
     + (c.intentionsErreur ? `<div class="card" style="border-color:var(--bad);margin-top:6px"><p><b>Le rapport intentions est illisible :</b> ${esc(c.intentionsErreur)}</p></div>` : '');
@@ -1843,7 +1843,7 @@ function vIntentions(c) {
   const cartesInt = a ? `<div class="tests">${intentions.map(i => { const x = statsInt(i); const ok = routes.some(r => r.intention === i); return `<div class="tc" style="cursor:default">
       <div style="display:flex;gap:6px;align-items:center"><b style="flex:1">${INTENTIONS_LIB[i]}</b><span class="chip ${ok ? 'ok' : ''}">${ok ? fr(x.clics) + ' clics routables' : 'aucune route retenue'}</span></div>
       <div class="d">${x.conversions ? fr(x.conversions) + ' conversion' + (x.conversions > 1 ? 's' : '') + ' historique' + (x.conversions > 1 ? 's' : '') + ' sur les routes retenues' : 'Pas de conversion historique sur les routes retenues'}</div>
-      <div class="f">${ok && c.contexte && !c.intentionsJob ? GO(I.sparkle(14) + 'Proposer 3 variantes', `data-act="gen-intent" data-int="${i}"`) : `<button class="btn sm" disabled title="${!ok ? 'Aucune route validée pour cette intention : tranchez les mots-clés à l’étape 2' : !c.contexte ? 'Décrivez d’abord l’annonce pour que les variantes parlent la langue de la campagne' : 'LPWS écrit déjà pour cette page'}">${I.sparkle(14)}Proposer 3 variantes</button>`}${ok && !c.contexte ? `<button class="btn sm" data-go="view:campagne">Décrire l’annonce</button>` : ''}</div>
+      <div class="f">${ok && c.contexte && !(c.intentionsJob && c.intentionsJob.etat === 'en cours') ? GO(I.sparkle(14) + 'Proposer 3 variantes', `data-act="gen-intent" data-int="${i}"`) : `<button class="btn sm" disabled title="${!ok ? 'Aucune route validée pour cette intention : tranchez les mots-clés à l’étape 2' : !c.contexte ? 'Décrivez d’abord l’annonce pour que les variantes parlent la langue de la campagne' : 'LPWS écrit déjà pour cette page'}">${I.sparkle(14)}Proposer 3 variantes</button>`}${ok && !c.contexte ? `<button class="btn sm" data-go="view:campagne">Décrire l’annonce</button>` : ''}</div>
       ${ok ? `<input class="inp" id="gen-${i}" placeholder="Consigne facultative : ex. parler de la livraison" value="${esc(st.consignes[i] || '')}" style="margin-top:8px">` : ''}
     </div>`; }).join('')}</div>` : '';
 
