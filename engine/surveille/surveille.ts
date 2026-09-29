@@ -26,7 +26,7 @@ import { existsSync } from "node:fs"
 import { join, basename, dirname } from "node:path"
 import { createHash } from "node:crypto"
 import { auditer, PageInjoignable, type Audit } from "../audit/audit.ts"
-import { concordance, type Concordance } from "../variant/concordance.ts"
+import { accrocheReprise, concordance, type Concordance } from "../variant/concordance.ts"
 import { lancerNavigateur, nouvellePage, UA } from "../shared/navigateur.ts"
 import { step, fail } from "../shared/log.ts"
 import { estLance, lireArgs } from "../shared/cli.ts"
@@ -51,6 +51,8 @@ export type Releve = {
   /** empreinte de l'annonce au moment du relevé : pour voir qu'elle a changé */
   annonce: string | null
   concordance: Concordance | null
+  /** l'accroche de la créa est-elle reprise en haut de page ? null = pas de créa renseignée (absent des relevés anciens) */
+  accroche?: boolean | null
   /** null = aucun test en ligne, la question ne se pose pas */
   express: boolean | null
 }
@@ -83,7 +85,7 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
   const f = fichiersDe(campagneDir)
   const meta = await lireJson<{ source?: string } | null>(f.meta, null)
   if (!meta?.source) throw new Error(`${f.meta} sans URL source : copier la page d'abord`)
-  const ctx = await lireJson<{ annonce?: { titre: string; description?: string; motsCles?: string[] } } | null>(f.contexte, null)
+  const ctx = await lireJson<{ annonce?: { titre: string; description?: string; motsCles?: string[] }; crea?: { accroche: string } } | null>(f.contexte, null)
   const tests = await lireJson<Test[]>(f.tests, [])
   const enLigne = tests.some((t) => t.etat === "live")
 
@@ -117,8 +119,9 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
     quand, url: meta.source, statut: audit.statut,
     gclid: audit.constats.some((k) => k.id === "gclid" && k.niveau === "ok"), balises: audit.balises, lcpMs: audit.lcpMs,
     auditResume: audit.resume, hautDePage: haut, empreinte: hash(texteHaut),
-    annonce: ctx?.annonce ? hash(JSON.stringify(ctx.annonce)) : null,
+    annonce: ctx?.annonce ? hash(JSON.stringify(ctx.crea ? { ...ctx.annonce, crea: ctx.crea.accroche } : ctx.annonce)) : null,
     concordance: ctx?.annonce ? concordance(ctx.annonce, texteHaut) : null,
+    accroche: ctx?.crea ? accrocheReprise(ctx.crea.accroche, texteHaut) : null,
     express,
   }
 
@@ -139,6 +142,10 @@ export async function surveiller(campagneDir: string): Promise<{ releve: Releve;
   if (c && ((c.score < 0.4 && (!c0 || c0.score >= 0.4)) || (c0 && c0.score - c.score >= 0.2)))
     alerte("annonce-page", "attention", `L'annonce et la page ne se parlent plus (concordance ${Math.round(c.score * 100)} %)`,
       `${avant && avant.annonce !== releve.annonce ? "L'annonce a changé depuis le dernier relevé. " : ""}Absents du haut de page : ${[...c.motsClesAbsents, ...c.motsTitreAbsents].slice(0, 6).join(", ") || "—"}. Un test de titre qui reprend l'annonce est le premier à lancer.`)
+
+  if (releve.accroche === false && avant?.accroche !== false)
+    alerte("crea-page", "attention", "L'accroche de la créa n'est plus reprise en haut de la page",
+      `${avant && avant.annonce !== releve.annonce ? "La créa a changé depuis le dernier relevé. " : ""}« ${ctx!.crea!.accroche.slice(0, 80)} » : le visiteur ne retrouve pas ce qu'il vient de voir. Un test de titre qui reprend l'accroche est le premier à lancer.`)
 
   return consigner(releve)
 }

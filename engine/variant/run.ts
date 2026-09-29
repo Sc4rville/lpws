@@ -68,11 +68,13 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
 
   // 1. compter
   let m: SignauxMecaniques
-  // un cache d'avant un nouveau capteur ne passe plus le schéma : on recompte, on ne plante pas
-  const cache = opts.refaire ? null : await lireCache(SignauxMecaniques, f.signaux)
+  const date = async (x: string) => (await stat(x)).mtimeMs
+  // une capture plus récente que les signaux les périme ; un cache d'avant un nouveau capteur ne passe plus le schéma : on recompte, on ne plante pas
+  const recapture = existsSync(f.signaux) && await date(f.capture) > await date(f.signaux)
+  const cache = opts.refaire || recapture ? null : await lireCache(SignauxMecaniques, f.signaux)
   if (cache) { m = cache; step(SCOPE, "signaux : cache") }
   else {
-    if (!opts.refaire && existsSync(f.signaux)) step(SCOPE, "signaux : le cache date d'avant un nouveau capteur, on recompte")
+    if (!opts.refaire && existsSync(f.signaux)) step(SCOPE, recapture ? "signaux : la page a été recapturée depuis, on recompte" : "signaux : le cache date d'avant un nouveau capteur, on recompte")
     m = await timed(SCOPE, "signaux mécaniques (deux tailles d'écran)", () => extraireSignaux(base))
     await ecrireJson(f.signaux, m)
   }
@@ -82,7 +84,6 @@ export async function brain(campagne: string, opts: { refaire?: boolean; sansJug
   let j: SignauxJuges | null = null
   if (!opts.sansJugement) {
     // le jugement compare la page à l'annonce : une annonce ou une capture plus récente que lui le périme
-    const date = async (x: string) => (await stat(x)).mtimeMs
     const perime = existsSync(f.jugement) && Math.max(await date(f.contexte), await date(f.capture)) > await date(f.jugement)
     if (perime && !opts.refaire) step(SCOPE, "jugement : l'annonce ou la capture a changé depuis, on rejuge")
     j = opts.refaire || perime ? null : await lireCache(SignauxJuges, f.jugement)
