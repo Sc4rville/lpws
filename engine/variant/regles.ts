@@ -69,7 +69,7 @@ export const FAMILLES: Record<Famille, string> = {
 
 const j = (s: Signaux) => s.j
 const chiffreDans = (t: string) => /\d/.test(t)
-const CTA_GENERIQUE = /^(submit|send|soumettre|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok|go)$/i
+export const CTA_GENERIQUE = /^(submit|send|soumettre|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok|go)$/i
 
 /** Le déclencheur de chaque règle de regles.json, par id. */
 export const QUAND: Record<string, Quand> = {
@@ -98,7 +98,12 @@ export const QUAND: Record<string, Quand> = {
   "fr-formulaire-long": (s) => s.m.formulaire.present ? s.m.formulaire.champs >= 7 : false,
   "fr-telephone-obligatoire": (s) => s.m.formulaire.present ? s.m.formulaire.telephoneObligatoire : false,
   "fr-compte-obligatoire": () => null,
-  "fr-securite-paiement": (s) => s.m.prix.visible ? s.m.paiement.marqueurs.length === 0 : null,
+  // un prix affiché n'est pas un tunnel de paiement (la grille tarifaire d'un SaaS) : il faut un
+  // panier, un passage en caisse ou des champs de carte sur la page
+  "fr-securite-paiement": (s) => {
+    const t = s.m.paiement.tunnel
+    return t.panier || t.checkout || t.champsCarte ? s.m.paiement.marqueurs.length === 0 : false
+  },
   "fr-qualification-faible": (s, c) => c.vente === "commercial" && s.m.formulaire.present ? s.m.formulaire.champs <= 2 : null,
 
   /* ————— l'offre et le prix ————— */
@@ -163,8 +168,11 @@ export function chargerRegles(brut: unknown, quand: Record<string, Quand> = QUAN
 
 export const REGLES: Regle[] = chargerRegles(JSON.parse(readFileSync(new URL("./regles.json", import.meta.url), "utf8")))
 
-/** impact × preuve × pertinence ÷ risque, sur 100. La pertinence : niche et trafic. */
-export function score(r: Regle, c: Contexte): number {
-  const pertinence = r.niches.includes(nicheDe(c)) ? 1 : 0.4
-  return Math.round((r.impact * r.preuve * pertinence) / r.risque / 25 * 100)
+/** La règle vaut-elle pour cette page ? Ses niches déclarées, face à la niche du contexte. */
+export const pourNiche = (r: Pick<Regle, "niches">, c: Contexte): boolean => r.niches.includes(nicheDe(c))
+
+/** impact × preuve ÷ risque, sur 100. Une règle hors de sa niche ne devient jamais un constat
+ *  (diagnostic.ts, `horsNiche`) : il n'y a plus de pertinence à pondérer. */
+export function score(r: Regle): number {
+  return Math.round((r.impact * r.preuve) / r.risque / 25 * 100)
 }
