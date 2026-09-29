@@ -196,9 +196,9 @@ export async function creerTest(c: string, camp: string, entree: { titre: string
       metrique: "conversions Google Ads sur le trafic payant",
       risque: "test défini à la main par le media buyer : à relire avant lancement",
       diagnostic: { regle: "media-buyer", signal: `édition manuelle : ${v.data.titre}`, priorite: "MEDIUM", confiance: "Medium", preuve: "intuition du media buyer : pas de règle KB" },
-      edits: v.data.edits.map((e) => {
+      edits: v.data.edits.map((e, i) => {
         const emp = empreintes.find((x) => x.a === e.anchor)
-        return { ...e, pourquoi: v.data.pourquoi, ...(e.op === "duplicate" ? { as: "b" } : {}), ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
+        return { ...e, pourquoi: v.data.pourquoi, ...(e.op === "duplicate" ? { as: `copie${i}` } : {}), ...(emp ? { attendu: { role: emp.role, text: emp.text } } : {}) }
       }),
     }
     const specPath = fichiersDe(d).spec(id)

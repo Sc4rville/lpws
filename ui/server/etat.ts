@@ -7,6 +7,7 @@ import { lireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe, type Test, type Express } from "../../engine/shared/campagne.ts"
 import { ROOT, BASE_TAGS } from "./config.ts"
 import { jobs } from "./jobs.ts"
+import { VariantSpec } from "../../engine/apply/spec.ts"
 import { resumeCompte } from "./compte.ts"
 import { type Audit } from "../../engine/audit/audit.ts"
 import { historique as relevesDe, type Alerte } from "../../engine/surveille/surveille.ts"
@@ -75,7 +76,12 @@ export async function etat() {
       const signaux = await lireJson<SignauxMecaniques | null>(fichiersDe(d).signaux, null)
       // un test en échec libère sa proposition : le buyer peut la retenter après correction
       const dejaTests = new Set(tests.filter((t) => t.etat !== "echec").map((t) => t.id))
-      const propositions = (await lireJson<any[]>(fichiersDe(d).propositions, [])).filter((p) => !dejaTests.has(p.nom) && !p.refusee)
+      const propositions = await Promise.all((await lireJson<any[]>(fichiersDe(d).propositions, []))
+        .filter((p) => !dejaTests.has(p.nom) && !p.refusee)
+        .map(async (p) => {
+          const spec = VariantSpec.safeParse(await lireJson<unknown>(fichiersDe(d).spec(p.nom), null))
+          return { ...p, edits: spec.success ? spec.data.edits : [] }
+        }))
       const brainJob = [...jobs.values()].find((jb) => jb.type === "brain" && jb.etat === "en cours" && jb.campagne === d)
       const brainEnCours = !!brainJob
       const dernierBrain = [...jobs.values()].filter((jb) => jb.type === "brain" && jb.campagne === d).at(-1)
