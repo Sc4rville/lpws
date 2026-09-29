@@ -1298,7 +1298,7 @@ function vNouveau(c) {
   const mode = S.ntMode || 'propositions', custom = S.ntCustom || 'guide';
   const hero = liste?.find(x => x.anchor === m?.hero.titreAnchor);
   const cta = liste?.find(x => x.anchor === m?.ctas[0]?.anchor);
-  const preuve = m?.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre));
+  const preuve = m?.sections.find(x => x.preuve || /preuve|avis|client|témoignage|logo/i.test(x.titre));
   const destination = m?.sections.find(x => x.anchor !== preuve?.anchor);
   const rows = !LIVE ? `<div class="empty"><b>Démo sans serveur</b>${esc(SANS_SERVEUR)}</div>`
     : !liste ? '<div class="muted" id="nt-liste">Lecture de la page…</div>'
@@ -1934,7 +1934,7 @@ document.addEventListener('click', e => {
         const original = liste.find(x => x.anchor === anchor);
         if (original && texte && texte !== original.text) edits[anchor] = { op: 'set', text: texte };
       }
-      const preuve = m?.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre));
+      const preuve = m?.sections.find(x => x.preuve || /preuve|avis|client|témoignage|logo/i.test(x.titre));
       const cible = m?.sections.find(x => x.anchor !== preuve?.anchor);
       if (q.preuve && preuve && cible) edits[preuve.anchor] = { op: 'move', position: 'before', target: cible.anchor };
       if (!q.pourquoi || !Object.keys(edits).length) { document.getElementById('nt-err').textContent = 'Expliquez le test et changez au moins un élément.'; break; }

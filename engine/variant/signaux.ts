@@ -45,7 +45,7 @@ export const SignauxMecaniques = z.object({
   lisibilite: z.object({ mots: z.number(), motsParPhrase: z.number(), motsLongs: z.number() }),
   fonctionnalitesListees: z.number(),
   personnalisationIdentite: z.boolean(),
-  sections: z.array(z.object({ anchor: z.string(), y: z.number(), h: z.number(), titre: z.string() })),
+  sections: z.array(z.object({ anchor: z.string(), y: z.number(), h: z.number(), titre: z.string(), preuve: z.boolean().optional() })),
   /** ce qu'un acheteur cherche avant de payer (Baymard) ; et l'essai sans carte côté SaaS */
   commerce: z.object({
     ajoutPanier: z.object({ present: z.boolean(), anchor: z.string().optional(), texte: z.string(), y: z.number().nullable(), auDessusDuPliMobile: z.boolean() }),
@@ -208,7 +208,11 @@ export async function extraireSignaux(baseline: string): Promise<SignauxMecaniqu
       const lu = await page.evaluate(lirePage, viewport.height)
       // les bandes de haut niveau selon la MÊME géométrie que le juge : une <section> sémantique
       // porte une ancre e<n>, pas s<n> — un sélecteur sur « s » seul voyait 0 section sur ces pages
-      const sections = (await page.evaluate(bandesDuRendu)).map((b) => ({ ...b, titre: b.titre.slice(0, 80) }))
+      const bandes = await page.evaluate(bandesDuRendu)
+      const preuves = await page.evaluate((anchors) => anchors.filter((anchor) =>
+        !!document.querySelector(`[data-lpws="${anchor}"]`)?.querySelector('blockquote, [itemprop="review"], [class*="testimonial" i], [class*="review" i]')),
+        bandes.map((b) => b.anchor))
+      const sections = bandes.map((b) => ({ ...b, titre: b.titre.slice(0, 80), preuve: preuves.includes(b.anchor) }))
       return { ...lu, sections }
     }
     const [d, m, mesure, vitesse] = await Promise.all([
