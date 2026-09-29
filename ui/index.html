@@ -1896,8 +1896,13 @@ document.addEventListener('click', e => {
       if (!c) break;
       const k = c.diagnostic?.tests.find(x => x.id === act.dataset.regle), m = c.signaux;
       if (!k || !m) break;
+      const cta = k.id === 'sea-cta-generique'
+        ? m.ctas.find(x => /^(submit|send|soumettre|envoyer|en savoir plus|learn more|cliquez ici|click here|valider|ok|go)$/i.test(x.texte.trim()))
+        : k.id === 'sea-trop-de-ctas'
+          ? m.ctas.find((x, i) => i > 0 && x.auDessusDuPli) : m.ctas[0];
+      const section = k.id.startsWith('pr-') ? m.sections.find(x => /preuve|avis|client|témoignage|logo/i.test(x.titre)) : m.sections[0];
       const cible = k.test?.cible === 'titre' ? m.hero.titreAnchor : k.test?.cible === 'sous-titre' ? m.hero.sousTitreAnchor
-        : k.test?.cible === 'cta' ? m.ctas[0]?.anchor : k.test?.cible === 'nav' ? m.nav.anchor : m.sections[0]?.anchor;
+        : k.test?.cible === 'cta' ? cta?.anchor : k.test?.cible === 'nav' ? m.nav.anchor : section?.anchor;
       S.ntEdits = cible ? { [cible]: { op: k.test?.verbes?.[0] || 'set' } } : {};
       S.piste = k; S.ntTitre = k.action; S.ntWhy = k.pourquoi; S.view = 'nouveau'; render(); break;
     }
