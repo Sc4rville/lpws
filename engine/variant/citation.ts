@@ -37,7 +37,7 @@ const section = (x: SignauxMecaniques["sections"][number]) => el("section", x.ti
 const preuve = (m: SignauxMecaniques) => m.sections.find((x) => x.preuve)
 const libelles = (xs: Array<{ texte: string }>) => [...new Set(xs.map((x) => x.texte))]
 /** les chiffres tels que l'annonce les écrit (« 2x », « 14-day ») */
-const chiffresDe = (t: string) => [...new Set(t.match(/[^\s«»"'(),;:]*\d[^\s«»"'(),.;:]*/g) ?? [])]
+export const chiffresDe = (t: string) => [...new Set(t.match(/[^\s«»"'(),;:]*\d[^\s«»"'(),.;:]*/g) ?? [])]
 const annonce = (c: Contexte) => [c.annonce.titre, c.annonce.description].filter(Boolean).join(" / ")
 
 /** titre et sous-titre dans une phrase : « le titre « … » (e11) et le sous-titre « … » (e12) » */

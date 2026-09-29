@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { diagnostiquer } from "./diagnostic.ts"
+import type { SignauxJuges } from "./jugement.ts"
 import { Contexte } from "./contexte.ts"
 import { choisirPistes, ecrirePropositions, estMulti, type Refus } from "./variantes.ts"
 import type { SignauxMecaniques } from "./signaux.ts"
@@ -153,4 +154,35 @@ test("écriture : sans piste testable, rien n'est demandé au modèle", async ()
   assert.equal(variantes.length, 0)
   assert.equal(bilan.appels, 0)
   assert.match(bilan.manque!, /aucune piste testable/)
+})
+
+test("écriture : la piste n°1 refusée pour la forme est relancée avec l'erreur, et garde la multi-éléments", async () => {
+  // le jugement réel de Relay : le titre nomme une catégorie
+  const oui = { valeur: true, confiance: 0.9 }
+  const j: SignauxJuges = { promesseDansTitre: oui, titreType: { valeur: "categorie", confiance: 0.9 }, cadreDeReference: oui, niveauLecture: { valeur: "simple", confiance: 0.9 }, objectionsTraitees: oui, preuveAligneeCible: oui, ctaAligneVente: oui, risquePercuEleve: { valeur: false, confiance: 0.9 } }
+  const d = diagnostiquer({ m: relay(), j }, ctx)
+  assert.equal(d.tests[0].id, "vp-titre-categorie")
+  const multi = (titre: string) => v("vp-titre-categorie", titre, [
+    { anchor: "e11", text: "Answer customers 2x faster from one shared inbox" },
+    { anchor: "e13", text: "Start free trial" },
+    { anchor: "e67", text: "Start my free trial" },
+  ])
+  await repondre([
+    [multi("Le titre dit le résultat que l'équipe obtient, repris de l'annonce, avec les deux boutons alignés"),
+      v("sea-cta-generique", "Le bouton du formulaire dit ce qu'on obtient", [{ anchor: "e67", text: "Create my shared inbox" }]),
+      { ...v("st-nav-complete", "Sans menu", []), edits: [{ anchor: "e2", op: "remove", pourquoi: "moins de sorties" }] }],
+    [multi("Le titre promet 2x plus vite, les boutons disent l'essai")],
+  ])
+  const { variantes, bilan } = await ecrirePropositions(campagne, d.tests, relay(), ctx, "anglais")
+  assert.deepEqual(variantes.map((x) => [x.regle, x.ancres.length]), [["vp-titre-categorie", 3], ["sea-cta-generique", 1], ["st-nav-complete", 1]])
+  assert.equal(bilan.appels, 2)
+  assert.equal(bilan.manque, undefined)
+  // la multi-éléments demandée sur la piste n°1 : un résultat, le 2x de l'annonce, les deux boutons
+  assert.match(await prompt(0), /\[vp-titre-categorie\][^\n]*\n(?:   [^\n]*\n)*   MULTI-ÉLÉMENTS[^\n]*le titre \(e11\), le bouton principal \(e13\), le bouton du formulaire \(e67\)[^\n]*jamais une catégorie[^\n]*« 2x »/)
+  // la relance porte sur cette piste, avec l'erreur exacte, avant toute piste suivante
+  const p1 = await prompt(1)
+  assert.match(p1, /\[vp-titre-categorie\][\s\S]*MULTI-ÉLÉMENTS[\s\S]*À RÉPARER : [^\n]*hors contrat : [^\n]*titre/)
+  assert.doesNotMatch(p1, /\[(sea-motcle-titre|mm-chiffre-annonce|vp-niveau-lecture)\]/)
+  const refus: Refus[] = JSON.parse(await readFile(join(campagne, "variantes-refusees.json"), "utf8"))
+  assert.deepEqual(refus.map((r) => [r.regle, r.reparable]), [["vp-titre-categorie", true]])
 })
