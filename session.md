@@ -17,6 +17,8 @@
   exigée avant lancement ; une piste du diagnostic présélectionne sa cible (bouton générique, preuve…).
   Décliner : chaque proposition donne à la demande 3 autres versions du même test (bouton « Décliner », `--decliner`).
   « Pas celui-là » prend un motif ; les refus du client sont relus à chaque écriture (textes refusés interdits).
+  Constats cités (texte exact + ancre, `citation.ts`), `rang` explicite, règles hors niche écartées
+  (`horsNiche`), 3 propositions visées avec au moins une multi-éléments, sinon `ecriture.manque` dit pourquoi.
 - **Mesure** : GA4 par fenêtre de test, un seul moteur stats (`engine/measure/stats.ts`, embarqué
   aussi dans l'UI), journal des expériences, « Peut-on conclure ? ».
 - **Modules business** : audit tracking, surveillance, compte/paliers/mandats, rapport client, coûts.
