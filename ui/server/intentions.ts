@@ -54,11 +54,17 @@ export function publicDisponible(): boolean {
   try {
     const u = new URL(process.env.LPWS_URL_PUBLIQUE ?? "")
     if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) return false
-    const h = u.hostname.toLowerCase()
-    if (h === "localhost" || h.endsWith(".localhost") || /^\d+\.\d+\.\d+\.\d+$/.test(h)
-      || h === "::1" || h === "[::1]" || /^\[(0:)+1\]$/.test(h)) return false
-    if (/^10\.|^127\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\.|^0\./.test(h)) return false
-    if (/^(fe80:|fc|fd)/i.test(h)) return false
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "")
+    if (h === "localhost" || h.endsWith(".localhost")) return false
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(h)) {
+      const [a, b] = h.split(".").map(Number)
+      if (a === 10 || a === 127 || a === 0 || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)) return false
+      return true
+    }
+    if (h.includes(":")) {
+      if (h === "::1" || h === "0:0:0:0:0:0:0:1" || /^fe[89ab]/i.test(h) || /^f[cd]/i.test(h)) return false
+      return true
+    }
     return true
   } catch { return false }
 }

@@ -6,7 +6,7 @@ import { basename, join } from "node:path"
 import { ecrireJson, lireJson } from "../../engine/shared/json.ts"
 import { campagne as fichiersDe } from "../../engine/shared/campagne.ts"
 import { ROOT } from "./config.ts"
-import { etatIntentions, importerIntentions, deciderIntentions, connecter, authentifierSync, synchroniserCorps, simuler, propositionIntentions } from "./intentions.ts"
+import { etatIntentions, importerIntentions, deciderIntentions, connecter, authentifierSync, synchroniserCorps, simuler, propositionIntentions, publicDisponible } from "./intentions.ts"
 
 let C = "", D = "", f: ReturnType<typeof fichiersDe>, JETON = ""
 const CAMP = "search"
@@ -114,4 +114,32 @@ test("connexion refusée sans instance publique", async () => {
   delete process.env.LPWS_URL_PUBLIQUE
   await assert.rejects(connecter(C, CAMP, { compte: "1234567890", campagnes: ["1"] }), (e: any) => e.code === 409)
   process.env.LPWS_URL_PUBLIQUE = "https://lpws.example.com"
+})
+
+test("rotation du jeton : l’ancien est révoqué, le nouveau seul fonctionne", async () => {
+  const vieux = JETON
+  const r = await connecter(C, CAMP, { compte: "1234567890", campagnes: ["111", "222"] })
+  JETON = r.script.match(/LPWS_JETON = "([a-f0-9]{64})"/)![1]
+  assert.notEqual(JETON, vieux)
+  await assert.rejects(synchroniserCorps(C, CAMP, Buffer.from("{}"), vieux), (e: any) => e.code === 401)
+  await assert.rejects(synchroniserCorps(C, CAMP, Buffer.from(JSON.stringify({
+    source: { fichier: "s.json", format: "csv-script", langue: "en", compte: "1234567890" },
+    importeLe: new Date().toISOString(), ignorees: 0, termes: [],
+  })), JETON), (e: any) => e.code === 429)
+})
+
+test("publicDisponible : domaines fc/fd légitimes et IPv4 publics acceptés, privés refusés", async () => {
+  const orig = process.env.LPWS_URL_PUBLIQUE
+  const cas: [string, boolean][] = [
+    ["https://lpws.example.com", true], ["https://fd-exemple.fr", true], ["https://fc.example.net", true],
+    ["https://8.8.8.8", true], ["https://192.168.1.1", false], ["https://10.0.0.1", false],
+    ["https://127.0.0.1", false], ["https://localhost", false], ["https://app.localhost", false],
+    ["https://[::1]", false], ["https://[fe80::1]", false], ["https://[fd00::1]", false],
+    ["http://lpws.example.com", false], ["https://u:p@lpws.example.com", false], ["https://lpws.example.com/?x=1", false],
+  ]
+  for (const [u, attendu] of cas) {
+    process.env.LPWS_URL_PUBLIQUE = u
+    assert.equal(publicDisponible(), attendu, u)
+  }
+  process.env.LPWS_URL_PUBLIQUE = orig
 })
